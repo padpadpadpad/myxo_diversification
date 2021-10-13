@@ -19,7 +19,7 @@ diversification of Myxobacteria in natural environments.
       - [ ] Scripts uploaded
       - [ ] Bought primers uploaded
   - [x] Samples 16S sequenced **(May 2021)**
-      - [ ] Processed data uploaded
+      - [x] Processed data uploaded
       - [ ] Analysis scripts uploaded
       - [ ] Clustering analysis to look at habitat separation and
         potential definitions
@@ -29,7 +29,7 @@ diversification of Myxobacteria in natural environments.
       - [ ] Processed data uploaded
       - [ ] Exploratory analysis scripts
 
-## To use and folder structure
+## To use
 
 The GitHub repo should be super easy to use on everyone’s machine using
 RStudio projects. RStudio projects automatically assigns the root
@@ -43,9 +43,47 @@ obvious reasons. The sequencing data is stored as
 [phyloseq](https://joey711.github.io/phyloseq/) objects and should be
 easy to query.
 
-  - `data` includes the processed data from each part of the project.
-    `sequencing_16s` contains the data for the 16s sequencing etc.
-  - `plots` includes the plots from each part of the project so far.
-    `sequencing_16s` contains the plots for the 16s sequencing etc.
-  - `scripts` includes the scripts from each part of the project so far.
-    `sequencing_16s` contains the scripts for the 16s sequencing etc.
+## Folder structure
+
+### data
+
+**data** includes the processed data from each part of the project.
+`sequencing_16s` contains the data for the 16s sequencing etc.
+
+  - **metadata.csv** - completed metadata for each sample
+  - **sequencing 16s** - folder containing data from the 16s sequencing
+
+<!-- end list -->
+
+1.  `ps_16s_complete.rds` - the original phyloseq object from the
+    processing pipeline
+2.  `ps_16s_prev_filtered.rds` - low abundance and low prevalence ASVs
+    removed
+3.  `ps_16s_low_depth_removed.rds` - low depth samples removed **no
+    samples were too low here**
+4.  `ps_16s_rarefied.rds` - rarefied samples
+
+### scripts
+
+**scripts** includes the scripts from each part of the project so far.
+`sequencing_16s` contains the scripts for the 16s sequencing etc. At the
+top of each script there is a summary of what has been done in each
+script. Order of scripts to be run is the same as numbered here.
+
+  - **sequencing\_16s**
+
+<!-- end list -->
+
+1.  `prevalence_filtering.R`
+2.  `rarefy_data.R`
+3.  `first_clustering.R`
+4.  `second_clustering.R`
+
+<!-- end list -->
+
+  - **sequencing\_rpoB**
+
+### plots
+
+**plots** includes the plots from each part of the project so far.
+`sequencing_16s` contains the plots for the 16s sequencing etc.
