@@ -4,9 +4,10 @@
 
 # what does this script do
 
-# 1. removes any ASVs not assigned to at least the phylum level
-# 2. removes low prevalence ASVs - defined as present in <5% samples and a total read abundance <200
-# 3. saves out objects and plots some phylogenetic trees
+# 1. fixes metadata
+# 2. removes any ASVs not assigned to at least the phylum level
+# 3. removes low prevalence ASVs - defined as present in <5% samples and a total read abundance <200
+# 4. saves out objects and plots some phylogenetic trees
 
 # load packages
 library(patchwork)
@@ -25,6 +26,10 @@ path_fig <- 'plots/sequencing_16s'
 ps <- readRDS('data/sequencing_16s/ps_16s_complete.rds')
 
 sample_names(ps)
+
+#----------------------------#
+# 1. fix metadata for 16s ####
+#----------------------------#
 
 # replace with new metadata
 meta_new <- read.csv('data/metadata.csv', stringsAsFactors = FALSE)
@@ -55,7 +60,7 @@ psraw_tree <- plot_tree(ps, method = "treeonly",
                         title = "Raw tree")
 
 #-----------------------------------#
-# 1. remove poorly assigned ASVs ####
+# 2. remove poorly assigned ASVs ####
 #-----------------------------------#
 
 # remove NA characterisation
@@ -103,7 +108,7 @@ ggplot(prevdf1, aes(total_abundance, prevalence / nsamples(ps0),color=Phylum)) +
 ggsave(file.path(path_fig, 'prevalence_phyla_plot.pdf'), last_plot(), height = 10, width = 13)
 
 #----------------------------#
-# 2. prevalence filtering ####
+# 3. prevalence filtering ####
 #----------------------------#
 
 # delete things under 5% prevalence
@@ -134,7 +139,7 @@ ps_genus_tree <- plot_tree(ps_genus, ladderize="left",
 ps_genus_tree
 
 #----------------------#
-# 3. plot all trees ####
+# 4. plot all trees ####
 #----------------------#
 
 # plot side by side

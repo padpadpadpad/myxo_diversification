@@ -20,8 +20,8 @@ diversification of Myxobacteria in natural environments.
       - [ ] Bought primers uploaded
   - [x] Samples 16S sequenced **(May 2021)**
       - [x] Processed data uploaded
-      - [ ] Analysis scripts uploaded
-      - [ ] Clustering analysis to look at habitat separation and
+      - [x] Analysis scripts uploaded
+      - [x] Clustering analysis to look at habitat separation and
         potential definitions
       - [ ] Data archived and backed up
   - [ ] Samples amplicon sequenced to amplify rpoB gene **(October
@@ -51,6 +51,8 @@ easy to query.
 `sequencing_16s` contains the data for the 16s sequencing etc.
 
   - **metadata.csv** - completed metadata for each sample
+  - **sample\_cluster\_assignments.csv** - cluster assignments for each
+    sample based on 16S clustering.
   - **sequencing 16s** - folder containing data from the 16s sequencing
 
 <!-- end list -->
@@ -74,10 +76,12 @@ script. Order of scripts to be run is the same as numbered here.
 
 <!-- end list -->
 
-1.  `prevalence_filtering.R`
-2.  `rarefy_data.R`
-3.  `first_clustering.R`
-4.  `second_clustering.R`
+1.  `prevalence_filtering.R` - removes low prevalence ASVs
+2.  `rarefy_data.R` - rarefies data and sets root to tree
+3.  `first_clustering.R` - runs initial PCoA plot to look at differences
+    between habitats
+4.  `second_clustering.R` - runs cleaned PCoA and clustering analysis to
+    identify habitat clusters in the data.
 
 <!-- end list -->
 
