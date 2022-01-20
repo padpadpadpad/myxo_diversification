@@ -65,6 +65,24 @@ easy to query.
     samples were too low here**
 4.  `ps_16s_rarefied.rds` - rarefied samples
 
+<!-- end list -->
+
+  - **sequencing\_rpoB** - folder containing data from the rpoB
+    sequencing
+
+<!-- end list -->
+
+1.  `alignments` - folder containing the alignments of myxobacteria
+    reads after clustering at different levels of OTU similarity and
+    prevalence filtering
+2.  `raxml` - the trees of each level of OTU similarity. To see the
+    meaning of the output files see the [raxml-ng help
+    page](https://github.com/amkozlov/raxml-ng/wiki/Output:-files-and-settings).
+    Rooted trees (myxo\_asv.raxml.bestTreeRooted) were made in R using
+    `ape::root` and has only been done for the asv tree so far.
+    `_LogLik.txt` files show the log likelihood of all the trees
+    outputted by the raxml command.
+
 ### scripts
 
 **scripts** includes the scripts from each part of the project so far.
