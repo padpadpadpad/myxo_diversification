@@ -73,14 +73,14 @@ correct_eigenvalues[1:2]
 cols <- tibble(group = c("woodland_oak", "estuarine mud_low polyhaline", "woodland_pine", "reservoir", "river", "estuarine mud_oligohaline", "estuarine mud_full saline", "beach_supratidal", "pasture", "beach_subtidal","thrift_rhizosphere","beach_seaweed","field_wheat","rock_samphire","marine mud_full saline"),
                col = c('#089a2d', '#995a08', '#106c12', '#1170bd', '#9dcdf4', '#663c05', '#b6966b', '#f5e279', '#61dd1e', '#f2f426', '#c5f8ae', '#a6ab52', '#9ff121', '#5e8128', '#714a03'),
                hab_order = c(1.1, 2.1, 1.2, 3.1, 3.2, 2.2, 2.3, 2.4, 1.3, 2.5, 2.6, 2.7, 1.4, 1.5, 2.8))
-cols <- filter(cols, group != 'thrift_rhizosphere') %>% arrange(hab_order)
+cols <- cols %>% arrange(hab_order)
 
 # plot PCoA
 p1 <- ggplot() +
   geom_point(aes(PCoA1, PCoA2, col = group, shape = location),d_fig$eigenvector) +
   geom_point(aes(PCoA1, PCoA2, col = group), d_fig$centroids, size = 5, show.legend = FALSE) +
   geom_segment(aes(x = PCoA1.x, y = PCoA2.x, yend = PCoA2.y, xend = PCoA1.y, group = sample, col = group), betadisper_lines) +
-  theme_bw(base_size = 14) +
+  #theme_bw(base_size = 14) +
   theme(strip.background = element_blank(),
         strip.text = element_text(hjust = 0, size = 12),
         legend.position = 'right') +
@@ -91,6 +91,15 @@ p1 <- ggplot() +
 
 ggsave(file.path(path_fig, 'ordination_16S.pdf'), p1, width = 10, height = 7)
 ggsave(file.path(path_fig, 'ordination_16S.png'), p1, width = 10, height = 7)
+
+p1 + MicrobioUoE::theme_black(base_size = 24) +
+  theme(plot.background = element_rect(fill = '#404040', color = '#404040'),
+        panel.background = element_rect(fill = '#404040'),
+        legend.position = "none",
+        panel.grid.major = element_blank())
+  
+ggsave(file.path(path_fig, 'ordination_16S_presentation.pdf'), last_plot(), width = 10, height = 7)
+
 
 #-----------------------------------------------------#
 # 2. look at pairwise differences between habitats ####

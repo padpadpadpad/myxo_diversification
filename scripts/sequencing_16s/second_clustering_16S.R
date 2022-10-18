@@ -133,20 +133,24 @@ ggsave(file.path(path_fig, 'ordination_axis_split.pdf'), last_plot(), width = 12
 
 # plot PCoA
 p1 <- ggplot() +
-  geom_point(aes(PCoA1, PCoA2, col = group, shape = location),d_fig$eigenvector) +
+  geom_point(aes(PCoA1*-1, PCoA2, col = group, shape = location),d_fig$eigenvector) +
   #ggrepel::geom_label_repel(aes(PCoA1, PCoA2, col = habitat, label = id), data = to_label) +
-  geom_point(aes(PCoA1, PCoA2, col = group), d_fig$centroids, size = 3, show.legend = FALSE) +
-  geom_segment(aes(x = PCoA1.x, y = PCoA2.x, yend = PCoA2.y, xend = PCoA1.y, group = sample, col = group), betadisper_lines) +
+  geom_point(aes(PCoA1*-1, PCoA2, col = group), d_fig$centroids, size = 5, show.legend = FALSE) +
+  geom_segment(aes(x = PCoA1.x*-1, y = PCoA2.x, yend = PCoA2.y, xend = PCoA1.y*-1, group = sample, col = group), betadisper_lines) +
   theme_bw(base_size = 14) +
   theme(strip.background = element_blank(),
         strip.text = element_text(hjust = 0, size = 12),
         legend.position = 'right') +
   scale_color_manual('Habitat', values = setNames(cols$col, cols$group)) +
-  labs(x = 'Habitat',
-       y = 'Eigenvector')
-
+  labs(y = 'Axis 2 (14.24%)',
+       x = 'Axis 1 (34.69%)')
 ggsave(file.path(path_fig, 'ordination_16S_clean.pdf'), p1, width = 10, height = 7)
 ggsave(file.path(path_fig, 'ordination_16S_clean.png'), p1, width = 10, height = 7)
+
+p1 + theme_bw(base_size = 24) +
+  theme(legend.position = 'none')
+
+ggsave(file.path(path_fig, 'ordination_16S_clean_presentation.pdf'), last_plot(), width = 10, height = 7)
 
 # look at pairwise differences between groups
 # pairwise permanovas
@@ -234,6 +238,21 @@ p3 <- ggplot() +
   facet_wrap(~method)
 
 ggsave(file.path(path_fig, 'partition_clustering.png'), p3, width = 10, height = 5)
+
+ggplot(filter(d_clustering, method == 'nbclust')) +
+  geom_segment(aes(x = PCoA1.x*-1, y = PCoA2.x, yend = PCoA2.y, xend = PCoA1.y*-1, group = sample, col = cluster), filter(d_lines, method == 'nbclust'), show.legend = TRUE) +
+  geom_point(aes(PCoA1*-1, PCoA2, fill = cluster), show.legend = FALSE, shape = 21, col = 'white') +
+  geom_point(aes(PCoA1*-1, PCoA2, fill = cluster), shape = 21, col = 'white', filter(d_centroids, method == 'nbclust'), size = 5, show.legend = FALSE)  +
+  theme(strip.background = element_blank(),
+        strip.text = element_text(hjust = 0, size = 12)) +
+  labs(y = 'Axis 2 (14.24%)',
+       x = 'Axis 1 (34.69%)') +
+  theme_bw(base_size = 24) +
+  theme( legend.position = "none") +
+  scale_fill_manual(values = c('sienna4', 'green4', '#1E90FE')) +
+  scale_color_manual(values = c('sienna4', 'green4', '#1E90FE'))
+
+ggsave(file.path(path_fig, 'clustering_presentation.pdf'), last_plot(), width = 10, height = 7)
 
 ggplot(d_gap, aes(k, gap)) +
   geom_line() +
