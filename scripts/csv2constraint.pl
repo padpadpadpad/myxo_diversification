@@ -53,10 +53,15 @@ LINE: while(<$fh>) {
 # print output
 print '(';
 my @taxa;
-for my $taxon ( keys %constraints ) {
+TAXON: for my $taxon ( keys %constraints ) {
   my $t;
-  if ( $taxon eq 'NA' and $comprehensive ) {
-    $t = join ',', @{ $constraints{$taxon} };
+  if ( $taxon eq 'NA' ) {
+    if ( $comprehensive ) {
+      $t = join ',', @{ $constraints{$taxon} };
+    }
+    else {
+      next TAXON;
+    }
   }
   else {
     if ( scalar(@{ $constraints{$taxon} }) > 1 ) {
