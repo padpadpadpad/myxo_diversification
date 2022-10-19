@@ -5,9 +5,9 @@ mrca = all otu_outgroup1 otu_5324
 min = all 1
 max = all 1
 outfile = myxo_treepl.tree
-opt = 1
-optad = 1
-optcvad = 1 [set the autodiff cross validation based optimizer]
+opt = 5
+optad = 5
+optcvad = 3 [set the autodiff cross validation based optimizer]
 [cv]
 [randomcv] [designate that you want to do random sampled cross validation]
 [cvoutfile = mxyo_support_tbe_figtree_cv.out]
@@ -21,6 +21,6 @@ cvsimaniter = 20000 [the number of cross validation simulated annealing iteratio
 plsimaniter = 200000 [the number of penalized likelihood simulated annealing iterations, default = 5000]
 [log_pen] [rate penalty will use log instead of additive function]
 seed = 42 [seed for random number generator, default = clock]
-[thorough]
-prime
+thorough
+[prime]
 [moredetailcvad]
