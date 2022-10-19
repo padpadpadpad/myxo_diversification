@@ -54,14 +54,19 @@ LINE: while(<$fh>) {
 print '(';
 my @taxa;
 for my $taxon ( keys %constraints ) {
+  my $t;
   if ( $taxon eq 'NA' and $comprehensive ) {
-    my $t = join ',', @{ $constraints{$taxon} };
-    push @taxa, $t;
+    $t = join ',', @{ $constraints{$taxon} };
   }
   else {
-    my $t = '(' . join(',', @{ $constraints{$taxon} }) . ')' . $taxon;
-    push @taxa, $t;
+    if ( scalar(@{ $constraints{$taxon} }) > 1 ) {
+      $t = '(' . join(',', @{ $constraints{$taxon} }) . ')';
+    }
+    else {
+      $t = $constraints{$taxon}->[0];
+    }
   }
+  push @taxa, $t;
 }
 print join ',', @taxa;
 print ');';
