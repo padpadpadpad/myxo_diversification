@@ -7,16 +7,18 @@ use Getopt::Long;
 
 # process command line arguments
 my $infile;
+my $comprehensive;
 my $otus = 'tip_label'; # which column has the OTU labels
 my $taxon = 'family'; # which column has the higher taxon
 GetOptions(
-  'infile=s' => \$infile,
-  'otus=s'   => \$otus,
-  'taxon=s'  => \$taxon,
+  'infile=s'      => \$infile,
+  'otus=s'        => \$otus,
+  'taxon=s'       => \$taxon,
+  'comprehensive' => \$comprehensive,
 );
 
 # initialize data structure
-my %constraints;
+my %constraints = ( 'NA' => [] );
 
 # start reading file
 my @header;
@@ -43,7 +45,6 @@ LINE: while(<$fh>) {
   }
   
   # postprocess
-  next LINE if $record{$taxon} eq 'NA';
   my $name = $record{$taxon};
   $constraints{$name} = [] if not $constraints{$name};
   push @{ $constraints{$name} }, $record{$otus};
@@ -53,8 +54,14 @@ LINE: while(<$fh>) {
 print '(';
 my @taxa;
 for my $taxon ( keys %constraints ) {
-  my $t = '(' . join(',', @{$constraints{$taxon}}) . ')' . $taxon;
-  push @taxa, $t;
+  if ( $taxon eq 'NA' and $comprehensive ) {
+    my $t = join ',', @{ $constraints{$taxon} };
+    push @taxa, $t;
+  }
+  else {
+    my $t = '(' . join(',', @{ $constraints{$taxon} }) . ')' . $taxon;
+    push @taxa, $t;
+  }
 }
 print join ',', @taxa;
 print ');';
