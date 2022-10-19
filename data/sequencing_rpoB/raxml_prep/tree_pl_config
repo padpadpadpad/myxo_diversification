@@ -1,0 +1,26 @@
+treefile = raxml_mle_rooted.tre
+smooth = 10
+numsites = 246
+mrca = all otu_outgroup1 otu_5324
+min = all 1
+max = all 1
+outfile = myxo_treepl.tree
+opt = 1
+optad = 1
+optcvad = 1 [set the autodiff cross validation based optimizer]
+[cv]
+[randomcv] [designate that you want to do random sampled cross validation]
+[cvoutfile = mxyo_support_tbe_figtree_cv.out]
+[cvstart = .0001] [set where you want to start cross validation, default = 1000]
+[cvstop = 10000] [set where you want to stop cross validation, default = 0.1]
+[cvmultstep = 0.1]
+nthreads = 2 [number of threads]
+cviter = 2 [the number of cross validation total optimization iterations, default = 2]
+pliter = 10 [the number of penalized likelihood total optimization iterations, default = 2]
+cvsimaniter = 20000 [the number of cross validation simulated annealing iterations, default = 5000]
+plsimaniter = 200000 [the number of penalized likelihood simulated annealing iterations, default = 5000]
+[log_pen] [rate penalty will use log instead of additive function]
+seed = 42 [seed for random number generator, default = clock]
+[thorough]
+prime
+[moredetailcvad]
