@@ -3,7 +3,7 @@ use strict;
 use warnings;
 use Getopt::Long;
 
-# usage: perl csv2constraint.pl -i ../data/sequencing_rpoB/raxml_prep/asv_metadata_filtered.csv > ../data/sequencing_rpoB/raxml_prep/contree.tre 
+# usage: perl csv2constraint.pl -i ../data/sequencing_rpoB/raxml_prep/asv_metadata_filtered.csv -c > ../data/sequencing_rpoB/raxml_prep/contree.tre 
 
 # process command line arguments
 my $infile;
