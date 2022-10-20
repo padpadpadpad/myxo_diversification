@@ -46,27 +46,27 @@ Substitution Matrix: GTR
 
 RAxML was called as follows:
 
-raxml -m GTRGAMMA -n rpoBcontree -s ../data/sequencing_rpoB/raxml_prep/alignment_myxo_97.7percent_new.fasta -p 1 -g ../data/sequencing_rpoB/raxml_prep/contree.tre -T 6 
+raxml -m GTRGAMMA -n rpoBcontree -s alignment_myxo_97.7percent_new.fasta -p 1 -g contree.tre -T 6 
 
 
 Partition: 0 with name: No Name Provided
 Base frequencies: 0.183 0.347 0.313 0.157 
 
-Inference[0]: Time 2509.169547 GAMMA-based likelihood -116913.742020, best rearrangement setting 25
-alpha[0]: 0.310023 rates[0] ac ag at cg ct gt: 0.553008 2.628732 3.187179 4.209919 6.027365 1.000000 
+Inference[0]: Time 5363.898014 GAMMA-based likelihood -112930.609181, best rearrangement setting 25
+alpha[0]: 0.367305 rates[0] ac ag at cg ct gt: 0.516780 2.626699 3.085017 4.031007 5.744100 1.000000 
 
 
 Conducting final model optimizations on all 1 trees under GAMMA-based models ....
 
-Inference[0] final GAMMA-based Likelihood: -116913.132701 tree written to file /Users/rutger/Documents/local-projects/myxo_diversification/scripts/RAxML_result.rpoBcontree
+Inference[0] final GAMMA-based Likelihood: -112929.970634 tree written to file /Users/rutger/Documents/local-projects/myxo_diversification/data/sequencing_rpoB/raxml_prep/RAxML_result.rpoBcontree
 
 
-Starting final GAMMA-based thorough Optimization on tree 0 likelihood -116913.132701 .... 
+Starting final GAMMA-based thorough Optimization on tree 0 likelihood -112929.970634 .... 
 
-Final GAMMA-based Score of best tree -116910.537244
+Final GAMMA-based Score of best tree -112929.544501
 
-Program execution info written to /Users/rutger/Documents/local-projects/myxo_diversification/scripts/RAxML_info.rpoBcontree
-Best-scoring ML tree written to: /Users/rutger/Documents/local-projects/myxo_diversification/scripts/RAxML_bestTree.rpoBcontree
+Program execution info written to /Users/rutger/Documents/local-projects/myxo_diversification/data/sequencing_rpoB/raxml_prep/RAxML_info.rpoBcontree
+Best-scoring ML tree written to: /Users/rutger/Documents/local-projects/myxo_diversification/data/sequencing_rpoB/raxml_prep/RAxML_bestTree.rpoBcontree
 
-Overall execution time: 2629.172668 secs or 0.730326 hours or 0.030430 days
+Overall execution time: 5477.780648 secs or 1.521606 hours or 0.063400 days
 
