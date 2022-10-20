@@ -1,10 +1,10 @@
-treefile = raxml_mle_rooted.tre
-smooth = 1
+treefile = rerooted-pruned.tre
+smooth = 10
 numsites = 246
-mrca = all otu_outgroup1 otu_5324
+mrca = all otu_378_Polyangiaceae otu_4884_Anaeromyxobacteraceae
 min = all 1
 max = all 1
-outfile = myxo_treepl_smooth1.tree
+outfile = myxo_treepl_smooth10.tree
 opt = 5
 optad = 5
 optcvad = 3 [set the autodiff cross validation based optimizer]
@@ -14,7 +14,7 @@ optcvad = 3 [set the autodiff cross validation based optimizer]
 [cvstart = .0001] [set where you want to start cross validation, default = 1000]
 [cvstop = 10000] [set where you want to stop cross validation, default = 0.1]
 [cvmultstep = 0.1]
-nthreads = 2 [number of threads]
+nthreads = 6 [number of threads]
 cviter = 2 [the number of cross validation total optimization iterations, default = 2]
 pliter = 10 [the number of penalized likelihood total optimization iterations, default = 2]
 cvsimaniter = 20000 [the number of cross validation simulated annealing iterations, default = 5000]
