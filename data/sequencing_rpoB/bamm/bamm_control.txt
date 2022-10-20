@@ -16,7 +16,7 @@
 modeltype = speciationextinction        
 # Specify "speciationextinction" or "trait" analysis
                                   
-treefile = myxo_treepl_fzb.tree
+treefile = myxo_treepl_smooth10.tree
 # File name of the phylogenetic tree to be analyzed
 
 runInfoFilename = run_info.txt
