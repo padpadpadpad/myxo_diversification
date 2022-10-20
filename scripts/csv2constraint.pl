@@ -2,76 +2,49 @@
 use strict;
 use warnings;
 use Getopt::Long;
+use Text::CSV 'csv';
+use Bio::Phylo::Factory;
+use Bio::Phylo::IO 'parse_tree';
 
-# usage: perl csv2constraint.pl -i ../data/sequencing_rpoB/raxml_prep/asv_metadata_filtered.csv -c > ../data/sequencing_rpoB/raxml_prep/contree.tre 
+# usage: perl csv2constraint.pl -i asv_metadata_filtered.csv -b  backbone.tre > contree.tre 
 
 # process command line arguments
 my $infile;
-my $comprehensive;
+my $backbone;
 my $otus = 'tip_label'; # which column has the OTU labels
 my $taxon = 'family'; # which column has the higher taxon
 GetOptions(
-  'infile=s'      => \$infile,
-  'otus=s'        => \$otus,
-  'taxon=s'       => \$taxon,
-  'comprehensive' => \$comprehensive,
+  'infile=s'   => \$infile,
+  'otus=s'     => \$otus,
+  'taxon=s'    => \$taxon,
+  'backbone=s' => \$backbone,
 );
 
-# initialize data structure
-my %constraints = ( 'NA' => [] );
+# instantiate Factory
+my $fac = Bio::Phylo::Factory->new;
 
-# start reading file
-my @header;
-open my $fh, '<', $infile or die $!;
-LINE: while(<$fh>) {
-  chomp;
-  
-  # read header on first iteration
-  if ( not @header ) {
-    my @cols = split /,/, $_;
-    for my $name ( @cols ) {
-      $name =~ s/"//g;
-      push @header, $name;
-    }
-    next LINE;
+# read $backbone
+my $tree = parse_tree(
+  '-format' => 'newick',
+  '-file'   => $backbone,
+);
+
+# read $infile
+my $csv = csv(
+  'in'      => $infile,
+  'headers' => 'auto',
+);
+
+# expand terminals
+for my $tip ( @{ $tree->get_terminals } ) {
+  my $name = $tip->get_name;
+  for my $otu ( grep { $_->{$taxon} eq $name } @$csv ) {
+    $tip->set_child( $fac->create_node( '-name' => $otu->{$otus} ) );
   }
-  
-  # read record
-  my %record;
-  my @record = split /,/, $_;
-  for my $i ( 0 .. $#record ) {
-    $record[$i] =~ s/"//g;
-    $record{$header[$i]} = $record[$i];
-  }
-  
-  # postprocess
-  my $name = $record{$taxon};
-  $constraints{$name} = [] if not $constraints{$name};
-  push @{ $constraints{$name} }, $record{$otus};
 }
+
+# raxml doesn't like nested 1-degree nodes
+$tree->remove_unbranched_internals;
 
 # print output
-print '(';
-my @taxa;
-TAXON: for my $taxon ( keys %constraints ) {
-  my $t;
-  if ( $taxon eq 'NA' ) {
-    if ( $comprehensive ) {
-      $t = join ',', @{ $constraints{$taxon} };
-    }
-    else {
-      next TAXON;
-    }
-  }
-  else {
-    if ( scalar(@{ $constraints{$taxon} }) > 1 ) {
-      $t = '(' . join(',', @{ $constraints{$taxon} }) . ')';
-    }
-    else {
-      $t = $constraints{$taxon}->[0];
-    }
-  }
-  push @taxa, $t;
-}
-print join ',', @taxa;
-print ');';
+print $tree->to_newick;
