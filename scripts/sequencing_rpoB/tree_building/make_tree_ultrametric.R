@@ -2,7 +2,6 @@
 
 library(phytools)
 
-
 # read in tree
 tree <- read.tree('data/sequencing_rpoB/treepl/myxo_treepl_smooth10.tree')
 
