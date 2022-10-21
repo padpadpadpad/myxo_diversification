@@ -420,6 +420,8 @@ We can look at diversification rates change through time to see if diversificati
 #| fig.height: 5
 #| fig.width: 12
 
+plotRateThroughTime(edata)
+
 # get rate through time estimates
 rtt <- getRateThroughTimeMatrix(edata)
 
