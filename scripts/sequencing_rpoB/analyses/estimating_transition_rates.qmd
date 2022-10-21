@@ -398,7 +398,7 @@ custom_matrix
 # lets try refit the model with these parameters fixed to zero
 ancestral_states_ape3 <- ace(hab_pref, tree, model=custom_matrix, type="discrete")
 
-saveRDS(ancestral_states_ape3, here('sequencing_rpoB/data/processed/ancestral_states/ancestral_states_ape3.rds'))
+saveRDS(ancestral_states_ape3, here('data/sequencing_rpoB/processed/transition_rates/ancestral_states_ape3.rds'))
 ```
 
 We can now try and refit the $Mk$ model to the tree and habitat preference data, but using our custom transition matrix.
@@ -406,7 +406,7 @@ We can now try and refit the $Mk$ model to the tree and habitat preference data,
 ```{r ape_2_load}
 #| echo: false
 
-ancestral_states_ape3 <- readRDS(here('sequencing_rpoB/data/processed/ancestral_states/ancestral_states_ape3.rds'))
+ancestral_states_ape3 <- readRDS(here('data/sequencing_rpoB/processed/transition_rates/ancestral_states_ape3.rds'))
 ```
 
 ```{r ape_2_norun}
@@ -460,33 +460,7 @@ ace_transition_df(ancestral_states_ape3) %>%
   scale_color_manual(values = c('black', 'red'))
 ```
 
-The black boxes with 0 in are rates that we fixed to be 0. However we can see that lots of estimated rates still returned 0 after fitting this new model.
-
-We will now remove these and once again see if the model fit is better.
-
-These transitions are:
-
--   mud and shore/terrestrial to freshwater
-
--   generalist to freshwater/mud and shore
-
--   mud and shore/terrestrial to freshwater/mud and shore
-
--   terrestrial to freshwater/mud and shore
-
--   mud and shore/terrestrial to freshwater/terrestrial
-
--   mud and shore/terrestrial to generalist
-
--   freshwater to mud and shore/terrestrial
-
--   freshwater/terrestrial to mud and shore/terrestrial
-
--   generalist to mud and shore
-
--   freshwater/mud and shore to terrestrial
-
--   generalist to terrestrial
+The black boxes with 0 in are rates that we fixed to be 0. There are now no other rates that are 0. We will remove the next lowest rate to see whether its presence significantly improves the model fit. This is freshwater + terrestrial to marine mud + terrestrial.
 
 ```{r custom_matrix2}
 custom_matrix
@@ -495,7 +469,7 @@ custom_matrix
 custom_matrix2 <- custom_matrix
 
 # set some more rates to 0
-custom_matrix2[custom_matrix2 %in% c(5, 8, 10, 11, 15, 18, 21, 23, 24, 27, 29)] <- 0
+custom_matrix2[custom_matrix2 %in% c(25)] <- 0
 
 # replace values of non-zeroes with correct vector of 1:n parameters
 custom_matrix2[custom_matrix2 != 0] <- 1:length(custom_matrix2[custom_matrix2 != 0])
@@ -507,7 +481,7 @@ custom_matrix2[custom_matrix2 != 0] <- 1:length(custom_matrix2[custom_matrix2 !=
 # lets try refit the model with these parameters fixed to zero
 ancestral_states_ape4 <- ace(hab_pref, tree, model=custom_matrix2, type="discrete")
 
-saveRDS(ancestral_states_ape4, here('sequencing_rpoB/data/processed/ancestral_states/ancestral_states_ape4.rds'))
+saveRDS(ancestral_states_ape4, here('data/sequencing_rpoB/processed/transition_rates/ancestral_states_ape4.rds'))
 ```
 
 ```{r ape_3_load}
@@ -537,192 +511,7 @@ arrange(mod_compare, aic)
 
 ```
 
-We have improved the model again with the second custom matrix. We can have a look at the rate matrix again as before.
-
-```{r plot_transition_matrix2}
-#| fig.height: 5
-#| fig.width: 7
-
-# plot transition matrix
-ace_transition_df(ancestral_states_ape4) %>%
-  left_join(., select(coding, state_1 = hab_pref, state_1_num = hab_pref_num2, state_1_label = hab_pref_axis)) %>%
-  left_join(., select(coding, state_2 = hab_pref, state_2_num = hab_pref_num2, state_2_label = hab_pref_axis)) %>%
-  mutate(transition_rate = round(transition_rate, 2)) %>%
-  ggplot(., aes(forcats::fct_reorder(state_2_label, state_2_num), forcats::fct_reorder(state_1_label, desc(state_1_num)))) +
-  geom_tile(aes(alpha = transition_rate, col = free_param), width = 0.9, height = 0.9, size = 1.1) +
-  theme_bw(base_size = 14) +
-  theme(panel.grid.major = element_blank(),
-  legend.position = 'none',
-  axis.text.x.top = element_text(angle = 90, vjust = 0.5),
-  plot.title.position = "plot") +
-  scale_alpha_continuous(range = c(0, 0.6)) +
-  geom_text(aes(label = transition_rate), size = MicrobioUoE::pts(10)) +
-  scale_x_discrete(position = 'top', labels = scales::label_wrap(13)) +
-  scale_y_discrete(position = 'left', labels = scales::label_wrap(13)) +
-  labs(y = 'state 1',
-  x = 'state 2',
-  title = paste('all rates different with', length(custom_matrix2[custom_matrix2 != 0]), 'free parameters', sep = ' ')) +
-  coord_fixed() +
-  scale_color_manual(values = c('black', 'red'))
-```
-
-As you can see we now have only one estimated transition rates that is (close to) zero (7th row first column)!
-
-We will remove the smallest this transition rate to see if the model improves with it compared to without it. That one is mud and shore/terrestrial to freshwater.
-
-```{r custom_matrix3}
-custom_matrix2
-
-custom_matrix3 <- custom_matrix2
-custom_matrix3[custom_matrix3 %in% c(4)] <- 0
-
-# replace values of non-zeroes with correct vector of 1:n parameters
-custom_matrix3[custom_matrix3 != 0] <- 1:length(custom_matrix3[custom_matrix3 != 0])
-```
-
-```{r ape_4_save}
-#| eval: false
-#| echo: false
-
-# lets try refit the model with these parameters fixed to zero
-ancestral_states_ape5 <- ace(hab_pref, tree, model=custom_matrix3, type="discrete")
-
-saveRDS(ancestral_states_ape5, here('sequencing_rpoB/data/processed/ancestral_states/ancestral_states_ape5.rds'))
-
-```
-
-```{r ape_4_load}
-#| echo: false
-ancestral_states_ape5 <- readRDS(here('sequencing_rpoB/data/processed/ancestral_states/ancestral_states_ape5.rds'))
-```
-
-```{r ape_4_norun}
-#| eval: false
-
-# lets try refit the model with these parameters fixed to zero
-ancestral_states_ape5 <- ace(hab_pref, tree, model=custom_matrix3, type="discrete")
-```
-
-```{r ape_4_compare}
-# compare the less complicated model with the more complicated model
-anova(ancestral_states_ape5, ancestral_states_ape4)
-
-# check AIC of each model
-mod_compare <- tibble(mod = c('ER', 'SYM', 'ARD', 'ancestral_states_ape3', 'ancestral_states_ape4', 'ancestral_states_ape5'),
-               aic = c(AIC(ancestral_states_ape), AIC(ancestral_states_ape1), AIC(ancestral_states_ape2), AIC(ancestral_states_ape3),AIC(ancestral_states_ape4), AIC(ancestral_states_ape5)))
-
-arrange(mod_compare, aic)
-
-```
-
-The model is better with this transition set to 0 (just). We will now remove the next smallest transition rates and see how it changes the model fit.
-
-That is mud and shore to mud and shore/terrestrial.
-
-```{r custom_matrix4}
-custom_matrix4 <- custom_matrix3
-
-custom_matrix4[custom_matrix4 %in% c(16)] <- 0
-
-# replace values of non-zeroes with correct vector of 1:n parameters
-custom_matrix4[custom_matrix4 != 0] <- 1:length(custom_matrix4[custom_matrix4 != 0])
-```
-
-```{r ape_5_save}
-#| echo: false
-#| eval: false
-
-# lets try refit the model with these parameters fixed to zero
-ancestral_states_ape6 <- ace(hab_pref, tree, model=custom_matrix4, type="discrete")
-
-saveRDS(ancestral_states_ape6, here('sequencing_rpoB/data/processed/ancestral_states/ancestral_states_ape6.rds'))
-```
-
-```{r ape_5_load}
-#| echo: false
-
-ancestral_states_ape6 <- readRDS(here('sequencing_rpoB/data/processed/ancestral_states/ancestral_states_ape6.rds'))
-```
-
-We rerun the model with the latest custom transition matrix.
-
-```{r ape_5_norun}
-#| eval: false
-
-# lets try refit the model with these parameters fixed to zero
-ancestral_states_ape6 <- ace(hab_pref, tree, model=custom_matrix4, type="discrete")
-
-```
-
-We can do model comparison again.
-
-```{r ape_5_compare}
-# compare the less complicated model with the more complicated model
-anova(ancestral_states_ape6, ancestral_states_ape5)
-
-# check AIC of each model
-mod_compare <- tibble(mod = c('ER', 'SYM', 'ARD', 'ancestral_states_ape3', 'ancestral_states_ape4', 'ancestral_states_ape5', 'ancestral_states_ape6'),
-               aic = c(AIC(ancestral_states_ape), AIC(ancestral_states_ape1), AIC(ancestral_states_ape2), AIC(ancestral_states_ape3),AIC(ancestral_states_ape4), AIC(ancestral_states_ape5), AIC(ancestral_states_ape6)))
-
-arrange(mod_compare, aic)
-
-```
-
-This parameter is really close to being significant. The model (based on AIC) is actually worse here. So it might be worth keeping that term in when we run a MuHiSSE model. But for this exercise we will remove it and go to the next smallest parameter.
-
-That is mud and shore to freshwater/mud and shore.
-
-```{r custom_matrix5}
-# input the rates into the custom matrix
-custom_matrix5 <- custom_matrix4
-
-custom_matrix5[custom_matrix5 %in% c(6)] <- 0
-
-# replace values of non-zeroes with correct vector of 1:n parameters
-custom_matrix5[custom_matrix5 != 0] <- 1:length(custom_matrix5[custom_matrix5 != 0])
-```
-
-```{r ape_6_save}
-#| echo: false
-#| eval: false
-
-# lets try refit the model with these parameters fixed to zero
-ancestral_states_ape7 <- ace(hab_pref, tree, model=custom_matrix5, type="discrete")
-
-saveRDS(ancestral_states_ape7, here('sequencing_rpoB/data/processed/ancestral_states/ancestral_states_ape7.rds'))
-
-```
-
-```{r ape_6_load}
-#| echo: false
-
-# lets try refit the model with these parameters fixed to zero
-ancestral_states_ape7 <- readRDS(here('sequencing_rpoB/data/processed/ancestral_states/ancestral_states_ape7.rds'))
-
-```
-
-```{r ape_6_norun}
-#| eval: false
-
-# lets try refit the model with these parameters fixed to zero
-ancestral_states_ape7 <- ace(hab_pref, tree, model=custom_matrix5, type="discrete")
-
-```
-
-```{r ape_6_compare}
-# compare the less complicated model with the more complicated model
-anova(ancestral_states_ape7, ancestral_states_ape6)
-
-# check AIC of each model
-mod_compare <- tibble(mod = c('ER', 'SYM', 'ARD', 'ancestral_states_ape3', 'ancestral_states_ape4', 'ancestral_states_ape5', 'ancestral_states_ape6', 'ancestral_states_ape7'),
-               aic = c(AIC(ancestral_states_ape), AIC(ancestral_states_ape1), AIC(ancestral_states_ape2), AIC(ancestral_states_ape3),AIC(ancestral_states_ape4), AIC(ancestral_states_ape5), AIC(ancestral_states_ape6), AIC(ancestral_states_ape7)))
-
-arrange(mod_compare, aic)
-```
-
-We have a winner after model simplification (according to likelihood ratio tests)!
-
-The best model is `ancestral_states_ape6`.
+So this parameter is super important in the model. So our best model is **ancestral_states_ape3**.
 
 ## Estimate ancestral states with castor::asr_mk_model()
 
@@ -732,14 +521,14 @@ We will only fit the model with the best custom transition matrix to compare est
 
 ```{r acr_castor}
 # rename best transition matrix for using it later
-best_matrix <- custom_matrix4
+best_matrix <- custom_matrix
 
 rownames(best_matrix) <- colnames(best_matrix) <- sort(coding$hab_pref)
 
-saveRDS(best_matrix, here('sequencing_rpoB/data/processed/best_matrix_mk.rds'))
+saveRDS(best_matrix, here('data/sequencing_rpoB/processed/transition_rates/best_matrix_mk.rds'))
 
 # get dataframe of transition matrix
-d_best_matrix <- ace_transition_df(ancestral_states_ape6) %>%
+d_best_matrix <- ace_transition_df(ancestral_states_ape3) %>%
   left_join(., select(coding, state_1 = hab_pref, state_1_num = hab_pref_num2, state_1_label = hab_pref_axis)) %>%
   left_join(., select(coding, state_2 = hab_pref, state_2_num = hab_pref_num2, state_2_label = hab_pref_axis)) %>%
   mutate(transition_rate = round(transition_rate, 2)) 
@@ -870,7 +659,7 @@ best_matrix_estimates <- select(d_best_matrix, state_1, state_2, transition_rate
 diag(best_matrix_estimates) <- -rowSums(best_matrix_estimates)
 ```
 
-We can now run **make.simmap()** on our tree. We will run it for 1000 simulations, albeot this returns an object that is 3.9GB!
+We can now run **make.simmap()** on our tree. We will run it for 100 simulations for now to reduce object space.
 
 ```{r acr_phytools_save}
 #| eval: false
@@ -878,16 +667,16 @@ We can now run **make.simmap()** on our tree. We will run it for 1000 simulation
 
 # do stochastic mapping of character traits using phytools
 # feed in the best transition matrix previously found using other methods
-ancestral_states_phytools <- make.simmap(tree, hab_pref, nsim = 1000, Q = best_matrix_estimates)
+ancestral_states_phytools <- make.simmap(tree, hab_pref, nsim = 100, Q = best_matrix_estimates)
 
-saveRDS(ancestral_states_phytools, here("sequencing_rpoB/data/processed/ancestral_states_phytools.rds"))
+saveRDS(ancestral_states_phytools, here("data/sequencing_rpoB/processed/transition_rates/simmap.rds"))
 
 ```
 
 ```{r acr_phytools_load}
 #| echo: false
 
-ancestral_states_phytools <- readRDS(here("sequencing_rpoB/data/processed/ancestral_states_phytools.rds"))
+ancestral_states_phytools <- readRDS(here("data/sequencing_rpoB/processed/transition_rates/simmap.rds"))
 
 ```
 
@@ -1026,10 +815,10 @@ We can plot the best transition matrix using **ggplot2**.
 #| fig.width: 7
 
 # rename best transition matrix for using it later
-best_matrix <- custom_matrix4
+best_matrix <- custom_matrix
 
 # get dataframe of transition matrix
-d_best_matrix <- ace_transition_df(ancestral_states_ape6) %>%
+d_best_matrix <- ace_transition_df(ancestral_states_ape3) %>%
   left_join(., select(coding, state_1 = hab_pref, state_1_num = hab_pref_num2, state_1_label = hab_pref_axis)) %>%
   left_join(., select(coding, state_2 = hab_pref, state_2_num = hab_pref_num2, state_2_label = hab_pref_axis)) %>%
   mutate(transition_rate = round(transition_rate, 2)) 
@@ -1053,8 +842,7 @@ ggplot(d_best_matrix, aes(forcats::fct_reorder(state_2_label, state_2_num), forc
   coord_fixed() +
   scale_color_manual(values = c('black', 'red'))
 
-ggsave(here('sequencing_rpoB/plots/analyses/ace_transition_matrix.pdf'), last_plot(), height = 7, width = 8)
-ggsave(here('sequencing_rpoB/plots/analyses/ace_transition_matrix.png'), last_plot(), height = 7, width = 8)
+ggsave(here('plots/sequencing_rpoB/analyses/transition_matrix.png'), last_plot(), height = 6, width = 8)
 
 ```
 
@@ -1084,12 +872,11 @@ First need to change our transition matrix into a network.
 
 ```{r make_network_data}
 #| fig-height: 6
-#| fig-width: 7
+#| fig-width: 8
 
 # calculate mean time spent in each state
 d_timespent <- group_by(d_time, state) %>%
   summarise(mean = mean(prop), .groups = 'drop')
-
 
 # turn transition matrix into network to plot
 d_network <- as_tbl_graph(select(d_best_matrix, state_1, state_2, transition_rate)) %>%
@@ -1118,7 +905,7 @@ p <- ggraph(d_network, layout = 'linear', circular = TRUE) +
   theme_void() +
   #geom_node_label(aes(label = label, x=xmin), repel = TRUE) +
   scale_size(range = c(2,20)) +
-  scale_edge_width(range = c(0.5, 2)) +
+  scale_edge_width(range = c(0.25, 3)) +
   scale_color_manual('Habitat preference', values = cols_hab, labels = c('terrestrial', 'freshwater', 'marine mud', 'generalist')) +
 scale_fill_manual('Habitat preference', values = cols_hab, labels = c('terrestrial', 'freshwater', 'marine mud', 'generalist'))
 
@@ -1136,8 +923,8 @@ p + geom_label(aes(nudge_x + x, nudge_y+y, label = label), point_data, size = Mi
   xlim(c(min(point_data$x) + min(point_data$nudge_x) - 0.3), max(point_data$x) + max(point_data$nudge_x) + 0.3) +
   ylim(c(min(point_data$y) + min(point_data$nudge_y) - 0.1), max(point_data$y) + max(point_data$nudge_y) + 0.1)
 
-ggsave(here('sequencing_rpoB/plots/analyses/transition_plot.pdf'), last_plot(), height = 6, width = 8)
-ggsave(here('sequencing_rpoB/plots/analyses/transition_plot.png'), last_plot(), height = 6, width = 8)
+#ggsave(here('sequencing_rpoB/plots/analyses/transition_plot.pdf'), last_plot(), height = 6, width = 8)
+ggsave(here('plots/sequencing_rpoB/analyses/transition_plot.png'), last_plot(), height = 6, width = 8)
 
 
 ```
