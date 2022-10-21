@@ -1,0 +1,689 @@
+---
+title: "Exploring rates of speciation in the tree using BAMM"
+author: "Daniel Padfield"
+date: last-modified
+format:
+  html:
+    toc: true
+    toc-depth: 2
+    toc-title: 'Contents'
+    code-overflow: wrap
+    code-fold: true
+    code-tools: true
+    self-contained: true
+    self-contained-math: true
+execute:
+  message: false
+  warning: false
+  fig.align: 'center'
+editor: visual
+---
+
+## Outline
+
+This walk-through goes through the analysis of a BAMM run on our phylogenetic tree, which is short for Bayesian Analysis of Macroevolutionary Mixtures. This model identifies changes in speciation, extinction, and diversification rates on a tree without any knowledge of tip states or traits, and identifies the most likely number of transitions, where they are likely to occur, and outputs a bunch of other useful things.
+
+From the online documentation of BAMM, we are following [Section 8](http://bamm-project.org/postprocess.html#bammtools): Analysing BAMM Output with BAMMtools. We have previously ran **bamm** on our tree. *Input information about that run here.*
+
+## Progress and Results
+
+-   We have plotted all the "core" shifts on the whole of the phylogenetic tree
+-   Currently running bamm for the fourth time to check convergence
+-   Identifies lots of shifts, but all of them have low probability
+-   Best model has at \~35 shifts
+-   Have identified areas with a high density of potential shifts
+
+## Possibilities
+
+-   Macroevolutionary cohort analysis. An introduction to this is [here](http://bamm-project.org/rateshifts.html#analysis-of-rate-shifts-in-the-bamm-framework) and explained in more detail [here](https://academic.oup.com/sysbio/article/63/4/610/2848733?login=false).
+-   Can get an estimate of evolutionary rate through time and also tip specific diversification rates. Not sure what these could be used for.
+-   Do we need to re-run the model at different levels of sampled diversity to check if the results are robust?
+
+## Load in R packages
+
+First we will load in R packages used and the metadata file used and wrangled in a previous walk-through.
+
+```{r load_packages}
+#| results: false
+
+# load packages
+library(here)
+library(caper)
+library(tidyverse)
+library(ggtree)
+library(ggnewscale)
+library(RColorBrewer)
+library(patchwork)
+library(ape)
+library(phytools)
+library(BAMMtools)
+library(coda)
+library(MetBrewer)
+library(fastdivrate) # remotes::install_github("jonchang/fastdivrate")
+library(brms)
+library(nlme)
+library(emmeans)
+
+# set where I am in the project
+here::i_am('scripts/sequencing_rpoB/analyses/post_bamm_analysis.qmd')
+
+# read in metadata
+d_meta <- read.csv(here('data/sequencing_rpoB/processed/asv_metadata.csv'))
+
+# read in habitat trait colours
+cols_hab <- readRDS(here('data/sequencing_rpoB/processed/habitat_colours.rds'))
+
+```
+
+## Lineage through time plot
+
+First we will look at a lineage through time plot of our ultrametric phylogenetic tree.
+
+```{r ltt}
+#| fig.height: 5
+#| fig.width: 7
+
+# load in tree
+tree <- read.tree(here('data/sequencing_rpoB/bamm/rerooted-pruned-chronopl10.tre'))
+
+# check is rooted
+is.rooted(tree)
+
+# check is ultrametric
+is.ultrametric(tree)
+
+# create lineage through time plot
+ape::ltt.plot(tree)
+
+```
+
+## Assess convergence of BAMM run
+
+First we will assess convergence of our MCMC simulation.
+
+```{r bamm_check_convergence}
+# read in mcmc output from bamm
+mcmcout <- read.csv(here("data/sequencing_rpoB/bamm/bamm_1_mcmc_out.txt"), header=TRUE)
+max(mcmcout$generation)
+
+# discard some runs as burnin. We will discard the first 10% of samples
+burnstart <- floor(0.1 * nrow(mcmcout))
+postburn <- mcmcout[burnstart:nrow(mcmcout), ]
+
+# calculate effective sample size
+effectiveSize(postburn$N_shifts)
+effectiveSize(postburn$logLik)
+```
+
+In general, we want the effective sample size values to be at least 200 (and 200 is on the low side, but might be reasonable for very large datasets). Both are now over well over 200 here so that is good. We have re-ran the results a few times but never for this number of iterations. We are currently re-running the analysis again with a wider prior to see how that helps convergence. This run was 31,920,000 iterations.
+
+Next we can look at the number of potential rate shifts.
+
+```{r check_rate_shifts}
+#| fig.height: 4
+#| fig.width: 6
+
+post_probs <- table(postburn$N_shifts) / nrow(postburn)
+names(post_probs)
+
+edata <- getEventData(tree, eventdata = here('data/sequencing_rpoB/bamm/bamm_1_event_data.txt'), burnin = 0.1)
+shift_probs <- summary(edata)
+
+# plot these
+ggplot(shift_probs, aes(shifts, prob)) +
+  geom_col(col = 'black', fill = 'light grey') +
+  theme_bw(base_size = 14) +
+  labs(x = 'Number of shifts',
+       y = 'Probability')
+
+# calculate 95% CIs for the number of shifts
+n_shifts_ci <- tibble(mean_shifts = mean(postburn$N_shifts),
+                      lower_ci = quantile(postburn$N_shifts, 0.025),
+                      upper_ci = quantile(postburn$N_shifts, 0.975))
+n_shifts_ci
+
+```
+
+This looks like it has converged, but also there is a huge range of potential values and the 95% credible intervals of the number of range shifts is huge!
+
+The maintainers or BAMM suggest that (usually) the best overall model from a BAMM analysis is the model with the highest Bayes factor relative to the null model, $M_{0}$, which has zero rate shifts. However, we do not have any samples of zero shifts in our postburn in sample `r min(postburn$N_shifts)`! However, we do have zero shifts in our preburn-in samples as can be seen here `r min(mcmcout$N_shifts)`.
+
+We can therefore calculate Bayes factors from the `mcmc_out.txt` file. We are not going to have a burnin because otherwise we cannot sample the example of zero shifts.
+
+Bayes factors greater than 20 generally imply strong evidence for one model over another; values greater than 50 are very strong evidence in favour of the numerator model. There is no definitive Bayes factor criterion for "significance", but many researchers consider values greater than 12 to be consistent with at least some effect.
+
+```{r bamm_bayes_factors}
+# list file
+mcmc_file = here("data/sequencing_rpoB/bamm/bamm_1_mcmc_out.txt")
+
+# calculate Bayes Factors
+bayes_factors <- computeBayesFactors(mcmc_file, expectedNumberOfShifts=500, burnin=0)
+
+# grab the columns for pairwise comparisons between 0 shifts and number of shifts
+d_bayes_factors <- bayes_factors[,1] %>%
+  data.frame() %>%
+  rownames_to_column(var = 'n_shifts') %>%
+  rename(., bayes_factor = `.`)
+
+# we can rank bayes factors and then find the the difference between these
+d_bayes_factors <- arrange(d_bayes_factors, desc(bayes_factor)) %>%
+  mutate(diff = c(0, abs(diff(bayes_factor))),
+         cum_diff = cumsum(diff))
+
+head(d_bayes_factors)
+```
+
+We can see only 3 models have a Bayesfactor within 20 of the best model, which gives us a set of 4 models, indicating we have between 27 and 35 rate shifts on the tree.
+
+**BAMMtools** also has a function for visualizing the prior and posterior simultaneously. This is useful to see what models are not being sampled in the posterior, and also to evaluate how far from the prior the posterior has moved.
+
+```{r plot_prior_posterior}
+#| fig.height: 5
+#| fig.width: 7
+# use plotPrior to visualise the prior and posterior simultaneously
+plotPrior(mcmcout, expectedNumberOfShifts=500)
+
+```
+
+We can see that our posterior distribution has shifted from the prior which further reinforces our conclusion that the model has converged.
+
+## Plotting results from bamm model
+
+We can now try and plot the mean, model-average diversification rates at any point along every branch of a phylogenetic tree. The standard code to do this takes so long to run that right we will not evaluate the code.
+
+```{r plot_diversification_rates}
+#| eval: false
+
+plot.bammdata(edata, lwd=2)
+```
+
+We can calculate the credible shift set that is the set of distinct shift configurations that account for 95% of the probability of the data. Core shifts are those that contribute appreciably to your ability to model the data. Non-core shifts are simply ephemeral shifts that don't really contribute anything: they are simply what you expect under the prior distribution for rate shifts across the tree.
+
+```{r credible_shift_sets}
+#| fig.height: 7
+#| fig.width: 8
+
+# calculate credible shift set
+d_css <- credibleShiftSet(edata, expectedNumberOfShifts = 500, threshold = 5, set.limit = 0.95)
+
+# number of distinct configurations in the data
+d_css$number.distinct
+
+# view more information about the credible set
+summary(d_css)
+
+# can plot this credible shift set
+plot.credibleshiftset(d_css)
+
+```
+
+However, as can be seen from the summary, even the single best shift configuration has a really low posterior probability (\<0.005). It also picks a model with only 4 core shifts, despite the lower 95%CI of numbers of shifts being 14. So to me this means that although the best model has \~35 shifts and the minimum 95%CI of shifts is 14, lots of those shifts are in non-core positions most of the time.
+
+For some datasets with large numbers of taxa and rate shifts (e.g., trees with thousands of taxa), all shift configurations may have low probability. There are simply too many parameters in the model to allow a single shift configuration to dominate the credible set. An alternative approach is to extract the shift configuration that maximises the marginal probability of rate shifts along individual branches. This is very similar to the idea of a maximum clade credibility tree in phylogenetic analysis. BAMM has a function `maximumShiftCredibility` for extracting this shift configuration:
+
+```{r max_clade_cred}
+#| fig.height: 6
+#| fig.width: 7
+
+# calculate max shift credibility
+msc_set <- maximumShiftCredibility(edata, maximize='product')
+
+# grab the best configuration and plot it
+msc_config <- subsetEventData(edata, index = msc_set$sampleindex)
+plot.bammdata(msc_config, lwd=2)
+addBAMMshifts(msc_config, cex = 2)
+```
+
+This picks a model with just 8 rate shifts over the whole tree.
+
+We can try and plot these shifts using ggtree. First we will look at the distribution of speciation rates across the tree. We need to be careful about our colour scale to prevent it being misleading.
+
+Here we also change the tip labels of our tree so they rematch with those from our metadata.
+
+```{r plot_ggtree_prep}
+#| fig.height: 5
+#| fig.width: 12
+
+# get mean phylorates that underly the colorised plot produced by plot.bammdata
+# from here: https://groups.google.com/g/bamm-project/c/W6s38xzm6OU/m/LALF47xVS54J
+#mbt <- getMeanBranchLengthTree(edata, rate = "speciation")
+
+# get the mean branch lengths from the best tree configuration as identified from maximumShiftCredibility 
+mbt2 <- getMeanBranchLengthTree(msc_config, rate = "ndr")
+
+# get shift nodes from "best model"
+shiftnodes <- getShiftNodesFromIndex(edata, index = msc_set$sampleindex)
+
+# get tree
+tree_bamm <- mbt2$phy
+
+# remove family name from the tip label
+d_labels <- data.frame(tip_label = tree_bamm$tip.label) %>%
+  separate(., tip_label, c('part1', 'part2', 'part3'), sep = '_', remove = FALSE) %>%
+  unite('tip_label_new', c(part1, part2), sep = '_')
+
+tree_bamm$tip.label <- d_labels$tip_label_new
+
+# get the edge lengths in a dataframe
+d_tree_bamm <- data.frame(tree_bamm$edge, edge_num=1:nrow(tree_bamm$edge), edge_length = tree_bamm$edge.length)
+colnames(d_tree_bamm)=c("parent", "node", "edge_num", 'edge_length')
+
+# transform these to log for the colour scale
+d_tree_bamm <- mutate(d_tree_bamm, log_edge_length = log(edge_length))
+
+# visualise edge lengths that represent speciation rates of each branch
+# similar to visualising colour breaks http://bamm-project.org/colorbreaks.html#how-do-i-plot-these-histograms
+p1 <- ggplot(d_tree_bamm, aes(edge_length)) +
+  geom_histogram(col = 'black', fill = 'light grey') +
+  theme_bw()
+
+p2 <- ggplot(d_tree_bamm, aes(log(edge_length))) +
+  geom_histogram(col = 'black', fill = 'light grey') +
+  theme_bw()
+
+p1 + p2
+```
+
+We will use the log edge lengths/rates of diversification because they result in a more even spread of diversification rates across a range of values.
+
+Now we can plot the tree.
+
+```{r plot_ggtree}
+#| fig.height: 12
+#| fig.width: 12
+# remove any tip labels not in our tree from d_meta
+d_meta <- filter(d_meta, tip_label %in% tree_bamm$tip.label)
+
+# plot tree using ggtree
+# first colour branches and add rate shifts
+p1 <- ggtree(tree_bamm, layout = 'circular', branch.length = 'none', aes(col = log_edge_length)) %<+% d_tree_bamm +
+scale_color_gradientn('Net diversification', colors = met.brewer(name='Hiroshige', direction=-1, override.order = F), breaks=c(min(d_tree_bamm$log_edge_length, na.rm = TRUE) * 1.1,max(d_tree_bamm$log_edge_length, na.rm = TRUE) * 0.95), labels=c("Slow","Fast")) +
+geom_point2(aes(subset=(node %in% shiftnodes)), color="black",size=8)
+
+# next add tip points
+p1 %<+% d_meta +
+new_scale_color() +
+geom_tippoint(aes(x=x+5, col = hab1, fill = hab2), size = 0.8, shape = 21, position = position_jitter(width = 2, height = 0)) +
+scale_color_manual('Habitat preference', values = cols_hab, labels = c('terrestrial', 'freshwater', 'marine mud', 'generalist')) +
+scale_fill_manual('Habitat preference', values = cols_hab, labels = c('terrestrial', 'freshwater', 'marine mud', 'generalist'))
+```
+
+Alternatively to look at "hotspots" of core shifts we can average over all the fits to get the average rates across all the iterations of the model, and grab out all the core shifts and plot them on a single plot.
+
+To do this we will first estimate the rates of diversification on the branches. We will do this once and then save out the file as it takes so long, then not evaluate it going forward!
+
+```{r get_branch_lengths}
+#| eval: false
+
+# get mean phylorates that underly the colorised plot produced by plot.bammdata
+# from here: https://groups.google.com/g/bamm-project/c/W6s38xzm6OU/m/LALF47xVS54J
+mbt <- getMeanBranchLengthTree(edata, rate = "ndr")
+
+# save out mean branch lengths
+saveRDS(mbt, here('data/sequencing_rpoB/processed/bamm_1_ndr_branch_lengths.rds'))
+
+```
+
+```{r plot_ggtree2}
+#| fig.height: 12
+#| fig.width: 12
+
+# read in branch length data
+mbt <- readRDS(here('data/sequencing_rpoB/processed/bamm_1_ndr_branch_lengths.rds'))
+
+# get shift nodes from all of the events in the 
+shiftnodes <- unlist(d_css$shiftnodes) %>% unique()
+
+# save out shift nodes
+saveRDS(shiftnodes, here('data/sequencing_rpoB/processed/shiftnodes.rds'))
+
+# get tree
+tree_bamm <- mbt$phy
+
+# remove family name from the tip label
+d_labels <- data.frame(tip_label = tree_bamm$tip.label) %>%
+  separate(., tip_label, c('part1', 'part2', 'part3'), sep = '_', remove = FALSE) %>%
+  unite('tip_label_new', c(part1, part2), sep = '_')
+
+tree_bamm$tip.label <- d_labels$tip_label_new
+
+# get the edge lengths in a dataframe
+d_tree_bamm <- data.frame(tree_bamm$edge, edge_num=1:nrow(tree_bamm$edge), edge_length = tree_bamm$edge.length)
+colnames(d_tree_bamm)=c("parent", "node", "edge_num", 'edge_length')
+
+# transform these to log for the colour scale
+d_tree_bamm <- mutate(d_tree_bamm, log_edge_length = log(edge_length))
+
+p1 <- ggtree(tree_bamm, layout = 'circular', branch.length = 'none', aes(col = edge_length)) %<+% d_tree_bamm +
+scale_color_gradientn('Diversification rate', colors = met.brewer(name='Hiroshige', direction=-1, override.order = F), breaks=c(min(d_tree_bamm$edge_length, na.rm=TRUE) + (abs(min(d_tree_bamm$edge_length, na.rm=TRUE) * 1)),max(d_tree_bamm$edge_length, na.rm=TRUE) * 0.95), labels=c("Slow","Fast")) +
+geom_point2(aes(subset=(node %in% shiftnodes)), color="black",size=4, alpha = 0.5)
+
+# next add tip points
+p1 %<+% d_meta +
+new_scale_color() +
+geom_tippoint(aes(x=x+5, col = hab1, fill = hab2), size = 0.8, shape = 21, position = position_jitter(width = 2, height = 0)) +
+scale_color_manual('Habitat preference', values = cols_hab, labels = c('terrestrial', 'freshwater', 'marine mud', 'generalist')) +
+scale_fill_manual('Habitat preference', values = cols_hab, labels = c('terrestrial', 'freshwater', 'marine mud', 'generalist')) +
+guides(color = guide_legend(override.aes = list(size = 5)),
+       fill = guide_legend(override.aes = list(size = 5)))
+
+
+# save plot out
+ggsave(here('plots/sequencing_rpoB/analyses/bamm_all_tree.png'), last_plot(), height = 9, width = 12)
+```
+
+## Identify nodes where transitions are occurring
+
+To be able to visualise where habitat transitions are occurring, we can create interactive plots of our trees using plotly and save them to file. As plotly currently does not support some ggtree geoms (**geom_point2()**) or **ggnewscale()** we will have to grab the data from the tree and use **geom_point()**. We will also create a separate plot with the transitions and the rates on and with the points and the habitats on.
+
+```{r plotly}
+#| eval: false
+
+# create plot for plotly to identify nodes to subset
+p_for_plotly <- ggtree(tree_bamm, branch.length = 'none', aes(col = edge_length)) %<+% d_tree_bamm +
+scale_color_gradientn('Speciation rate', colors = met.brewer(name='Hiroshige', direction=-1, override.order = F), breaks=c(min(d_tree_bamm$edge_length, na.rm=TRUE) + (abs(min(d_tree_bamm$edge_length, na.rm=TRUE) * 1)),max(d_tree_bamm$edge_length, na.rm=TRUE) * 0.95), labels=c("Slow","Fast")) +
+  NULL
+
+# grab dataset so plotly renders properly
+d_plotly <- p_for_plotly$data %>%
+  left_join(., dplyr::rename(d_meta, label = tip_label)) %>%
+  mutate(label2 = node)
+
+# cant have two colour scales on plotly at present
+# make one plotly with just the transitions and the colours depicting rates of speciation
+p_for_plotly <- p_for_plotly %<+% d_meta +
+  geom_point(aes(x, y, label = label2), size = 3, alpha = 0.6, filter(d_plotly, node %in% shiftnodes), col = 'black') +
+  geom_point(aes(x, y, label = label2), size = 1, alpha = 0.1, filter(d_plotly, ! node %in% shiftnodes), col = 'black') +
+  coord_flip()
+
+htmlwidgets::saveWidget(plotly::ggplotly(p_for_plotly), here('sequencing_rpoB/plots/analyses/tree_plot_bamm.html'))
+
+# make one which has no colours for the rates of speciation but has colours for the habitats at the tip
+p_for_plotly <- ggtree(tree_bamm, branch.length = 'none') %<+% 
+  d_plotly +
+  geom_point(aes(x, y, label = label2), size = 3, alpha = 0.6, filter(d_plotly, node %in% shiftnodes), col = 'black') +
+  geom_point(aes(x, y, label = label2), size = 1, alpha = 0.1, filter(d_plotly, ! node %in% shiftnodes), col = 'black') +
+  geom_point(aes(x, y, col = hab1, fill = hab2), size = 0.8, shape = 21, position = position_jitter(width = 2, height = 0), filter(d_plotly, isTip == TRUE)) +
+scale_color_manual('Habitat preference', values = cols_hab, labels = c('terrestrial', 'freshwater', 'marine mud', 'generalist')) +
+scale_fill_manual('Habitat preference', values = cols_hab, labels = c('terrestrial', 'freshwater', 'marine mud', 'generalist')) +
+  coord_flip()
+
+htmlwidgets::saveWidget(plotly::ggplotly(p_for_plotly), here('sequencing_rpoB/plots/analyses/tree_plot_transitions.html'))
+
+```
+
+## Rate variation through time
+
+We can look at diversification rates change through time to see if diversification in general is faster or slower deeper in the tree, and therefore further back in evolutionary time.
+
+```{r get_rate_through_time}
+#| fig.height: 5
+#| fig.width: 12
+
+# get rate through time estimates
+rtt <- getRateThroughTimeMatrix(edata)
+
+# grab different parts
+rtt_sp <- rtt$lambda %>%
+  data.frame() %>%
+  mutate(sample = 1:n()) %>%
+  pivot_longer(starts_with('X'), names_to = 'time_point', values_to = 'rate') %>%
+  mutate(time_point = parse_number(time_point),
+  rate_type = 'speciation') %>%
+  group_by(sample) %>%
+  mutate(time = unname(rtt$times)) %>%
+  ungroup()
+rtt_ex <- rtt$mu %>%
+  data.frame() %>%
+  mutate(sample = 1:n()) %>%
+  pivot_longer(starts_with('X'), names_to = 'time_point', values_to = 'rate') %>%
+  mutate(time_point = parse_number(time_point),
+  rate_type = 'extinction') %>%
+  group_by(sample) %>%
+  mutate(time = unname(rtt$times)) %>%
+  ungroup()
+
+rtt_combine <- bind_rows(rtt_sp, rtt_ex)
+
+# create means
+rtt_combine_means <- group_by(rtt_combine, time_point, rate_type, time) %>%
+  summarise(ave_rate = mean(rate), .groups = 'drop')
+
+# create a plot
+ggplot() +
+  geom_line(aes(time, rate, group = sample), alpha = 0.01, rtt_combine) +
+  geom_line(aes(time, ave_rate), rtt_combine_means) +
+  facet_wrap(~rate_type, scales = 'free') +
+  theme_bw(base_size = 14) +
+  labs(x = 'time before present',
+       y = 'rate')
+
+# save plot out
+ggsave(here('plots/sequencing_rpoB/analyses/bamm_rate_through_time.png'), last_plot(), height = 5, width = 12)
+```
+
+So something extremely ubiquitous, and likely linked to the features of the ultrametric tree, is happening in the tree. I do not know whether or not this is a big problem, or how we can deal with this or alter the tree to make this less of a big deal.
+
+## Looking at tip-specific evolutionary rates
+
+We can also estimate tip-specific evolutionary rates. We can plot these across our different traits to see if there is anything particularly interesting going on. This could be complemented by our models looking at state-dependent character diversification rates.
+
+```{r tip_rates}
+#| fig.height: 5
+#| fig.width: 17
+
+# grab out tip rates 
+tip_rates <- data.frame(tip_label = edata$tip.label,
+                        speciation = edata$meanTipLambda,
+                        extinction = edata$meanTipMu) %>%
+             separate(., tip_label, c('part1', 'part2', 'part3'), sep = '_') %>%
+             unite('tip_label', c(part1, part2), sep = '_') %>%
+             dplyr::select(-part3) %>%
+             left_join(., dplyr::select(d_meta, tip_label, habitat_preference, hab1, hab2)) %>%
+             filter(!is.na(habitat_preference)) %>%
+             group_by(habitat_preference) %>%
+             mutate(n = n()) %>%
+             ungroup() %>%
+             mutate(hab_pref_axis = gsub(':', '/ ', habitat_preference),
+                    hab_pref_axis = gsub('_', ' ', hab_pref_axis),
+                    net_diversification = speciation - extinction)
+
+# check numbers are right
+group_by(tip_rates, habitat_preference) %>%
+  tally() %>%
+  arrange(n)
+
+p1 <- ggplot(tip_rates, aes(forcats::fct_reorder(hab_pref_axis, n), speciation)) +
+  MicrobioUoE::geom_pretty_boxplot(col='black', fill = 'black') +
+  geom_point(shape = 21, fill = 'white', position = position_jitter(width = 0.2)) +
+  theme_bw(base_size = 12) +
+  scale_x_discrete(labels = scales::label_wrap(13)) +
+  labs(x = 'Habitat preference',
+       y = 'Speciation rate')
+
+p2 <- ggplot(tip_rates, aes(forcats::fct_reorder(hab_pref_axis, n), extinction)) +
+  MicrobioUoE::geom_pretty_boxplot(col='black', fill = 'black') +
+  geom_point(shape = 21, fill = 'white', position = position_jitter(width = 0.2)) +
+  theme_bw(base_size = 12) +
+  scale_x_discrete(labels = scales::label_wrap(13)) +
+  labs(x = 'Habitat preference',
+       y = 'Extinction rate')
+
+p3 <- ggplot(tip_rates, aes(forcats::fct_reorder(hab_pref_axis, n), net_diversification)) +
+  MicrobioUoE::geom_pretty_boxplot(col='black', fill = 'black') +
+  geom_point(shape = 21, fill = 'white', position = position_jitter(width = 0.2)) +
+  theme_bw(base_size = 12) +
+  scale_x_discrete(labels = scales::label_wrap(13)) +
+  labs(x = 'Habitat preference',
+       y = 'Net diversification rate')
+
+p1 + p2 + p3
+
+# save plot out
+ggsave(here('plots/sequencing_rpoB/analyses/bamm_tip_rates.png'), last_plot(), height = 5, width = 17)
+
+```
+
+There does not appear to be much variation between traits in their speciation and extinction rates. If we wanted to follow this further there are lots of papers we could look at. First and foremost would be to read Title & Rabosky's paper entitled ["Tip rates, phylogenies and diversification: What are we estimating, and how good are the estimates?"](https://besjournals.onlinelibrary.wiley.com/doi/10.1111/2041-210X.13153). They also share other papers that have used tip rate estimates to look at diversification rates across geographical and environmental gradients and across different traits.
+
+We can calculate the DR statistic (also known as tip DR) which is an tip-level estimate of the speciation rate. This measure is non-model based, and incorporates the number of splitting events and the internode distances along the root-to-tip path of a phylogeny, while giving greater weight to branches closer to the present. This was first implemented by Jetz *et al.* (2012) in their Nature paper about bird diversity in space and time.
+
+```{r tip_dr}
+#| fig.height: 5
+#| fig.width: 7
+#| warning: false
+
+# compute tip DR
+d_tipdr <- DR_statistic_C(tree)
+
+# put this into a dataframe
+d_tipdr <- data.frame(tip_label = names(d_tipdr),
+                      tip_dr = unname(d_tipdr)) %>%
+           separate(., tip_label, c('part1', 'part2', 'part3'), sep = '_') %>%
+           unite('tip_label', c(part1, part2), sep = '_') %>%
+           dplyr::select(-part3) %>%
+           left_join(., dplyr::select(d_meta, tip_label, habitat_preference, hab1, hab2)) %>%
+           filter(!is.na(habitat_preference)) %>%
+           group_by(habitat_preference) %>%
+           mutate(n = n()) %>%
+           ungroup() %>%
+           mutate(hab_pref_axis = gsub(':', '/ ', habitat_preference),
+                  hab_pref_axis = gsub('_', ' ', hab_pref_axis))
+
+ggplot(d_tipdr, aes(forcats::fct_reorder(hab_pref_axis, n), tip_dr)) +
+  MicrobioUoE::geom_pretty_boxplot(col='black', fill = 'black') +
+  geom_point(shape = 21, fill = 'white', position = position_jitter(width = 0.2)) +
+  theme_bw(base_size = 14) +
+  scale_x_discrete(labels = scales::label_wrap(13)) +
+  labs(x = 'Habitat preference',
+       y = 'tip DR (speciation rate)')
+```
+
+This method also shows very little variation in the estimated tip-level speciation rate between traits. It does look like marine mud may have a lower rate. This is interesting because the results from BAMM also indicate marine mud has a much lower variance of rates and a high density of tips with low speciation rates.
+
+This again is something to discuss further with Rutger as I am not sure exactly where to go with the remainder of this analysis. These sorts of statistics may be very useful where fitting of SSE models with rate changes within the state are not possible. This may be something to consider with our dataset where the number of parameters in the MuHiSSE would be so big.
+
+We can can do phylogenetic generalised least squares regressions to account for phylogentic relatedness concerning differences in diversification rate between species with different habitat preferences. This approach has been used by Jetz *et al.* (2012) in their Nature paper about bird diversity in space and time.
+
+We will first do this using **nlme::lme()** as described in Liam Revell's and Luke Harmon's book "Phylogenetic Comparative Methods in R".
+
+```{r pgls_nlme_run}
+#| eval: false
+
+# set up correlation matrix for the tree
+cor_lambda <- corPagel(value = 1, phy = tree, form = ~tip_label)
+
+# fit phylogenetic generalised linear model
+mod <- gls(tip_dr ~ habitat_preference, data = d_tipdr, correlation = cor_lambda)
+mod1 <- gls(log(tip_dr) ~ habitat_preference, data = d_tipdr, correlation = cor_lambda)
+
+# save out mean branch lengths
+saveRDS(mod, here('sequencing_rpoB/data/processed/tipDR_pgls.rds'))
+saveRDS(mod1, here('sequencing_rpoB/data/processed/tipDR_pgls_log.rds'))
+```
+
+```{r pgls_nlme}
+#| eval: false
+
+# read in model
+mod <- readRDS(here('sequencing_rpoB/data/processed/tipDR_pgls.rds'))
+
+# need to check model assumptions - graph
+performance::check_model(mod)
+
+# do contrasts between habitat preferences
+contrasts <- emmeans(mod, pairwise ~ habitat_preference)
+
+
+```
+
+So the model fits, but is not very good. All of the standard errors are extremely
+
+We will first do this using **caper::pgls()** using the example code and workthrough [here](https://nhcooper123.github.io/pcm-primer-online/phylogenetic-generalised-least-squares-pgls-in-r.html). We did not run this after running the **gls()** example because they should be equivalent.
+
+```{r do_pgls}
+#| eval: false
+
+# create comparative data set for caper
+tree2 <- tree
+tree2$node.label <- 1:length(tree2$node.label)
+
+d_tipdr <- data.frame(d_tipdr)
+
+d_caper <- comparative.data(phy = tree2, data = d_tipdr, names.col = tip_label, vcv = TRUE, na.omit = FALSE, warn.dropped = TRUE)
+
+# check dropped species
+d_caper$dropped$unmatched.rows
+d_caper$dropped$tips
+
+# delete any 0 length branches and collapse them into polytomies
+d_caper$phy <- di2multi(d_caper$phy)
+  
+# fit a pgls model using caper
+mod <- pgls(tip_dr ~ 0 + as.factor(habitat_preference), data = d_caper, lambda = 'ML')
+
+# this takes a long time
+
+# plot model diagnostics
+# First make a plotting window with four panes as there are four plots
+par(mfrow = c(2, 2))
+# Now plot the model diagnostics
+plot(mod)
+
+# Return the plot window to one pane for later plotting
+par(mfrow = c(1, 1))
+# the qqplot is not good, so lets take the log
+
+# Create a likelihood profile of the lambda estimate
+lambda_profile <- pgls.profile(mod, "lambda")
+# Plot the likelihood profile
+plot(lambda_profile)
+
+# fit a pgls model using caper
+mod2 <- pgls(log(tip_dr) ~ as.factor(habitat_preference), data = d_caper, lambda = 'ML')
+
+# First make a plotting window with four panes as there are four plots
+par(mfrow = c(2, 2))
+# Now plot the model diagnostics
+plot(mod2)
+
+# Return the plot window to one pane for later plotting
+par(mfrow = c(1, 1))
+```
+
+We can also fit the equivalent model in a Bayesian framework using **brms**.
+
+Both of these methods rely on us first converting our phylogenetic tree into a correlation structure. The correlation structure will then be used to define the distribution of the residuals from our linear model.
+
+First we will try a Bayesian approach. This takes too long to run lol.
+
+```{r phylo_brms}
+#| eval: false
+
+# create a covariance matrix of species
+sp_vcv <- ape::vcv.phylo(tree)
+
+# fit model
+model_simple <- brm(
+  tip_dr ~ habitat_preference + (1|gr(tip_label, cov = sp_vcv)), 
+  data = d_tipdr, 
+  family = gaussian(), 
+  data2 = list(sp_vcv = sp_vcv),
+  prior = c(
+    prior(normal(0, 10), "b"),
+    prior(normal(0, 50), "Intercept"),
+    prior(student_t(3, 0, 20), "sd"),
+    prior(student_t(3, 0, 20), "sigma")
+  ),
+  chains = 1,
+  iter = 1000
+)
+```
+
+## Useful links used
+
+-   [Chapter 13](https://lukejharmon.github.io/pcm/chapter13_chardiv/#ref-Beaulieu2016-ww) of Luke Harmon's book on phylogenetic comparative methods on "Characters and diversification rates".
+-   [Documentation](https://yulab-smu.top/treedata-book/) of the R package **ggtree** used for plotting phylogenies.
+-   [Documentation](http://bamm-project.org/introduction.html#bayesian-analysis-of-macroevolutionary-mixtures) for bamm - Bayesian Analysis of Macroevolutionary Mixtures.
+-   Chapter 3 of Liam Revell and Luke Harmon's new book on Phylogenetic Comparative Methods in R.
+-   [Chapter 6](https://nhcooper123.github.io/pcm-primer-online/phylogenetic-generalised-least-squares-pgls-in-r.html) of Natalie Cooper's book cover phylogenetic generalised least squares regression in R using caper.
