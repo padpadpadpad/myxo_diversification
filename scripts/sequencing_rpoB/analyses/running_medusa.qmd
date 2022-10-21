@@ -1,0 +1,82 @@
+---
+title: "Identifying shifts in diversification rate using MEDUSA"
+author: "Daniel Padfield"
+date: last-modified
+format:
+  html:
+    toc: true
+    toc-depth: 2
+    toc-title: 'Contents'
+    code-overflow: wrap
+    code-fold: true
+    code-tools: true
+    self-contained: true
+    self-contained-math: true
+execute:
+  message: false
+  warning: false
+  fig.align: 'center'
+editor: visual
+---
+
+## Outline
+
+This walk-through aims to run Medusa to identify places where rate shifts occur on our ultrametric tree.
+
+## Load in packages and existing data
+
+```{r load_packages}
+#| results: false
+
+# load packages
+library(here)
+library(geiger)
+library(tidyverse)
+library(ggtree)
+library(ggnewscale)
+library(RColorBrewer)
+library(patchwork)
+library(ape)
+library(phytools)
+library(MetBrewer)
+
+# set where I am in the project
+here::i_am('scripts/sequencing_rpoB/analyses/running_medusa.qmd')
+
+# read in metadata
+d_meta <- read.csv(here('data/sequencing_rpoB/processed/asv_metadata.csv'))
+
+# read in habitat trait colours
+cols_hab <- readRDS(here('data/sequencing_rpoB/processed/habitat_colours.rds'))
+
+```
+
+Next we load in the tree and change the tip labels to remove the family names.
+
+```{r load_tree}
+
+# load in tree
+tree <- read.tree(here('data/sequencing_rpoB/bamm/rerooted-pruned-chronopl10.tre'))
+
+# check is rooted
+is.rooted(tree)
+
+# check is ultrametric
+is.ultrametric(tree)
+
+# remove family name from the tip label
+d_labels <- data.frame(tip_label = tree$tip.label) %>%
+  separate(., tip_label, c('part1', 'part2', 'part3'), sep = '_', remove = FALSE) %>%
+  unite('tip_label_new', c(part1, part2), sep = '_')
+
+tree$tip.label <- d_labels$tip_label_new
+
+```
+
+Next we can try and run medusa using **geiger::medusa()**.
+
+```{r medusa}
+
+fit_medusa <- medusa(tree)
+
+```
