@@ -281,10 +281,10 @@ d_acr_ape_summary <- group_by(d_acr_ape, node) %>%
   summarise(total = sum(probability_ape), .groups = 'drop') %>%
   filter(total != 1)
 nrow(d_acr_ape_summary)
-# apparently 4 nodes that do not equal 1, but they are very close to 1.
+# apparently 7 nodes that do not equal 1, but they are very close to 1.
 ```
 
-All of the standard errors for the ARD model are `NaN`, suggesting convergence problems. However, there are only four internal nodes with probabilities different from 1, so these estimates are not completely crazy.
+Some of the standard errors for the ARD model are `NaN`, suggesting convergence problems. However, there are only seven internal nodes with probabilities different from 1, so these estimates are not completely crazy.
 
 ### Plotting transition matrices
 
@@ -361,22 +361,13 @@ filter(d_models, model == 'all rates different') %>%
 
 The transitions where the rates are estimated to be 0 are:
 
--   freshwater to generalist
--   freshwater to terrestrial
--   freshwater/mud and shore to generalist
--   freshwater/mud and shore to mud and shore/terrestrial
--   freshwater/terrestrial to mud and shore
--   mud and shore to freshwater/terrestrial
--   mud and shore to generalist
--   mud and shore to terrestrial
--   terrestrial to freshwater
+-   freshwater to marine mud + terrestrial
+-   freshwater + terrestrial to marine mud
+-   generalist to marine mud
+-   marine mud to freshwater + terrestrial
+-   marine mud to generalist
+-   terrestrial to freshwater + marine mud
 -   terrestrial to generalist
--   terrestrial to mud and shore
--   terrestrial to mud and shore/terrestrial
--   freshwater:mud_and_shore to mud_and_shore:terrestrial
--   mud_and_shore to generalist
--   terrestrial to generalist
--   terrestrial to mud_and_shore:terrestrial
 
 We can create a custom matrix and fix these parameters to be 0.
 
@@ -392,7 +383,7 @@ for(i in 1:nrow(custom_matrix)){
 }
 
 # make specific transitions 0 based on the output of the ARD.
-custom_matrix[custom_matrix %in% c(7, 19, 22, 23, 26, 28, 31, 35, 37, 42, 43, 47)] <- 0
+custom_matrix[custom_matrix %in% c(14, 19, 26, 28, 31, 32, 36)] <- 0
 
 # replace values of non-zeroes with correct vector of 1:n parameters
 custom_matrix[custom_matrix != 0] <- 1:length(custom_matrix[custom_matrix != 0])
