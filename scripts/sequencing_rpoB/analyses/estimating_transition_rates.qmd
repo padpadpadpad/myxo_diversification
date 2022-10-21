@@ -220,8 +220,8 @@ ancestral_states_ape1 <- ace(hab_pref, tree, model="SYM", type="discrete")
 ancestral_states_ape2 <- ace(hab_pref, tree, model="ARD", type="discrete")
 
 # save out files
-saveRDS(ancestral_states_ape, here('data/sequencing_rpoB/processed/ancestral_states/ancestral_states_ape.rds'))
-saveRDS(ancestral_states_ape1, here('data/sequencing_rpoB/processed/ancestral_states/ancestral_states_ape1.rds'))
+saveRDS(ancestral_states_ape, here('data/sequencing_rpoB/processed/transition_rates/ancestral_states_ape.rds'))
+saveRDS(ancestral_states_ape1, here('data/sequencing_rpoB/processed/transition_rates/ancestral_states_ape1.rds'))
 saveRDS(ancestral_states_ape2, here('data/sequencing_rpoB/processed/ancestral_states/ancestral_states_ape2.rds'))
 ```
 
