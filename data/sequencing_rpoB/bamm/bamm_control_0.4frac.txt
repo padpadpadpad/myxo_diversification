@@ -48,7 +48,7 @@ useGlobalSamplingProbability = 1
 # Whether to use a "global" sampling probability. If False (0), expects a file
 # name for species-specific sampling probabilities (see sampleProbsFilename)
                                         
-globalSamplingFraction = 1.0            
+globalSamplingFraction = 0.4            
 # The sampling probability. If useGlobalSamplingFraction = 0, this is ignored
 # and BAMM looks for a file name with species-specific sampling fractions
 
@@ -120,7 +120,7 @@ acceptanceResetFreq = 1000
 # Frequency in which to reset the acceptance rate calculation
 # The acceptance rate is output to both the MCMC data file and the screen
 
-outName = bamm_2
+outName = bamm_0.4frac
 # Optional name that will be prefixed on all output files (separated with "_")
 # If commented out, no prefix will be used
 
