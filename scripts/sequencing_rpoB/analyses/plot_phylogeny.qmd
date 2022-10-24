@@ -112,6 +112,24 @@ to_group <- split(d_meta$tip_label, d_meta$family_common)
 tree2 <- groupOTU(tree, to_group)
 ```
 
+We can also find the MRCA ancestor node of each of our constrained families. This can then be used to find colour the outside of our plot with clade colours.
+
+```{r find_mrca}
+# find the mrca of each of the clades
+d_meta2 <- filter(d_meta, family_common %in% constrained_families) %>%
+  select(family, tip_label) %>%
+  group_by(family) %>%
+  nest() %>%
+  mutate(mrca = NA)
+
+for(i in 1:nrow(d_meta2)){
+  d_meta2$mrca[i] <- findMRCA(tree2, tips = d_meta2$data[[i]]$tip_label)
+}
+
+d_meta2 <- select(d_meta2, family2 = family, mrca) %>%
+  mutate(blank_label = '')
+```
+
 We are now ready to plot the phylogenetic tree. We will plot the tree with different colours for each family, and then place the colours of the habitat preferences around the tips of the tree.
 
 ```{r plot_tree, fig.height=10, fig.width=12}
@@ -133,8 +151,15 @@ d_meta <- mutate(d_meta, rare = ifelse(habitat_preference %in% c('generalist', '
 
 # first only plot taxonomy
 tree_plot <- ggtree(tree2, layout = 'circular', branch.length = 'none', aes(col = group)) %<+% filter(d_meta) +
-  scale_color_manual('Family', values = cols) +
-  guides(color = guide_legend(override.aes = list(size = 5)))
+  scale_color_manual('Family (branch colours)', values = cols) +
+  guides(color = guide_legend(override.aes = list(size = 5))) +
+  geom_cladelab(data = d_meta2,
+                mapping = aes(node = mrca,
+                              color = family2,
+                              label = blank_label),
+                offset = 10,
+                barsize = 2)
+  
 
 # now plot habitat preference around the tips
 tree_plot2 <- tree_plot +
@@ -147,12 +172,12 @@ tree_plot2 <- tree_plot +
         axis.ticks = element_blank()) +
   new_scale_color() +
   geom_tippoint(aes(x=x+5, col = habitat_preference, size = rare), position = position_jitter(width = 3, height = 0)) +
-  scale_color_manual('Habitat preference', values = cols_hab, labels = hab_labels) +
+  scale_color_manual('Habitat preference (tip points)', values = cols_hab, labels = hab_labels) +
   scale_size_manual(values = c(0.6, 2)) +
   guides(color = guide_legend(override.aes = list(size = 5)),
-         size = FALSE)
+         size = 'none')
 
-tree_plot2
+tree_plot2 
 
 # save plot out
 #ggsave(here('sequencing_rpoB/plots/analyses/tree_all_taxonomy.pdf'), tree_plot2, height = 9, width = 12)
