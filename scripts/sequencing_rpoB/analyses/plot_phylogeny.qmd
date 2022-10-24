@@ -39,6 +39,7 @@ library(RColorBrewer)
 library(patchwork)
 library(ape)
 library(phytools)
+library(MetBrewer)
 ```
 
 ## Load in data and do some data wrangling
@@ -81,11 +82,11 @@ cols_hab <- readRDS(here('data/sequencing_rpoB/processed/habitat_colours.rds'))
 
 We can now plot the taxonomic information on a plot with the habitat preferences to visualise the phylogenetic tree. This uses the R packages **ggtree** and **ggnewscale** to plot the tree and combine multiple colour scales respectively.
 
-We constrained our tree based on the phylogeny in XX, so we will just colour by the families that were used in the constraint.
+We constrained our tree based on the phylogeny in XX, so we will just colour by the families that were used in the constraint. These were the ones that had properly assigned names in the GTDB database.
 
 ```{r find_common_taxa}
 # constrained families
-constrained_families <- d_labels$part3 %>% unique() %>% .[!is.na(.)]
+constrained_families <- c('Myxococcaceae', 'Vulgatibacteraceae', 'Anaeromyxobacteraceae', 'Polyangiaceae', 'Sandaracinaceae', 'Nannocystaceae', 'Haliangiaceae')
 
 # find 9 most common families based on number of tips assigned to them
 d_common <- d_meta %>%
@@ -93,21 +94,18 @@ d_common <- d_meta %>%
   tally() %>%
   ungroup() %>%
   mutate(., prop = n / sum(n)) %>%
-  filter(., family2 != 'uncertain') %>%
-  filter(., family2 %in% constrained_families) %>%
-  slice_max(n, n = 9)
+  filter(., family2 %in% constrained_families)
   
 sum(d_common$prop)
 ```
 
-The top 9 families represent 89% of all the tips. This is quite good so lets go with this for now. If we wanted we could plot all of these and see if there is an obvious cut-off where its not worth adding more colours.
+The families we used to constrain the tree represent 75% of all the tips.
 
 We can now add these into the meta dataframe as a new column, and anything that is not assigned to one of these families will be assigned "uncommon". To colour branches of the tree, we need to use **ggtree::groupOTU()**.
 
 ```{r create_plot_data}
 # add in column for colouring branches
-d_meta <- mutate(d_meta, family_common = ifelse(family2 %in% c(constrained_families, 'uncertain'), family2, 'unconstrained'),
-                 family_common = ifelse(family2 %in% c(d_common$family2, 'uncertain', 'unconstrained'), family2, 'rare constrained'))
+d_meta <- mutate(d_meta, family_common = ifelse(family2 %in% c(constrained_families, 'uncertain'), family2, 'unconstrained'))
 
 # group tip labels together in terms of their order
 to_group <- split(d_meta$tip_label, d_meta$family_common)
@@ -120,13 +118,18 @@ We are now ready to plot the phylogenetic tree. We will plot the tree with diffe
 # create colour palettes
 
 # for different families - add in black and grey for uncertain and uncommon respectively
-cols <- c(colorRampPalette(brewer.pal(11, "Spectral"))(nrow(d_common)), 'black', 'grey', 'dark grey')
-names(cols) <- c(d_common$family2, 'uncertain', 'unconstrained', 'rare constrained')
+cols <- c(colorRampPalette(brewer.pal(11, "Spectral"))(nrow(d_common)), 'black', 'grey')
+names(cols) <- c(d_common$family2, 'uncertain', 'unconstrained')
 
 # for different habitat preferences
 # I know Mick does not like the brown but I do not want two blues on the plot because it would be more difficult to tell them apart
 cols_hab <- c('green4', '#1E90FE', 'sienna4', 'darkorange')
-names(cols_hab) <- c('terrestrial', 'freshwater', 'mud_and_shore', 'generalist')
+cols_hab <- met.brewer('Austria', n = 7)
+names(cols_hab) <- c('mud_and_shore', 'freshwater', 'terrestrial', 'freshwater:terrestrial', 'generalist', 'mud_and_shore:terrestrial', 'freshwater:mud_and_shore')
+hab_labels <- c('marine mud', 'freshwater', 'terrestrial', 'freshwater + terrestrial', 'generalist', 'marine mud + terrestrial', 'freshwater + marine mud')
+
+# make a separate column for the rare states to make their size bigger!
+d_meta <- mutate(d_meta, rare = ifelse(habitat_preference %in% c('generalist', 'mud_and_shore:terrestrial'), 'rare', 'common'))
 
 # first only plot taxonomy
 tree_plot <- ggtree(tree2, layout = 'circular', branch.length = 'none', aes(col = group)) %<+% filter(d_meta) +
@@ -143,10 +146,11 @@ tree_plot2 <- tree_plot +
         axis.text.y = element_blank(),
         axis.ticks = element_blank()) +
   new_scale_color() +
-  geom_tippoint(aes(x=x+5, col = hab1, fill = hab2), size = 0.8, shape = 21, position = position_jitter(width = 2, height = 0)) +
-  scale_color_manual('Habitat preference', values = cols_hab, labels = c('terrestrial', 'freshwater', 'marine mud', 'generalist')) +
-  scale_fill_manual('Habitat preference', values = cols_hab, labels = c('terrestrial', 'freshwater', 'marine mud', 'generalist')) +
-  guides(color = guide_legend(override.aes = list(size = 5)))
+  geom_tippoint(aes(x=x+5, col = habitat_preference, size = rare), position = position_jitter(width = 3, height = 0)) +
+  scale_color_manual('Habitat preference', values = cols_hab, labels = hab_labels) +
+  scale_size_manual(values = c(0.6, 2)) +
+  guides(color = guide_legend(override.aes = list(size = 5)),
+         size = FALSE)
 
 tree_plot2
 
@@ -156,9 +160,9 @@ ggsave(here('plots/sequencing_rpoB/analyses/tree_all_taxonomy.png'), tree_plot2,
 
 ```
 
-Ok this looks pretty darn amazing. There are a couple of things to take home from this. Firstly, the phylogenetic data aligns pretty well with the tree we created from the rpoB sequencing. It is by no means perfect (e.g. Haliangiaceae and Polyangiaceae are kind of everywhere), but given this is a \~250bp region of a single gene it links pretty well to the taxonomy as created from GTDB which uses over a hundred single-copy-marker genes to make its taxonomy of the whole of bacteria.
+Ok this looks pretty darn amazing. There are a couple of things to take home from this. The constrained tree does what it says it should do in terms of getting ASVs of the same family to be in the same clade. It is interesting that no unconstrained tips find their way into the Nannocystaceae but do find their way into all other clades.
 
-Second, we can see clusters of colours at the tips of the phylogenetic tree showing that habitat preferences are not randomly distributed. It is difficult to see but when an ASV can live in two habitats its outline and fill colours are different. We have found phylogenetic signal in the data previously by calculating Pagel's lambda and the D-statistic for binary traits.
+We have coloured each trait state separately (seven colours). This allows us to better see the distribution of traits across the tree. Freshwater + terrestrial is extremely common all over the tree, whereas we see very specific clusters of marine mud specialists. We have made the very rare states (marine mud + terrestrial and generalist) have bigger points to see where they are, but there does not seem to be much clustering there. We found phylogenetic signal in the data previously by calculating Pagel's lambda and the D-statistic for binary traits.
 
 ## What is our trait and what is its distribution?
 
@@ -168,7 +172,7 @@ Our trait is our own definition of habitat preference for each ASV identified as
 -   Bootstrapped a distribution of proportions of occurrences in each habitat by re-sampling 100 presences based on these proportions 1000 times.
 -   Compared these to the availability of each habitat cluster (different clusters had a different number of samples assigned to them)
 -   If your use of a habitat was significantly less than what if you just used what was available evenly (0.975 quantile of proportional use distribution was less than the proportion available) we say you did not favour that habitat.
--   Your habitat preferences are defined as all the habitats you at least as much as is expected by their availability.
+-   Your habitat preferences are defined as all the habitats you use at least as much as is expected by their availability.
 -   You can be freshwater, terrestrial, marine mud, or any combination of these.
 
 We can look at the numbers of each of these and how many there are in each group.
