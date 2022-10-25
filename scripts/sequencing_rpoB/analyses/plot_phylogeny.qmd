@@ -137,7 +137,7 @@ We are now ready to plot the phylogenetic tree. We will plot the tree with diffe
 
 # for different families - add in black and grey for uncertain and uncommon respectively
 cols <- c(colorRampPalette(brewer.pal(11, "Spectral"))(nrow(d_common)), 'black', 'grey')
-names(cols) <- c(d_common$family2, 'uncertain', 'unconstrained')
+names(cols) <- c(sort(d_common$family2), 'uncertain', 'unconstrained')
 
 # for different habitat preferences
 # I know Mick does not like the brown but I do not want two blues on the plot because it would be more difficult to tell them apart
