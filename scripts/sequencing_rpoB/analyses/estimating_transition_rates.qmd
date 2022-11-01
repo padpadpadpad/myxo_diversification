@@ -22,9 +22,13 @@ editor: visual
 
 ## Outline
 
-Using information on the tip states of a phylogenetic tree we can use evolutionary models to estimate the ancestral states of internal nodes. The idea is to compare the BAMM analysis and the positions of shifts to the ancestral state reconstructions.
+Using information on the tip states of a phylogenetic tree we can use evolutionary models to estimate the ancestral states of internal nodes and transitions between states.
 
-Ancestral state reconstructions can also be estimated from the MuSSE and HiSSE models we are aiming to fit later on. We hope to reduce the number of free parameters in those models by estimating the transition matrix which best fits the data in the $M_k$ model.
+We fit an $Mk$ model of evolution to our tree and habitat preference data to understand how habitat preference evolved. For example does evolution readily allow transitions between specialist habitat preferences (i.e. from marine mud only to terrestrial only).
+
+We also try and fit an $Mk$ model of evolution when we combine two traits together (habitat preference and whether or not the species has high or low diversification rate as identified by BAMM).
+
+Ancestral state reconstructions can also be estimated from the MuSSE and HiSSE models we are aiming to fit later on. These models would have a lot of free parameters and we are unsure whether they can be fit with the dataset we have. We hope to reduce the number of free parameters in those models by estimating the transition matrix which best fits the data in the $Mk$ model. This would reduce the number of free parameters.
 
 ## TL;DR
 
@@ -50,15 +54,7 @@ Go to @sec-best_model for the best $Mk$ model and a discussion of the transition
 
 -   Have plotted the transition matrix in multiple ways, see @sec-best-model
 
--   Have tried to align
-
-## Possibilities
-
--   Should I be using the the bootstrapped trees to get some level of uncertainty. Going to be awkward because not all nodes will be the same. How do you deal with that?
-
--   How do we compare the results from BAMM to the results of the ancestral state reconstruction to look at whether shifts in diversification rates occur in nodes with a transition or specific habitats.
-
-## Doing ancestral state reconstruction
+## Fitting transition rate models and doing ancestral state reconstructions
 
 We can do ancestral state reconstruction with a couple of different methods in R as well as trying in [BayesTraits](http://www.evolution.reading.ac.uk/BayesTraitsV4.0.0/BayesTraitsV4.0.0.html).
 
@@ -72,7 +68,7 @@ We can do both marginal reconstruction using **ape::ace()** and **castor::asr_mk
 
 An alternative tactic to the one outlined above is to use an MCMC approach to sample character histories from their posterior probability distribution. This is called stochastic character mapping. The model is the same but in this case we get a sample of unambiguous histories for our discrete character's evolution on the tree - rather than a probability distribution for the character at nodes.
 
-Finally we can use BayesTraits to do both maximum likelihood and MCMC approaches.
+Finally we can use BayesTraits to do both maximum likelihood and MCMC approaches. We do not use this approach in this walk-through.
 
 The evolutionary models that are used to reconstruct ancestral states have a transition matrix between discrete states that define the rates of transitions between states on the tree. In most of these models, there are three that are easy to define: **ARD** means all transition rates are different, **SYM** means transitions to and from the same states are the same, and **ER** is an equal rates model where all rates between states are the same. These transition matrices can also be custom made but for now these three seem sensible starting points. Transition matrices also underpin the MuSSE and BiSSE models we are hoping to fit.
 
@@ -84,7 +80,6 @@ We also load in the final phylogenetic tree, the colours used for habitat prefer
 
 ```{r load_packages}
 #| results: false
-
 # load packages
 library(here)
 library(tidyverse)
@@ -169,6 +164,8 @@ ace_transition_df <- function(ace_object){
 Different methods for estimating ancestral states take different values for the traits. Some only allow for numeric values, whereas others allow characters. Some do not allow colons in the name, and one ([MBASR](https://github.com/stevenheritage/MBASR) which uses Mr Bayes) needs the first trait value to be 0. To allow for us to semi-easily link across different methods, we will make a data frame of our unique tip states and then turn them into a numeric vector. The ordering is all done alphabetically.
 
 ```{r tip_state_dataframe}
+d_meta <- tibble(tip_label = tree$tip.label) %>%
+  left_join(., d_meta)
 
 # make sure order of habitat preference is the same in the trait vector as the tip labels
 sum(d_meta$tip_label == tree$tip.label) == length(tree$tip.label)
@@ -486,7 +483,7 @@ saveRDS(ancestral_states_ape4, here('data/sequencing_rpoB/processed/transition_r
 
 ```{r ape_3_load}
 #| echo: false
-ancestral_states_ape4 <- readRDS(here('sequencing_rpoB/data/processed/ancestral_states/ancestral_states_ape4.rds'))
+ancestral_states_ape4 <- readRDS(here('data/sequencing_rpoB/processed/transition_rates/ancestral_states_ape4.rds'))
 ```
 
 We can now re run the $Mk$ model.
@@ -521,14 +518,14 @@ We will only fit the model with the best custom transition matrix to compare est
 
 ```{r acr_castor}
 # rename best transition matrix for using it later
-best_matrix <- custom_matrix
+best_matrix <- custom_matrix5
 
 rownames(best_matrix) <- colnames(best_matrix) <- sort(coding$hab_pref)
 
 saveRDS(best_matrix, here('data/sequencing_rpoB/processed/transition_rates/best_matrix_mk.rds'))
 
 # get dataframe of transition matrix
-d_best_matrix <- ace_transition_df(ancestral_states_ape3) %>%
+d_best_matrix <- ace_transition_df(ancestral_states_ape7) %>%
   left_join(., select(coding, state_1 = hab_pref, state_1_num = hab_pref_num2, state_1_label = hab_pref_axis)) %>%
   left_join(., select(coding, state_2 = hab_pref, state_2_num = hab_pref_num2, state_2_label = hab_pref_axis)) %>%
   mutate(transition_rate = round(transition_rate, 2)) 
@@ -573,7 +570,117 @@ filter(d_transition_compare, free_param == 'yes') %>%
 
 ```
 
-The transition rates from both approaches are now equivalent when using the best model. This is a great result and shows the model is reproducible.
+The transition rates from both approaches do not match! This is not good news. I wonder if we could set some symmetric rates to get an overall better fit and more consistent convergence.
+
+```{r set_some_symmetric_rates}
+# input the rates into the custom matrix
+custom_matrix3 <- custom_matrix
+
+# make some transitions symmetric:
+# marine mud to freshwater and vice versa
+custom_matrix3[custom_matrix3 %in% c(21)] <- 4
+custom_matrix3[custom_matrix3 > 21] <- custom_matrix3[custom_matrix3 > 21] -1
+
+ancestral_states_ape5 <- ace(hab_pref, tree, model=custom_matrix3, type="discrete")
+
+anova(ancestral_states_ape3, ancestral_states_ape5)
+
+# check AIC of each model
+mod_compare <- tibble(mod = c('ER', 'SYM', 'ARD', 'ancestral_states_ape3', 'ancestral_states_ape4', 'ancestral_states_ape5'),
+               aic = c(AIC(ancestral_states_ape), AIC(ancestral_states_ape1), AIC(ancestral_states_ape2), AIC(ancestral_states_ape3),AIC(ancestral_states_ape4), AIC(ancestral_states_ape5)))
+
+arrange(mod_compare, aic)
+
+```
+So this model fits better, and now lots of transitions that were positive are now zero, which would hint that we can remove them. Lets plot the transition matrix to see.
+
+```{r}
+# plot transition matrix
+ace_transition_df(ancestral_states_ape5) %>%
+  left_join(., select(coding, state_1 = hab_pref, state_1_num = hab_pref_num2, state_1_label = hab_pref_axis)) %>%
+  left_join(., select(coding, state_2 = hab_pref, state_2_num = hab_pref_num2, state_2_label = hab_pref_axis)) %>%
+  mutate(transition_rate = round(transition_rate, 2)) %>%
+  ggplot(., aes(forcats::fct_reorder(state_2_label, state_2_num), forcats::fct_reorder(state_1_label, desc(state_1_num)))) +
+  geom_tile(aes(alpha = transition_rate, col = free_param), width = 0.9, height = 0.9, size = 1.1) +
+  theme_bw(base_size = 14) +
+  theme(panel.grid.major = element_blank(),
+  legend.position = 'none',
+  axis.text.x.top = element_text(angle = 90, vjust = 0.5),
+  plot.title.position = "plot") +
+  scale_alpha_continuous(range = c(0, 0.6)) +
+  geom_text(aes(label = transition_rate), size = MicrobioUoE::pts(10)) +
+  scale_x_discrete(position = 'top', labels = scales::label_wrap(13)) +
+  scale_y_discrete(position = 'left', labels = scales::label_wrap(13)) +
+  labs(y = 'state 1',
+  x = 'state 2',
+  title = paste('all rates different with', length(unique(custom_matrix3[custom_matrix3 != 0])), 'free parameters', sep = ' ')) +
+  coord_fixed() +
+  scale_color_manual(values = c('black', 'red'))
+```
+Some pretty strong rates have now become 0 (which feels a bit weird to me).
+
+Instead we can try and set a bunch of low rates (<0.1) to zero and see how we from there.
+
+```{r}
+custom_matrix4 <- custom_matrix
+
+# get index of rates which are <0.1
+which(ancestral_states_ape3$rates < 0.1)
+
+custom_matrix4[custom_matrix4 %in% which(ancestral_states_ape3$rates < 0.1)] <- 0
+
+# replace values of non-zeroes with correct vector of 1:n parameters
+custom_matrix4[custom_matrix4 != 0] <- 1:length(custom_matrix4[custom_matrix4 != 0])
+
+ancestral_states_ape6 <- ace(hab_pref, tree, model=custom_matrix4, type="discrete")
+
+# check AIC of each model
+mod_compare <- tibble(mod = c('ER', 'SYM', 'ARD', 'ancestral_states_ape3', 'ancestral_states_ape4', 'ancestral_states_ape5', 'ancestral_states_ape6'),
+               aic = c(AIC(ancestral_states_ape), AIC(ancestral_states_ape1), AIC(ancestral_states_ape2), AIC(ancestral_states_ape3),AIC(ancestral_states_ape4), AIC(ancestral_states_ape5), AIC(ancestral_states_ape6)))
+
+arrange(mod_compare, aic)
+
+anova(ancestral_states_ape6, ancestral_states_ape3)
+
+custom_matrix5 <- custom_matrix4
+
+custom_matrix5[custom_matrix5 %in% which(ancestral_states_ape6$rates < 0.1)] <- 0
+
+# replace values of non-zeroes with correct vector of 1:n parameters
+custom_matrix5[custom_matrix5 != 0] <- 1:length(custom_matrix5[custom_matrix5 != 0])
+
+ancestral_states_ape7 <- ace(hab_pref, tree, model=custom_matrix5, type="discrete")
+
+anova(ancestral_states_ape7, ancestral_states_ape6)
+
+# check AIC of each model
+mod_compare <- tibble(mod = c('ER', 'SYM', 'ARD', 'ancestral_states_ape3', 'ancestral_states_ape4', 'ancestral_states_ape5', 'ancestral_states_ape6', 'ancestral_states_ape_7'),
+               aic = c(AIC(ancestral_states_ape), AIC(ancestral_states_ape1), AIC(ancestral_states_ape2), AIC(ancestral_states_ape3),AIC(ancestral_states_ape4), AIC(ancestral_states_ape5), AIC(ancestral_states_ape6), AIC(ancestral_states_ape7)))
+
+arrange(mod_compare, aic)
+
+ace_transition_df(ancestral_states_ape7) %>%
+  left_join(., select(coding, state_1 = hab_pref, state_1_num = hab_pref_num2, state_1_label = hab_pref_axis)) %>%
+  left_join(., select(coding, state_2 = hab_pref, state_2_num = hab_pref_num2, state_2_label = hab_pref_axis)) %>%
+  mutate(transition_rate = round(transition_rate, 2)) %>%
+  ggplot(., aes(forcats::fct_reorder(state_2_label, state_2_num), forcats::fct_reorder(state_1_label, desc(state_1_num)))) +
+  geom_tile(aes(alpha = transition_rate, col = free_param), width = 0.9, height = 0.9, size = 1.1) +
+  theme_bw(base_size = 14) +
+  theme(panel.grid.major = element_blank(),
+  legend.position = 'none',
+  axis.text.x.top = element_text(angle = 90, vjust = 0.5),
+  plot.title.position = "plot") +
+  scale_alpha_continuous(range = c(0, 0.6)) +
+  geom_text(aes(label = transition_rate), size = MicrobioUoE::pts(10)) +
+  scale_x_discrete(position = 'top', labels = scales::label_wrap(13)) +
+  scale_y_discrete(position = 'left', labels = scales::label_wrap(13)) +
+  labs(y = 'state 1',
+  x = 'state 2',
+  title = paste('all rates different with', length(unique(custom_matrix5[custom_matrix5 != 0])), 'free parameters', sep = ' ')) +
+  coord_fixed() +
+  scale_color_manual(values = c('black', 'red'))
+
+```
 
 ## Estimate ancestral states with diversitree
 
@@ -587,18 +694,25 @@ lik <- make.mkn(tree, hab_pref_num2, k = max(hab_pref_num2))
 
 # constrain correct parameters to be 0
 lik_constrain <- constrain(lik, q14~0, q16~0, q17~0,
-                           q24~0, q26~0, q27~0,
-                           q35~0, q36~0,
-                           q42~0, q45~0, q47~0,
-                           q51~0, q53~0, q54~0, q56~0, q57~0,
-                           q61~0, q62~0, q63~0, q64~0,
+                           q27~0,
+                           q34~0, q35~0, q36~0,
+                           q45~0, q46~0, q47~0,
+                           q51~0, q52~0, q53~0, q54~0,
+                           q63~0, q64~0, q67~0,
                            q71~0, q72~0, q74~0, q75~0, q76~0)
 
+argnames(lik_constrain)
+
 # need to pass start values to it - can grab these from the ape::ace, but we will just pass an average rate to the model
-inits <- rep(mean(ancestral_states_ape6$rates), length(ancestral_states_ape6$rates))
+inits <- rep(mean(ancestral_states_ape7$rates), length(argnames(lik_constrain)))
 
 # find the maximum likelihood estimates of this model
 mod_ml <- find.mle(lik_constrain, inits)
+
+# pass inits from the ancestral states model
+inits2 <- ancestral_states_ape7$rates
+
+mod_mcmc <- mcmc(lik_constrain, inits2, nsteps = 10, w = 1)
 
 unname(mod_ml$par)
 
@@ -648,6 +762,18 @@ An alternative approach is to do stochastic mapping of the ancestral states. Wha
 We need to do some initial changes to our transition matrix which we can pass to **make_simmap()** so the $M_{k}$ model is not fitted by this model. Importantly we need to make sure the rows add up to 0, so we need to make the diagonal value of the transition matrix be the negative of the sum of each row.
 
 ```{r phytools_matrix}
+# rename best transition matrix for using it later
+best_matrix <- custom_matrix5
+
+rownames(best_matrix) <- colnames(best_matrix) <- sort(coding$hab_pref)
+
+# get dataframe of transition matrix
+d_best_matrix <- ace_transition_df(ancestral_states_ape7) %>%
+  left_join(., select(coding, state_1 = hab_pref, state_1_num = hab_pref_num2, state_1_label = hab_pref_axis)) %>%
+  left_join(., select(coding, state_2 = hab_pref, state_2_num = hab_pref_num2, state_2_label = hab_pref_axis)) %>%
+  mutate(transition_rate = round(transition_rate, 2)) 
+
+
 # get best matrix
 best_matrix_estimates <- select(d_best_matrix, state_1, state_2, transition_rate) %>%
   spread(state_2, transition_rate) %>%
@@ -815,10 +941,10 @@ We can plot the best transition matrix using **ggplot2**.
 #| fig.width: 7
 
 # rename best transition matrix for using it later
-best_matrix <- custom_matrix
+best_matrix <- custom_matrix5
 
 # get dataframe of transition matrix
-d_best_matrix <- ace_transition_df(ancestral_states_ape3) %>%
+d_best_matrix <- ace_transition_df(ancestral_states_ape7) %>%
   left_join(., select(coding, state_1 = hab_pref, state_1_num = hab_pref_num2, state_1_label = hab_pref_axis)) %>%
   left_join(., select(coding, state_2 = hab_pref, state_2_num = hab_pref_num2, state_2_label = hab_pref_axis)) %>%
   mutate(transition_rate = round(transition_rate, 2)) 
@@ -905,7 +1031,7 @@ p <- ggraph(d_network, layout = 'linear', circular = TRUE) +
   theme_void() +
   #geom_node_label(aes(label = label, x=xmin), repel = TRUE) +
   scale_size(range = c(2,20)) +
-  scale_edge_width(range = c(0.25, 3)) +
+  scale_edge_width(range = c(0.5, 2)) +
   scale_color_manual('Habitat preference', values = cols_hab, labels = c('terrestrial', 'freshwater', 'marine mud', 'generalist')) +
 scale_fill_manual('Habitat preference', values = cols_hab, labels = c('terrestrial', 'freshwater', 'marine mud', 'generalist'))
 
