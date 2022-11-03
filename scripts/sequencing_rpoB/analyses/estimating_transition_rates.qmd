@@ -46,6 +46,8 @@ Go to @sec-best_model for the best $Mk$ model and a discussion of the transition
 
     -   **phytools::make.simmap()**
 
+All of these use a maximum likelihood and trying to run MCMC with **diversitree** took an EXTREMELY long time for only 2 steps (\~30 minutes) which makes this approach pretty inviable. Maybe lets try different implementations?
+
 -   Have written a quick primer to [BayesTraits](https://padpadpadpad.github.io/BayesTraitsAcrAllNodes/) but have not used it on our tree due to the time it takes to run the analysis with a transition matrix where all states are different.
 
 -   Have compared the three standard models of evolution for the transition matrix (equal rates, symmetric rates, and all rates different) using **ape::ace()** and the all-rates different method is best. Then did model simplification to find the best model for the transition matrix.
@@ -403,7 +405,7 @@ We can now try and refit the $Mk$ model to the tree and habitat preference data,
 ```{r ape_2_load}
 #| echo: false
 
-ancestral_states_ape3 <- readRDS(here('data/sequencing_rpoB/processed/transition_rates/ancestral_states_ape3.rds'))
+ancestral_states_ape3.2 <- readRDS(here('data/sequencing_rpoB/processed/transition_rates/ancestral_states_ape3.rds'))
 ```
 
 ```{r ape_2_norun}
@@ -466,7 +468,7 @@ custom_matrix
 custom_matrix2 <- custom_matrix
 
 # set some more rates to 0
-custom_matrix2[custom_matrix2 %in% c(25)] <- 0
+custom_matrix2[custom_matrix2 %in% c(26)] <- 0
 
 # replace values of non-zeroes with correct vector of 1:n parameters
 custom_matrix2[custom_matrix2 != 0] <- 1:length(custom_matrix2[custom_matrix2 != 0])
@@ -508,7 +510,208 @@ arrange(mod_compare, aic)
 
 ```
 
-So this parameter is super important in the model. So our best model is **ancestral_states_ape3**.
+This parameter is super important in the model. When we do model simplification using ANOVAs it says it is important and when we look at AIC scores this new model performs badly. So our best model is **ancestral_states_ape3**. However, other similar methods - using **castor::asr_mk_model()** and **diversitree::fit_mk()** struggle to fit the model with this transition matrix. So the results are not reproducible across very similar algorithms.
+
+So instead we can take the approach to remove all low rates below a certain number, and then simplify from there. I remove all rates from the first custom matrix that are \<0.01. This may circumvent a problem if we are at a local optimum for the transition matrix, as when we set one thing to 0 it changes the values and estimates for the other parameters.
+
+```{r ancestral_ape_5}
+# create new custom matrix
+custom_matrix3 <- custom_matrix
+
+# get index of rates which are <0.1
+which(ancestral_states_ape3$rates < 0.1)
+
+custom_matrix3[custom_matrix3 %in% which(ancestral_states_ape3$rates < 0.1)] <- 0
+
+# replace values of non-zeroes with correct vector of 1:n parameters
+custom_matrix3[custom_matrix3 != 0] <- 1:length(custom_matrix3[custom_matrix3 != 0])
+
+# fit habitat preference model
+ancestral_states_ape5 <- ace(hab_pref, tree, model=custom_matrix3, type="discrete")
+# fit habitat preference model
+ancestral_states_ape5.2 <- ace(hab_pref, tree, model=custom_matrix3, type="discrete")
+
+
+anova(ancestral_states_ape5, ancestral_states_ape3)
+
+# check AIC of each model
+mod_compare <- tibble(mod = c('ER', 'SYM', 'ARD', 'ancestral_states_ape3', 'ancestral_states_ape4', 'ancestral_states_ape5'),
+               aic = c(AIC(ancestral_states_ape), AIC(ancestral_states_ape1), AIC(ancestral_states_ape2), AIC(ancestral_states_ape3),AIC(ancestral_states_ape4), AIC(ancestral_states_ape5)))
+
+arrange(mod_compare, aic)
+
+```
+
+So using this method, we have vastly improved the model. We can now plot these results and see if there are other parameters that can be set to zero.
+
+```{r plot_ancestral_ape_5}
+#| fig.height: 5
+#| fig.width: 7
+
+# plot transition matrix
+ace_transition_df(ancestral_states_ape5) %>%
+  left_join(., select(coding, state_1 = hab_pref, state_1_num = hab_pref_num2, state_1_label = hab_pref_axis)) %>%
+  left_join(., select(coding, state_2 = hab_pref, state_2_num = hab_pref_num2, state_2_label = hab_pref_axis)) %>%
+  mutate(transition_rate = round(transition_rate, 2)) %>%
+  ggplot(., aes(forcats::fct_reorder(state_2_label, state_2_num), forcats::fct_reorder(state_1_label, desc(state_1_num)))) +
+  geom_tile(aes(alpha = transition_rate, col = free_param), width = 0.9, height = 0.9, size = 1.1) +
+  theme_bw(base_size = 14) +
+  theme(panel.grid.major = element_blank(),
+  legend.position = 'none',
+  axis.text.x.top = element_text(angle = 90, vjust = 0.5),
+  plot.title.position = "plot") +
+  scale_alpha_continuous(range = c(0, 0.6)) +
+  geom_text(aes(label = transition_rate), size = MicrobioUoE::pts(10)) +
+  scale_x_discrete(position = 'top', labels = scales::label_wrap(13)) +
+  scale_y_discrete(position = 'left', labels = scales::label_wrap(13)) +
+  labs(y = 'state 1',
+  x = 'state 2',
+  title = paste('all rates different with', length(ancestral_states_ape5$rates), 'free parameters', sep = ' ')) +
+  coord_fixed() +
+  scale_color_manual(values = c('black', 'red'))
+```
+
+We can once again remove low rates (again defined as 0.1) to see if that improves the model.
+
+```{r ancestral_states_ape6}
+
+custom_matrix4 <- custom_matrix3
+
+custom_matrix4[custom_matrix4 %in% which(ancestral_states_ape5$rates < 0.1)] <- 0
+
+# replace values of non-zeroes with correct vector of 1:n parameters
+custom_matrix4[custom_matrix4 != 0] <- 1:length(custom_matrix4[custom_matrix4 != 0])
+
+ancestral_states_ape6 <- ace(hab_pref, tree, model=custom_matrix4, type="discrete")
+
+anova(ancestral_states_ape6, ancestral_states_ape5)
+
+# check AIC of each model
+mod_compare <- tibble(mod = c('ER', 'SYM', 'ARD', 'ancestral_states_ape3', 'ancestral_states_ape4', 'ancestral_states_ape5', 'ancestral_states_ape6'),
+               aic = c(AIC(ancestral_states_ape), AIC(ancestral_states_ape1), AIC(ancestral_states_ape2), AIC(ancestral_states_ape3),AIC(ancestral_states_ape4), AIC(ancestral_states_ape5), AIC(ancestral_states_ape6)))
+
+arrange(mod_compare, aic)
+
+```
+
+Again this model is better than the previous model by a considerable amount. Lets plot it to see what the transition matrix looks like.
+
+```{r plot_ancestral_states_ape6}
+#| fig.height: 5
+#| fig.width: 7
+
+# plot transition matrix
+ace_transition_df(ancestral_states_ape6) %>%
+  left_join(., select(coding, state_1 = hab_pref, state_1_num = hab_pref_num2, state_1_label = hab_pref_axis)) %>%
+  left_join(., select(coding, state_2 = hab_pref, state_2_num = hab_pref_num2, state_2_label = hab_pref_axis)) %>%
+  mutate(transition_rate = round(transition_rate, 2)) %>%
+  ggplot(., aes(forcats::fct_reorder(state_2_label, state_2_num), forcats::fct_reorder(state_1_label, desc(state_1_num)))) +
+  geom_tile(aes(alpha = transition_rate, col = free_param), width = 0.9, height = 0.9, size = 1.1) +
+  theme_bw(base_size = 14) +
+  theme(panel.grid.major = element_blank(),
+  legend.position = 'none',
+  axis.text.x.top = element_text(angle = 90, vjust = 0.5),
+  plot.title.position = "plot") +
+  scale_alpha_continuous(range = c(0, 0.6)) +
+  geom_text(aes(label = transition_rate), size = MicrobioUoE::pts(10)) +
+  scale_x_discrete(position = 'top', labels = scales::label_wrap(13)) +
+  scale_y_discrete(position = 'left', labels = scales::label_wrap(13)) +
+  labs(y = 'state 1',
+  x = 'state 2',
+  title = paste('all rates different with', length(ancestral_states_ape6$rates), 'free parameters', sep = ' ')) +
+  coord_fixed() +
+  scale_color_manual(values = c('black', 'red'))
+
+```
+
+Ok we can see that some values are now estimated to be 0 (and none are non-zero but \< 0.1). We can set these to be zero in our transition matrix and compare the models.
+
+```{r ancestral_states_ape7}
+
+custom_matrix5 <- custom_matrix4
+
+custom_matrix5[custom_matrix5 %in% which(ancestral_states_ape6$rates < 0.1)] <- 0
+
+# replace values of non-zeroes with correct vector of 1:n parameters
+custom_matrix5[custom_matrix5 != 0] <- 1:length(custom_matrix5[custom_matrix5 != 0])
+
+ancestral_states_ape7 <- ace(hab_pref, tree, model=custom_matrix5, type="discrete")
+
+anova(ancestral_states_ape7, ancestral_states_ape6)
+
+# check AIC of each model
+mod_compare <- tibble(mod = c('ER', 'SYM', 'ARD', 'ancestral_states_ape3', 'ancestral_states_ape4', 'ancestral_states_ape5', 'ancestral_states_ape6', 'ancestral_states_ape7'),
+               aic = c(AIC(ancestral_states_ape), AIC(ancestral_states_ape1), AIC(ancestral_states_ape2), AIC(ancestral_states_ape3),AIC(ancestral_states_ape4), AIC(ancestral_states_ape5), AIC(ancestral_states_ape6), AIC(ancestral_states_ape7)))
+
+arrange(mod_compare, aic)
+
+```
+
+This model is again better than the previous model! We can again plot the results.
+
+```{r plot_ancestral_states_ape7}
+#| fig.height: 5
+#| fig.width: 7
+
+# plot transition matrix
+ace_transition_df(ancestral_states_ape7) %>%
+  left_join(., select(coding, state_1 = hab_pref, state_1_num = hab_pref_num2, state_1_label = hab_pref_axis)) %>%
+  left_join(., select(coding, state_2 = hab_pref, state_2_num = hab_pref_num2, state_2_label = hab_pref_axis)) %>%
+  mutate(transition_rate = round(transition_rate, 2)) %>%
+  ggplot(., aes(forcats::fct_reorder(state_2_label, state_2_num), forcats::fct_reorder(state_1_label, desc(state_1_num)))) +
+  geom_tile(aes(alpha = transition_rate, col = free_param), width = 0.9, height = 0.9, size = 1.1) +
+  theme_bw(base_size = 14) +
+  theme(panel.grid.major = element_blank(),
+  legend.position = 'none',
+  axis.text.x.top = element_text(angle = 90, vjust = 0.5),
+  plot.title.position = "plot") +
+  scale_alpha_continuous(range = c(0, 0.6)) +
+  geom_text(aes(label = transition_rate), size = MicrobioUoE::pts(10)) +
+  scale_x_discrete(position = 'top', labels = scales::label_wrap(13)) +
+  scale_y_discrete(position = 'left', labels = scales::label_wrap(13)) +
+  labs(y = 'state 1',
+  x = 'state 2',
+  title = paste('all rates different with', length(ancestral_states_ape7$rates), 'free parameters', sep = ' ')) +
+  coord_fixed() +
+  scale_color_manual(values = c('black', 'red'))
+
+```
+
+There are no longer any rates less than 0.1. Instead we will remove the lowest rate and refit the model to see if it is better or worse.
+
+```{r ancestral_states_ape8}
+
+custom_matrix6 <- custom_matrix5
+
+custom_matrix6[custom_matrix6 %in% which(ancestral_states_ape7$rates == min(ancestral_states_ape7$rates))] <- 0
+
+# replace values of non-zeroes with correct vector of 1:n parameters
+custom_matrix6[custom_matrix6 != 0] <- 1:length(custom_matrix6[custom_matrix6 != 0])
+
+ancestral_states_ape8 <- ace(hab_pref, tree, model=custom_matrix6, type="discrete")
+
+anova(ancestral_states_ape8, ancestral_states_ape7)
+
+# check AIC of each model
+mod_compare <- tibble(mod = c('ER', 'SYM', 'ARD', 'ancestral_states_ape3', 'ancestral_states_ape4', 'ancestral_states_ape5', 'ancestral_states_ape6', 'ancestral_states_ape7', 'ancestral_states_ape8'),
+               aic = c(AIC(ancestral_states_ape), AIC(ancestral_states_ape1), AIC(ancestral_states_ape2), AIC(ancestral_states_ape3),AIC(ancestral_states_ape4), AIC(ancestral_states_ape5), AIC(ancestral_states_ape6), AIC(ancestral_states_ape7), AIC(ancestral_states_ape8)))
+
+arrange(mod_compare, aic)
+
+#
+custom_matrix7 <- custom_matrix5
+custom_matrix7[length(custom_matrix7) - 2] <- 20
+custom_matrix7[length(custom_matrix7) - 1] <- 0
+
+ancestral_states_ape9 <- ace(hab_pref, tree, model=custom_matrix7, type="discrete")
+
+anova(ancestral_states_ape8, ancestral_states_ape7)
+
+
+
+```
+
+This parameter is significant in the model so we should not remove it! We have reached the best model using this approach. That is **ancestral_states_ape7**.
 
 ## Estimate ancestral states with castor::asr_mk_model()
 
@@ -570,119 +773,9 @@ filter(d_transition_compare, free_param == 'yes') %>%
 
 ```
 
-The transition rates from both approaches do not match! This is not good news. I wonder if we could set some symmetric rates to get an overall better fit and more consistent convergence.
+The transition rates from both approaches match pretty well. This is good news.Estimate ancestral states with diversitree
 
-```{r set_some_symmetric_rates}
-# input the rates into the custom matrix
-custom_matrix3 <- custom_matrix
-
-# make some transitions symmetric:
-# marine mud to freshwater and vice versa
-custom_matrix3[custom_matrix3 %in% c(21)] <- 4
-custom_matrix3[custom_matrix3 > 21] <- custom_matrix3[custom_matrix3 > 21] -1
-
-ancestral_states_ape5 <- ace(hab_pref, tree, model=custom_matrix3, type="discrete")
-
-anova(ancestral_states_ape3, ancestral_states_ape5)
-
-# check AIC of each model
-mod_compare <- tibble(mod = c('ER', 'SYM', 'ARD', 'ancestral_states_ape3', 'ancestral_states_ape4', 'ancestral_states_ape5'),
-               aic = c(AIC(ancestral_states_ape), AIC(ancestral_states_ape1), AIC(ancestral_states_ape2), AIC(ancestral_states_ape3),AIC(ancestral_states_ape4), AIC(ancestral_states_ape5)))
-
-arrange(mod_compare, aic)
-
-```
-So this model fits better, and now lots of transitions that were positive are now zero, which would hint that we can remove them. Lets plot the transition matrix to see.
-
-```{r}
-# plot transition matrix
-ace_transition_df(ancestral_states_ape5) %>%
-  left_join(., select(coding, state_1 = hab_pref, state_1_num = hab_pref_num2, state_1_label = hab_pref_axis)) %>%
-  left_join(., select(coding, state_2 = hab_pref, state_2_num = hab_pref_num2, state_2_label = hab_pref_axis)) %>%
-  mutate(transition_rate = round(transition_rate, 2)) %>%
-  ggplot(., aes(forcats::fct_reorder(state_2_label, state_2_num), forcats::fct_reorder(state_1_label, desc(state_1_num)))) +
-  geom_tile(aes(alpha = transition_rate, col = free_param), width = 0.9, height = 0.9, size = 1.1) +
-  theme_bw(base_size = 14) +
-  theme(panel.grid.major = element_blank(),
-  legend.position = 'none',
-  axis.text.x.top = element_text(angle = 90, vjust = 0.5),
-  plot.title.position = "plot") +
-  scale_alpha_continuous(range = c(0, 0.6)) +
-  geom_text(aes(label = transition_rate), size = MicrobioUoE::pts(10)) +
-  scale_x_discrete(position = 'top', labels = scales::label_wrap(13)) +
-  scale_y_discrete(position = 'left', labels = scales::label_wrap(13)) +
-  labs(y = 'state 1',
-  x = 'state 2',
-  title = paste('all rates different with', length(unique(custom_matrix3[custom_matrix3 != 0])), 'free parameters', sep = ' ')) +
-  coord_fixed() +
-  scale_color_manual(values = c('black', 'red'))
-```
-Some pretty strong rates have now become 0 (which feels a bit weird to me).
-
-Instead we can try and set a bunch of low rates (<0.1) to zero and see how we from there.
-
-```{r}
-custom_matrix4 <- custom_matrix
-
-# get index of rates which are <0.1
-which(ancestral_states_ape3$rates < 0.1)
-
-custom_matrix4[custom_matrix4 %in% which(ancestral_states_ape3$rates < 0.1)] <- 0
-
-# replace values of non-zeroes with correct vector of 1:n parameters
-custom_matrix4[custom_matrix4 != 0] <- 1:length(custom_matrix4[custom_matrix4 != 0])
-
-ancestral_states_ape6 <- ace(hab_pref, tree, model=custom_matrix4, type="discrete")
-
-# check AIC of each model
-mod_compare <- tibble(mod = c('ER', 'SYM', 'ARD', 'ancestral_states_ape3', 'ancestral_states_ape4', 'ancestral_states_ape5', 'ancestral_states_ape6'),
-               aic = c(AIC(ancestral_states_ape), AIC(ancestral_states_ape1), AIC(ancestral_states_ape2), AIC(ancestral_states_ape3),AIC(ancestral_states_ape4), AIC(ancestral_states_ape5), AIC(ancestral_states_ape6)))
-
-arrange(mod_compare, aic)
-
-anova(ancestral_states_ape6, ancestral_states_ape3)
-
-custom_matrix5 <- custom_matrix4
-
-custom_matrix5[custom_matrix5 %in% which(ancestral_states_ape6$rates < 0.1)] <- 0
-
-# replace values of non-zeroes with correct vector of 1:n parameters
-custom_matrix5[custom_matrix5 != 0] <- 1:length(custom_matrix5[custom_matrix5 != 0])
-
-ancestral_states_ape7 <- ace(hab_pref, tree, model=custom_matrix5, type="discrete")
-
-anova(ancestral_states_ape7, ancestral_states_ape6)
-
-# check AIC of each model
-mod_compare <- tibble(mod = c('ER', 'SYM', 'ARD', 'ancestral_states_ape3', 'ancestral_states_ape4', 'ancestral_states_ape5', 'ancestral_states_ape6', 'ancestral_states_ape_7'),
-               aic = c(AIC(ancestral_states_ape), AIC(ancestral_states_ape1), AIC(ancestral_states_ape2), AIC(ancestral_states_ape3),AIC(ancestral_states_ape4), AIC(ancestral_states_ape5), AIC(ancestral_states_ape6), AIC(ancestral_states_ape7)))
-
-arrange(mod_compare, aic)
-
-ace_transition_df(ancestral_states_ape7) %>%
-  left_join(., select(coding, state_1 = hab_pref, state_1_num = hab_pref_num2, state_1_label = hab_pref_axis)) %>%
-  left_join(., select(coding, state_2 = hab_pref, state_2_num = hab_pref_num2, state_2_label = hab_pref_axis)) %>%
-  mutate(transition_rate = round(transition_rate, 2)) %>%
-  ggplot(., aes(forcats::fct_reorder(state_2_label, state_2_num), forcats::fct_reorder(state_1_label, desc(state_1_num)))) +
-  geom_tile(aes(alpha = transition_rate, col = free_param), width = 0.9, height = 0.9, size = 1.1) +
-  theme_bw(base_size = 14) +
-  theme(panel.grid.major = element_blank(),
-  legend.position = 'none',
-  axis.text.x.top = element_text(angle = 90, vjust = 0.5),
-  plot.title.position = "plot") +
-  scale_alpha_continuous(range = c(0, 0.6)) +
-  geom_text(aes(label = transition_rate), size = MicrobioUoE::pts(10)) +
-  scale_x_discrete(position = 'top', labels = scales::label_wrap(13)) +
-  scale_y_discrete(position = 'left', labels = scales::label_wrap(13)) +
-  labs(y = 'state 1',
-  x = 'state 2',
-  title = paste('all rates different with', length(unique(custom_matrix5[custom_matrix5 != 0])), 'free parameters', sep = ' ')) +
-  coord_fixed() +
-  scale_color_manual(values = c('black', 'red'))
-
-```
-
-## Estimate ancestral states with diversitree
+## Estimate ancestral states with diversitree::fit_mk()
 
 We can also do the equivalent analysis using **diversitree**. This might be beneficial because it can also be used for BiSSE models later on.
 
@@ -697,8 +790,8 @@ lik_constrain <- constrain(lik, q14~0, q16~0, q17~0,
                            q27~0,
                            q34~0, q35~0, q36~0,
                            q45~0, q46~0, q47~0,
-                           q51~0, q52~0, q53~0, q54~0,
-                           q63~0, q64~0, q67~0,
+                           q51~0, q52~0, q53~0, q54~0, q57~0,
+                           q63~0, q64~0,
                            q71~0, q72~0, q74~0, q75~0, q76~0)
 
 argnames(lik_constrain)
@@ -712,12 +805,12 @@ mod_ml <- find.mle(lik_constrain, inits)
 # pass inits from the ancestral states model
 inits2 <- ancestral_states_ape7$rates
 
-mod_mcmc <- mcmc(lik_constrain, inits2, nsteps = 10, w = 1)
+# mod_mcmc <- mcmc(lik_constrain, inits2, nsteps = 10, w = 1)
 
 unname(mod_ml$par)
 
 # save out diversitree model
-saveRDS(mod_ml, here("sequencing_rpoB/data/processed/diversitree_mk_model.rds"))
+saveRDS(mod_ml, here("data/sequencing_rpoB/processed/diversitree_mk_model.rds"))
 
 ```
 
@@ -1073,6 +1166,8 @@ We tried this on the whole tree, but it broke my Mac so instead we are doing it 
 ```{r plot_nodepies1}
 #| fig.height: 8
 #| fig.width: 9
+#| eval: false
+
 
 # grab out marginal likelihood for each node
 # will use results from the stochastic character mapping
@@ -1180,6 +1275,7 @@ An alternative approach here is to not only plot each monomorphic state in the p
 ```{r plot_nodepies2}
 #| fig.height: 8
 #| fig.width: 9
+#| eval: false
 
 # change probabilities to just be marine, freshwater or terrestrial
 d_acr_single <- filter(d_acr_phytools, habitat_preference %in% c('terrestrial', 'mud_and_shore', 'freshwater'))
@@ -1239,6 +1335,7 @@ If there is no difference in ancestral state reconstruction between shift nodes 
 ```{r shift_node_explore}
 #| fig-height: 8
 #| fig-width: 10
+#| eval: false
 
 # check whether internal node has a shift in or not
 d_acr_phytools <- mutate(d_acr_phytools, shift = ifelse(node %in% shiftnodes, 'shift', 'noshift'))
