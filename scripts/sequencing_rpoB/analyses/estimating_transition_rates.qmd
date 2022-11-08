@@ -641,6 +641,8 @@ mod_compare <- tibble(mod = c('ER', 'SYM', 'ARD', 'ancestral_states_ape3', 'ance
 
 arrange(mod_compare, aic)
 
+saveRDS(ancestral_states_ape7, here('data/sequencing_rpoB/processed/transition_rates/ancestral_states_ape7.rds'))
+
 ```
 
 This model is again better than the previous model! We can again plot the results.
