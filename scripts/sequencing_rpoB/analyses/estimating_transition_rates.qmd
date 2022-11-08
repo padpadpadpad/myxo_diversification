@@ -405,7 +405,7 @@ We can now try and refit the $Mk$ model to the tree and habitat preference data,
 ```{r ape_2_load}
 #| echo: false
 
-ancestral_states_ape3.2 <- readRDS(here('data/sequencing_rpoB/processed/transition_rates/ancestral_states_ape3.rds'))
+ancestral_states_ape3 <- readRDS(here('data/sequencing_rpoB/processed/transition_rates/ancestral_states_ape3.rds'))
 ```
 
 ```{r ape_2_norun}
@@ -528,9 +528,6 @@ custom_matrix3[custom_matrix3 != 0] <- 1:length(custom_matrix3[custom_matrix3 !=
 
 # fit habitat preference model
 ancestral_states_ape5 <- ace(hab_pref, tree, model=custom_matrix3, type="discrete")
-# fit habitat preference model
-ancestral_states_ape5.2 <- ace(hab_pref, tree, model=custom_matrix3, type="discrete")
-
 
 anova(ancestral_states_ape5, ancestral_states_ape3)
 
@@ -591,7 +588,6 @@ mod_compare <- tibble(mod = c('ER', 'SYM', 'ARD', 'ancestral_states_ape3', 'ance
                aic = c(AIC(ancestral_states_ape), AIC(ancestral_states_ape1), AIC(ancestral_states_ape2), AIC(ancestral_states_ape3),AIC(ancestral_states_ape4), AIC(ancestral_states_ape5), AIC(ancestral_states_ape6)))
 
 arrange(mod_compare, aic)
-
 ```
 
 Again this model is better than the previous model by a considerable amount. Lets plot it to see what the transition matrix looks like.
@@ -697,18 +693,6 @@ mod_compare <- tibble(mod = c('ER', 'SYM', 'ARD', 'ancestral_states_ape3', 'ance
                aic = c(AIC(ancestral_states_ape), AIC(ancestral_states_ape1), AIC(ancestral_states_ape2), AIC(ancestral_states_ape3),AIC(ancestral_states_ape4), AIC(ancestral_states_ape5), AIC(ancestral_states_ape6), AIC(ancestral_states_ape7), AIC(ancestral_states_ape8)))
 
 arrange(mod_compare, aic)
-
-#
-custom_matrix7 <- custom_matrix5
-custom_matrix7[length(custom_matrix7) - 2] <- 20
-custom_matrix7[length(custom_matrix7) - 1] <- 0
-
-ancestral_states_ape9 <- ace(hab_pref, tree, model=custom_matrix7, type="discrete")
-
-anova(ancestral_states_ape8, ancestral_states_ape7)
-
-
-
 ```
 
 This parameter is significant in the model so we should not remove it! We have reached the best model using this approach. That is **ancestral_states_ape7**.
@@ -904,7 +888,7 @@ ancestral_states_phytools <- readRDS(here("data/sequencing_rpoB/processed/transi
 
 # do stochastic mapping of character traits using phytools
 # feed in the best transition matrix previously found using other methods
-ancestral_states_phytools <- make.simmap(tree, hab_pref, nsim = 1000, Q = best_matrix_estimates)
+ancestral_states_phytools <- make.simmap(tree, hab_pref, nsim = 100, Q = best_matrix_estimates)
 ```
 
 It has finished! We can count the number of transitions between each state using **describe.simmap()**. We can then plot these to see the distribution of **numbers of transitions**.
@@ -1092,6 +1076,10 @@ First need to change our transition matrix into a network.
 ```{r make_network_data}
 #| fig-height: 6
 #| fig-width: 8
+# set colours
+cols_hab <- met.brewer('Austria', n = 7)
+names(cols_hab) <- c('mud_and_shore', 'freshwater', 'terrestrial', 'freshwater:terrestrial', 'generalist', 'mud_and_shore:terrestrial', 'freshwater:mud_and_shore')
+hab_labels <- c('marine mud', 'freshwater', 'terrestrial', 'freshwater + terrestrial', 'generalist', 'marine mud + terrestrial', 'freshwater + marine mud')
 
 # calculate mean time spent in each state
 d_timespent <- group_by(d_time, state) %>%
@@ -1118,9 +1106,7 @@ p <- ggraph(d_network, layout = 'linear', circular = TRUE) +
                 end_cap = circle(10, 'mm'),
                 start_cap = circle(10, 'mm')) + 
   geom_node_point(aes(size = mean,
-                col = hab1, fill = hab2),
-                shape = 21,
-                stroke = 2) +
+                col = name)) +
   theme_void() +
   #geom_node_label(aes(label = label, x=xmin), repel = TRUE) +
   scale_size(range = c(2,20)) +
@@ -1144,7 +1130,6 @@ p + geom_label(aes(nudge_x + x, nudge_y+y, label = label), point_data, size = Mi
 
 #ggsave(here('sequencing_rpoB/plots/analyses/transition_plot.pdf'), last_plot(), height = 6, width = 8)
 ggsave(here('plots/sequencing_rpoB/analyses/transition_plot.png'), last_plot(), height = 6, width = 8)
-
 
 ```
 
