@@ -102,14 +102,10 @@ library(GGally)
 library(ggrepel)
 
 # set where I am in the project
-here::i_am('scripts/sequencing_rpoB/analyses/estimating_transition_rates.qmd')
-
+here::i_am('scripts/sequencing_rpoB/analyses/estimating_transition_rates_v3.qmd')
 
 # read in metadata
 d_meta <- read.csv(here('data/sequencing_rpoB/processed/asv_metadata.csv'))
-
-# read in habitat trait colours
-cols_hab <- readRDS(here('data/sequencing_rpoB/processed/habitat_colours.rds'))
 
 # read in tree
 tree <- read.tree(here('data/sequencing_rpoB/bamm/rerooted-pruned-chronopl10.tre'))
@@ -129,35 +125,6 @@ shiftnodes <- readRDS(here('data/sequencing_rpoB/processed/shiftnodes.rds'))
 ## Custom function
 
 We will write a custom function for getting the transition matrix into a format that is easy to plot using **ggplot2**.
-
-```{r custom_functions}
-
-# get dataframe of transition rates
-ace_transition_df <- function(ace_object){
-  
-  temp_1 <- ace_object$index.matrix
-  colnames(temp_1) <- rownames(temp_1) <- colnames(ace_object$lik.anc)
-  
-  # turn into dataframe
-  temp_1 <- as_tibble(temp_1, rownames = 'state_1') %>%
-    # make long format, the column names become state 2
-    pivot_longer(freshwater:terrestrial, names_to = 'state_2', values_to = 'order') %>%
-    mutate(free_param = ifelse(is.na(order)|order==0, 'no', 'yes'),
-           num_params = length(ace_object$rates))
-  
-  temp_1$transition_rate <- NA
-  temp_1$transition_rate[temp_1$order == 0] = 0
-  
-  # run for loop to input estimated transition rates
-  for(i in 1:length(ace_object$rates)){
-    temp_1[temp_1$order %in% i,]$transition_rate <- ace_object$rates[i]
-  }
-  
-  return(select(temp_1, -order, state_1, state_2, transition_rate, free_param, num_params))
-  
-}
-
-```
 
 ## Create a master dataframe for the trait states
 
@@ -193,10 +160,6 @@ coding <- tibble(hab_pref = unname(hab_pref), hab_pref_num = unname(hab_pref_num
   initials = c('F', 'FM', 'FT', 'G', 'M', 'MT', 'T'))
 
 coding
-
-# save out habitat preference vector
-saveRDS(hab_pref, here("data/sequencing_rpoB/processed/hab_pref_vec.rds"))
-
 ```
 
 This results in a dataframe which allows us to easily link between numeric and character values, and also gives us a vector - of the same length of tips in our tree - which we can use for estimating ancestral states.
@@ -205,7 +168,55 @@ This results in a dataframe which allows us to easily link between numeric and c
 
 First lets fit each of the models (ER, SYM, and ARD) using **diversitree::fit_mk()**. We can compare these models using AIC and likelihood ratio tests to see which model fits the tree best.
 
-```{r diversitree_1}
+**diversitree** is good because it makes us implicitly code the transitions we want to set to 0 or make equivalent, which aids our understanding of the models we are trying to fit. Its downside is that it takes numbers only, so we have to back-transform our model estimates into their biologically meaningful trait values.
+
+```{r diversitree_1_load}
+#| echo: false
+
+# save out files
+mod_er <- readRDS(here('data/sequencing_rpoB/processed/transition_rates/mod_er_mac.rds'))
+mod_sym <- readRDS(here('data/sequencing_rpoB/processed/transition_rates/mod_sym_mac.rds'))
+mod_ard <- readRDS(here('data/sequencing_rpoB/processed/transition_rates/mod_ard_mac.rds'))
+
+# all of these methods needs a likelihood function, we can build a Mkn model
+lik_ard <- make.mkn(tree, hab_pref_num2, k = max(hab_pref_num2))
+
+argnames(lik_ard)
+
+# make symmetric rates model
+lik_sym <- constrain(lik_ard, 
+                     q12~q21, q13~q31, q14~q41, q15~q51, q16~q61, q17~q71,
+                     q23~q32, q24~q42, q25~q52, q26~q62, q27~q72,
+                     q34~q43, q35~q53, q36~q63, q37~q73,
+                     q45~q54, q46~q64, q47~q74,
+                     q56~q65, q57~q75,
+                     q67~q76
+                     )
+
+argnames(lik_sym)
+
+# make equal rates model
+lik_er <- constrain.i(lik_ard, rep('q12', length(argnames(lik_ard))), i.free = 1)
+
+lik_er <- constrain(lik_ard,
+                    q13~q12, q14~q12, q15~q12, q16~q12, q17~q12,
+                    q21~q12, q23~q12, q24~q12, q25~q12, q26~q12, q27~q12,
+                    q31~q12, q32~q12, q34~q12, q35~q12, q36~q12, q37~q12,
+                    q41~q12, q42~q12, q43~q12, q45~q12, q46~q12, q47~q12,
+                    q51~q12, q52~q12, q53~q12, q54~q12, q56~q12, q57~q12,
+                    q61~q12, q62~q12, q63~q12, q64~q12, q65~q12, q67~q12,
+                    q71~q12, q72~q12, q73~q12, q74~q12, q75~q12, q76~q12)
+
+argnames(lik_er)
+
+# need to pass start values to it - can grab these from the ape::ace, but we will just pass an average rate to the model
+inits_ard <- rep(1, length(argnames(lik_ard)))
+inits_sym <- rep(1, length(argnames(lik_sym)))
+inits_er <- rep(1, length(argnames(lik_er)))
+```
+
+```{r diversitree_1_setup}
+#| eval: false
 
 # all of these methods needs a likelihood function, we can build a Mkn model
 lik_ard <- make.mkn(tree, hab_pref_num2, k = max(hab_pref_num2))
@@ -251,153 +262,484 @@ mod_ard <- find.mle(lik_ard, inits_ard, method = 'subplex', control = list(maxit
 AIC(mod_er)
 AIC(mod_sym)
 AIC(mod_ard)
+```
 
-# save out files
-saveRDS(mod_er, here('data/sequencing_rpoB/processed/transition_rates/mod_er_ubu.rds'))
-saveRDS(mod_sym, here('data/sequencing_rpoB/processed/transition_rates/mod_sym_ubu.rds'))
-saveRDS(mod_ard, here('data/sequencing_rpoB/processed/transition_rates/mod_ard_ubu.rds'))
+We can compare model fit using AIC and anovas
+
+```{r diversitree_1_compare}
+
+AIC(mod_sym, mod_ard, mod_er) %>% arrange(AIC)
+
+anova(mod_ard, mod_sym)
+anova(mod_ard, mod_er)
 
 ```
 
+So the ARD model is the best model by a considerable margin using AIC. We can do model simplification of this model to see what parameters can be removed to further improve the model. First we will just plot the distribution of estimated parameters. As most rates are very small we shall do another histogram filtering out the larger rates.
 
+```{r plot_ard}
+#| fig.height: 4
+#| fig.width: 10
 
-```{r ape_1_save}
-#| warnings: false
-#| message: false
-#| eval: false
-#| echo: false
+# look at paraemters
+mod_ard$par
 
-# with ape
-ancestral_states_ape <- ace(hab_pref, tree, model="ER", type="discrete")
-ancestral_states_ape1 <- ace(hab_pref, tree, model="SYM", type="discrete")
-ancestral_states_ape2 <- ace(hab_pref, tree, model="ARD", type="discrete")
+# plot of all parameters
+p1 <- tibble(rate = mod_ard$par) %>%
+  ggplot(., aes(rate)) +
+  geom_histogram(fill = 'white', col = 'black') +
+  theme_bw()
 
-# save out files
-saveRDS(ancestral_states_ape, here('data/sequencing_rpoB/processed/transition_rates/ancestral_states_ape_mac.rds'))
-saveRDS(ancestral_states_ape1, here('data/sequencing_rpoB/processed/transition_rates/ancestral_states_ape1_mac.rds'))
-saveRDS(ancestral_states_ape2, here('data/sequencing_rpoB/processed/transition_rates/ancestral_states_ape2_mac.rds'))
+# plot of constrained x axis (rates <1)
+p2 <- tibble(rate = mod_ard$par) %>%
+  filter(rate < 1) %>%
+  ggplot(., aes(rate)) +
+  geom_histogram(fill = 'white', col = 'black') +
+  theme_bw()
+
+p1+p2
+
+# sort parameter estimates
+mod_ard$par %>% sort()
+
+# get parameters close to 0.
+mod_ard$par[mod_ard$par < 1e-03] %>% names(.)
+
 ```
 
-```{r ape_1_load}
+We can immediately see there are many parameters that are extremely close to 0. We shall set these to zero and refit the model. This plot identifies a bunch of parameters that are extremely close to 1. By sorting them we can see the split here is from e-06 to e-02.
+
+```{r diversitree_2_load}
 #| echo: false
 
 # read in files
-ancestral_states_ape <- readRDS(here('data/sequencing_rpoB/processed/transition_rates/ancestral_states_ape_mac.rds'))
-ancestral_states_ape1 <- readRDS(here('data/sequencing_rpoB/processed/transition_rates/ancestral_states_ape1_mac.rds'))
-ancestral_states_ape2 <- readRDS(here('data/sequencing_rpoB/processed/transition_rates/ancestral_states_ape2_mac.rds'))
+mod_custom1 <- readRDS(here('data/sequencing_rpoB/processed/transition_rates/mod_custom1_mac.rds'))
+
+# make custom matrix model
+lik_custom1 <- constrain(lik_ard, 
+                     q16~0, q26~0, q27~0, q35~0, q36~0, q42~0, q46~0, q47~0, q53~0, q54~0, q63~0, q64~0, q72~0, q74~0)
+
+# make start parameters
+inits_custom1 <- rep(1, length(argnames(lik_custom1)))
+
 ```
 
-```{r ape_1_norun}
+```{r diversitree_2_setup}
 #| eval: false
 
-# do ancestral reconstruction with ape
-ancestral_states_ape <- ace(hab_pref, tree, model="ER", type="discrete")
-ancestral_states_ape1 <- ace(hab_pref, tree, model="SYM", type="discrete")
-ancestral_states_ape2 <- ace(hab_pref, tree, model="ARD", type="discrete")
+# make custom matrix model
+lik_custom1 <- constrain(lik_ard, 
+                     q16~0, q26~0, q27~0, q35~0, q36~0, q42~0, q46~0, q47~0, q53~0, q54~0, q63~0, q64~0, q72~0, q74~0)
+
+# make start parameters
+inits_custom1 <- rep(1, length(argnames(lik_custom1)))
+
+# run model
+mod_custom1 <- find.mle(lik_custom1, inits_custom1, method = 'subplex', control = list(maxit = 50000))
+
 
 ```
 
-We can do model comparison using both AIC scores and likelihood ratio tests.
+We can now do model comparison again.
 
-```{r ape_1_compare}
-# compare models
-anova(ancestral_states_ape, ancestral_states_ape1)
-anova(ancestral_states_ape1, ancestral_states_ape2)
+```{r diversitree_2_compare}
+# do AIC comparison
+AIC(mod_sym, mod_ard, mod_er, mod_custom1) %>% arrange(AIC)
 
-# check AIC of each model
-mod_compare <- tibble(mod = c('ER', 'SYM', 'ARD'),
-               aic = c(AIC(ancestral_states_ape), AIC(ancestral_states_ape1), AIC(ancestral_states_ape2)))
-mod_compare
+# anova
+anova(mod_ard, mod_custom1)
 ```
 
-From these comparisons we can see that the ARD model, where all rates in the transition rate are allowed to be different, is the best model in terms of both doing likelihood ratio tests of nested models and AIC scores.
+This model is loads better again. We can again look at the distribution of rates to see how they look.
 
-### Do some rudimentary checks of ape::ace()
+```{r plot_custom1}
+# filter for only estimated parameters
+mod_custom1$par.full[names(mod_custom1$par.full) %in% argnames(lik_custom1)] 
+# plot of all parameters
+p1 <- tibble(rate = mod_custom1$par.full[names(mod_custom1$par.full) %in% argnames(lik_custom1)]) %>%
+  ggplot(., aes(rate)) +
+  geom_histogram(fill = 'white', col = 'black') +
+  theme_bw()
 
-We can grab the ancestral states from the output of **ace()**. We can do some checks which include checking whether any of the transition rates are negative or whether they have any standard errors that are `NaN`, and whether any of the node states have probabilities \> 1. This hints the model is too complex/has not converged/not doing a good job.
+# plot of constrained x axis (rates <1)
+p2 <- tibble(rate = mod_custom1$par.full[names(mod_custom1$par.full) %in% argnames(lik_custom1)]) %>%
+  filter(rate < 1) %>%
+  ggplot(., aes(rate)) +
+  geom_histogram(fill = 'white', col = 'black') +
+  theme_bw()
 
-We can format the transition matrix from the output of **ace::ape()** to look at the rates. As it is not stated in the **ape::ace()** directory, we assume the rates are entered as in **castor::asr_mk_model()**, where the \[r,c\]-th entry is the transition rate from state r to state c. This is confirmed on this [help page](https://www.r-phylo.org/wiki/HowTo/Ancestral_State_Reconstruction#Reconstructing_Ancestral_States_for_Discrete_Variables).
+p1+p2
 
-```{r check_ape_ace}
-# see whether any of the SEs are NA. This hints that its not converged properly
-ancestral_states_ape$se
-ancestral_states_ape1$se
-ancestral_states_ape2$se
-# as you can see both the symmetric and all rates different models have NaNs for some/all of the transitions
+# sort parameter estimates
+mod_custom1$par %>% sort()
 
-# get marginal likelihood of each ancestral state at each node
-d_acr_ape <- ancestral_states_ape2$lik.anc %>%
-  as_tibble(rownames = 'node') %>%
-  pivot_longer(cols = all_of(coding$hab_pref), values_to = 'probability_ape', names_to = 'habitat_preference')
-
-d_acr_ape_summary <- group_by(d_acr_ape, node) %>%
-  summarise(total = sum(probability_ape), .groups = 'drop') %>%
-  filter(total != 1)
-nrow(d_acr_ape_summary)
-# apparently 7 nodes that do not equal 1, but they are very close to 1.
 ```
 
-Some of the standard errors for the ARD model are `NaN`, suggesting convergence problems. However, there are only seven internal nodes with probabilities different from 1, so these estimates are not completely crazy.
+The lowest rate (q17) is around five times smaller than the other low rates. So we shall remove this rate first and compare models.
 
-### Plotting transition matrices
+```{r diversitree_3_load}
+#| echo: false
 
-We can plot the transition matrices to see what the estimated rates are. This uses our custom function **ace_transition_df()**.
+# read in files
+mod_custom2 <- readRDS(here('data/sequencing_rpoB/processed/transition_rates/mod_custom2_mac.rds'))
 
-The transition matrices plotted here can be interpreted as follows:
+# make custom matrix model
+lik_custom2 <- constrain(lik_ard, 
+                     q16~0, q26~0, q27~0, q35~0, q36~0, q42~0, q46~0, q47~0, q53~0, q54~0, q63~0, q64~0, q72~0, q74~0, q17~0)
 
--   the transition rates are from state 1 (on the y axis) to state 2 (on the x axis)
+# make start parameters
+inits_custom2 <- rep(1, length(argnames(lik_custom2)))
+```
 
--   diagonal rates are when state 1 equals state 2 and are therefore not estimated
+```{r diversitree_3_setup}
+#| eval: false
 
--   Red boxes indicate rates which are estimated. This will be useful when we start using custom matrices.
+# make custom matrix model
+lik_custom2 <- constrain(lik_ard, 
+                     q16~0, q26~0, q27~0, q35~0, q36~0, q42~0, q46~0, q47~0, q53~0, q54~0, q63~0, q64~0, q72~0, q74~0, q17~0)
 
-```{r plot_transition_matrices}
-#| fig.height: 5
-#| fig.width: 12
+# make start parameters
+inits_custom2 <- rep(1, length(argnames(lik_custom2)))
 
-# bind together the transition matrices from each of the standard models for the transition matrices
-d_models <- bind_rows(ace_transition_df(ancestral_states_ape) %>% mutate(model = 'equal rates'),
-  ace_transition_df(ancestral_states_ape1) %>% mutate(model = 'symmetric'),
-  ace_transition_df(ancestral_states_ape2) %>% mutate(model = 'all rates different')) %>%
-  # add in colums for reordering and naming of axes
+# run model
+mod_custom2 <- find.mle(lik_custom2, inits_custom2, method = 'subplex', control = list(maxit = 50000))
+```
+
+We can now again do model comparison.
+
+```{r diversitree_3_compare}
+# do AIC comparison
+AIC(mod_sym, mod_ard, mod_er, mod_custom1, mod_custom2) %>% arrange(AIC)
+
+# anova
+anova(mod_custom1, mod_custom2)
+
+# sort parameter estimates
+mod_custom2$par %>% sort()
+```
+
+This model is once again better. We will do the same procedure to remove the next parameters that are extremely low. We can see that q75 and q71 are both extremely low and similar (difference is \~0.008). We will remove q75 first.
+
+```{r diversitree_4_load}
+#| echo: false
+
+# read in files
+mod_custom3 <- readRDS(here('data/sequencing_rpoB/processed/transition_rates/mod_custom3_mac.rds'))
+
+# make custom matrix model
+lik_custom3 <- constrain(lik_ard, 
+                     q16~0, q26~0, q27~0, q35~0, q36~0, q42~0, q46~0, q47~0, q53~0, q54~0, q63~0, q64~0, q72~0, q74~0, q17~0, q75~0)
+
+# make start parameters
+inits_custom3 <- rep(1, length(argnames(lik_custom3)))
+
+```
+
+```{r diversitree_4_setup}
+#| eval: false
+
+# make custom matrix model
+lik_custom3 <- constrain(lik_ard, 
+                     q16~0, q26~0, q27~0, q35~0, q36~0, q42~0, q46~0, q47~0, q53~0, q54~0, q63~0, q64~0, q72~0, q74~0, q17~0, q75~0)
+
+# make start parameters
+inits_custom3 <- rep(1, length(argnames(lik_custom3)))
+
+# run model
+mod_custom3 <- find.mle(lik_custom3, inits_custom3, method = 'subplex', control = list(maxit = 50000))
+```
+
+We can now again do model comparison.
+
+```{r diversitree_4_compare}
+# do AIC comparison
+AIC(mod_sym, mod_ard, mod_er, mod_custom1, mod_custom2, mod_custom3) %>% arrange(AIC)
+
+# anova
+anova(mod_custom2, mod_custom3)
+
+# sort parameter estimates
+mod_custom3$par %>% sort()
+```
+
+This model is once again better. We will do the same procedure to remove the next parameters that are extremely low. We will now remove q71.
+
+```{r diversitree_4_load}
+#| echo: false
+
+# read in files
+mod_custom4 <- readRDS(here('data/sequencing_rpoB/processed/transition_rates/mod_custom4_mac.rds'))
+
+# make custom matrix model
+lik_custom4 <- constrain(lik_ard, 
+                     q16~0, q26~0, q27~0, q35~0, q36~0, q42~0, q46~0, q47~0, q53~0, q54~0, q63~0, q64~0, q72~0, q74~0, q17~0, q75~0, q71~0)
+
+# make start parameters
+inits_custom4 <- rep(1, length(argnames(lik_custom4)))
+```
+
+```{r diversitree_4_setup}
+#| eval: false
+
+# make custom matrix model
+lik_custom4 <- constrain(lik_ard, 
+                     q16~0, q26~0, q27~0, q35~0, q36~0, q42~0, q46~0, q47~0, q53~0, q54~0, q63~0, q64~0, q72~0, q74~0, q17~0, q75~0, q71~0)
+
+# make start parameters
+inits_custom4 <- rep(1, length(argnames(lik_custom4)))
+
+# run model
+mod_custom4 <- find.mle(lik_custom4, inits_custom4, method = 'subplex', control = list(maxit = 50000))
+```
+
+We can now again do model comparison.
+
+```{r diversitree_4_compare}
+# do AIC comparison
+AIC(mod_sym, mod_ard, mod_er, mod_custom1, mod_custom2, mod_custom3, mod_custom4) %>% arrange(AIC)
+
+# anova
+anova(mod_custom3, mod_custom4)
+
+# sort parameter estimates
+mod_custom4$par %>% sort()
+```
+
+Again the model fits better. q51 and q14 are essentially equivalent, so we will now remove them both at once.
+
+```{r diversitree_5_load}
+#| echo: false
+
+# read in files
+mod_custom5 <- readRDS(here('data/sequencing_rpoB/processed/transition_rates/mod_custom5_mac.rds'))
+
+# make custom matrix model
+lik_custom5 <- constrain(lik_ard, 
+                     q16~0, q26~0, q27~0, q35~0, q36~0, q42~0, q46~0, q47~0, q53~0, q54~0, q63~0, q64~0, q72~0, q74~0, q17~0, q75~0, q71~0, q51~0, q14~0)
+
+# make start parameters
+inits_custom5 <- rep(1, length(argnames(lik_custom5)))
+```
+
+```{r diversitree_5_setup}
+#| eval: false
+
+# make custom matrix model
+lik_custom5 <- constrain(lik_ard, 
+                     q16~0, q26~0, q27~0, q35~0, q36~0, q42~0, q46~0, q47~0, q53~0, q54~0, q63~0, q64~0, q72~0, q74~0, q17~0, q75~0, q71~0, q51~0, q14~0)
+
+# make start parameters
+inits_custom5 <- rep(1, length(argnames(lik_custom5)))
+
+# run model
+mod_custom5 <- find.mle(lik_custom5, inits_custom5, method = 'subplex', control = list(maxit = 50000))
+```
+
+We can now again do model comparison.
+
+```{r diversitree_5_compare}
+# do AIC comparison
+AIC(mod_sym, mod_ard, mod_er, mod_custom1, mod_custom2, mod_custom3, mod_custom4, mod_custom5) %>% arrange(AIC)
+
+# anova
+anova(mod_custom4, mod_custom5)
+
+# sort parameter estimates
+mod_custom5$par %>% sort()
+```
+
+```{r diversitree_6_load}
+#| echo: false
+
+# read in files
+mod_custom6 <- readRDS(here('data/sequencing_rpoB/processed/transition_rates/mod_custom6_mac.rds'))
+
+# make custom matrix model
+lik_custom6 <- constrain(lik_ard, 
+                     q16~0, q26~0, q27~0, q35~0, q36~0, q42~0, q46~0, q47~0, q53~0, q54~0, q63~0, q64~0, q72~0, q74~0, q17~0, q75~0, q71~0, q51~0, q14~0, q52~0)
+
+# make start parameters
+inits_custom6 <- rep(1, length(argnames(lik_custom6)))
+```
+
+```{r diversitree_6_setup}
+#| eval: false
+
+# make custom matrix model
+lik_custom6 <- constrain(lik_ard, 
+                     q16~0, q26~0, q27~0, q35~0, q36~0, q42~0, q46~0, q47~0, q53~0, q54~0, q63~0, q64~0, q72~0, q74~0, q17~0, q75~0, q71~0, q51~0, q14~0, q52~0)
+
+# make start parameters
+inits_custom6 <- rep(1, length(argnames(lik_custom6)))
+
+# run model
+mod_custom6 <- find.mle(lik_custom6, inits_custom6, method = 'subplex', control = list(maxit = 50000))
+```
+
+We can now again do model comparison.
+
+```{r diversitree_6_compare}
+# do AIC comparison
+AIC(mod_sym, mod_ard, mod_er, mod_custom1, mod_custom2, mod_custom3, mod_custom4, mod_custom5, mod_custom6) %>% arrange(AIC)
+
+# anova
+anova(mod_custom5, mod_custom6)
+
+# sort parameter estimates
+mod_custom6$par %>% sort()
+```
+
+Weirdly q67 has suddenly become really really small, compared to being 1.83 in the previous model. We can remove it and see how the model does.
+
+```{r diversitree_7_load}
+#| echo: false
+
+# read in files
+mod_custom7 <- readRDS(here('data/sequencing_rpoB/processed/transition_rates/mod_custom7_mac.rds'))
+
+# make custom matrix model
+lik_custom7 <- constrain(lik_ard, 
+                     q16~0, q26~0, q27~0, q35~0, q36~0, q42~0, q46~0, q47~0, q53~0, q54~0, q63~0, q64~0, q72~0, q74~0, q17~0, q75~0, q71~0, q51~0, q14~0, q52~0, q67~0)
+
+# make start parameters
+inits_custom7 <- rep(1, length(argnames(lik_custom7)))
+```
+
+```{r diversitree_7_setup}
+#| eval: false
+
+# make custom matrix model
+lik_custom7 <- constrain(lik_ard, 
+                     q16~0, q26~0, q27~0, q35~0, q36~0, q42~0, q46~0, q47~0, q53~0, q54~0, q63~0, q64~0, q72~0, q74~0, q17~0, q75~0, q71~0, q51~0, q14~0, q52~0, q67~0)
+
+# make start parameters
+inits_custom7 <- rep(1, length(argnames(lik_custom7)))
+
+# run model
+mod_custom7 <- find.mle(lik_custom7, inits_custom7, method = 'subplex', control = list(maxit = 50000))
+```
+
+We can now again do model comparison.
+
+```{r diversitree_7_compare}
+# do AIC comparison
+AIC(mod_sym, mod_ard, mod_er, mod_custom1, mod_custom2, mod_custom3, mod_custom4, mod_custom5, mod_custom6, mod_custom7) %>% arrange(AIC)
+
+# anova
+anova(mod_custom6, mod_custom7)
+
+# sort parameter estimates
+mod_custom7$par %>% sort()
+```
+
+```{r diversitree_8_load}
+#| echo: false
+
+# read in files
+mod_custom8 <- readRDS(here('data/sequencing_rpoB/processed/transition_rates/mod_custom8_mac.rds'))
+
+# make custom matrix model
+lik_custom8 <- constrain(lik_ard, 
+                     q16~0, q26~0, q27~0, q35~0, q36~0, q42~0, q46~0, q47~0, q53~0, q54~0, q63~0, q64~0, q72~0, q74~0, q17~0, q75~0, q71~0, q51~0, q14~0, q52~0, q67~0, q34~0)
+
+# make start parameters
+inits_custom8 <- rep(1, length(argnames(lik_custom8)))
+```
+
+```{r diversitree_8_setup}
+#| eval: false
+
+# make custom matrix model
+lik_custom8 <- constrain(lik_ard, 
+                     q16~0, q26~0, q27~0, q35~0, q36~0, q42~0, q46~0, q47~0, q53~0, q54~0, q63~0, q64~0, q72~0, q74~0, q17~0, q75~0, q71~0, q51~0, q14~0, q52~0, q67~0, q34~0)
+
+# make start parameters
+inits_custom8 <- rep(1, length(argnames(lik_custom8)))
+
+# run model
+mod_custom8 <- find.mle(lik_custom8, inits_custom8, method = 'subplex', control = list(maxit = 50000))
+```
+
+We can now again do model comparison.
+
+```{r diversitree_8_compare}
+# do AIC comparison
+AIC(mod_sym, mod_ard, mod_er, mod_custom1, mod_custom2, mod_custom3, mod_custom4, mod_custom5, mod_custom6, mod_custom7, mod_custom8) %>% arrange(AIC)
+
+# anova
+anova(mod_custom7, mod_custom8)
+
+# sort parameter estimates
+mod_custom8$par %>% sort()
+```
+
+This parameter is important in the model. Consequently our best model is **mod_custom7**.
+
+We can try and run mcmc on this model.
+
+```{r mcmc_load}
+#| echo: false
+
+fit_mcmc3 <- readRDS(here('data/sequencing_rpoB/processed/transition_rates/best_diversitree_mcmc.rds'))
+```
+
+```{r mcmc_try}
+#| eval: false
+
+# set up initial start values
+inits_mcmc <- mod_custom7$par
+
+# set up upper and lower limits - limit the values to be < 10 times the max value
+lower_mcmc <- rep(0, length(inits_mcmc))
+upper_mcmc <- rep(max(inits_mcmc)*10, length(inits_mcmc))
+
+# run first mcmc to tune w
+fit_mcmc <- mcmc(lik_custom7, inits_mcmc, nsteps = 10, w = 0.1, upper = upper_mcmc, lower = lower_mcmc)
+
+# tune w for each parameter
+w <- diff(sapply(fit_mcmc[2:(ncol(fit_mcmc)-1)], quantile, c(.05, .95)))
+
+# run second mcmc to tune w
+fit_mcmc2 <- mcmc(lik_custom7, inits_mcmc, nsteps=100, w=w, upper = upper_mcmc, lower = lower_mcmc)
+
+# tune w for each parameter
+w <- diff(sapply(fit_mcmc2[2:(ncol(fit_mcmc2)-1)], quantile, c(.05, .95)))
+
+# run third mcmc for 1000 iter
+fit_mcmc3 <- mcmc(lik_custom7, inits_mcmc, nsteps=1000, w=w, upper = upper_mcmc, lower = lower_mcmc)
+
+```
+
+We can plot the transition matrix of the best model.
+
+```{r plot_transition_matrix}
+#| fig.height: 6
+#| fig.width: 8
+
+get_diversitree_df <- function(div_obj, trait_vec, replace_vec){
+  
+  temp <- tibble(param = names(div_obj$par.full)) %>%
+    mutate(state_1_num = as.numeric(substr(param, 2,2)),
+         state_2_num = as.numeric(substr(param, 3,3)),
+         transition_rate = unlist(div_obj$par.full),
+         state_1 = stringi::stri_replace_all_regex(state_1_num, pattern = trait_vec, replacement = replace_vec, vectorize=FALSE),
+         state_2 = stringi::stri_replace_all_regex(state_2_num, pattern = trait_vec, replacement = replace_vec, vectorize=FALSE)) %>%
+    select(param, state_1, state_2, state_1_num, state_2_num, transition_rate) %>%
+    mutate(free_param = ifelse(param %in% names(div_obj$par), 'yes', 'no'),
+           num_params = length(div_obj$par))
+  
+  return(temp)
+  
+}
+
+diversitree_df <- get_diversitree_df(mod_custom8, coding$hab_pref_num2, coding$hab_pref)
+
+diversitree_df %>%
   left_join(., select(coding, state_1 = hab_pref, state_1_num = hab_pref_num2, state_1_label = hab_pref_axis)) %>%
   left_join(., select(coding, state_2 = hab_pref, state_2_num = hab_pref_num2, state_2_label = hab_pref_axis)) %>%
-  mutate(transition_rate = round(transition_rate, 2))
-
-# plot transition matrices
-# make heatmap of changes
-ggplot(d_models, aes(forcats::fct_reorder(state_2_label, state_2_num), forcats::fct_reorder(state_1_label, desc(state_1_num)))) +
-  geom_tile(aes(alpha = transition_rate), col = 'black', width = 0.9, height = 0.9) +
-  geom_tile(aes(alpha = transition_rate), fill = NA, col = 'red', size = 1.1, filter(d_models, free_param == 'yes'), width = 0.9, height = 0.9) +
-  theme_bw(base_size = 14) +
-  theme(panel.grid.major = element_blank(),
-  legend.position = 'none',
-  axis.text.x.top = element_text(angle = 90, vjust = 0.5)) +
-  scale_alpha_continuous(range = c(0, 0.6)) +
-  geom_text(aes(label = transition_rate), size = MicrobioUoE::pts(10)) +
-  scale_x_discrete(position = 'top', labels = scales::label_wrap(13)) +
-  scale_y_discrete(position = 'left', labels = scales::label_wrap(13)) +
-  labs(y = 'state 1',
-  x = 'state 2') +
-  coord_fixed() +
-  facet_wrap(~model)
-```
-
-### Doing model simplification on the all rates different model
-
-So we have seen that the all rates different model is better than the SYM model, but we can also use the results of the ARD model to make some of the rates 0.
-
-We can view the all rates different transition matrix only.
-
-```{r ard_transition_matrix}
-#| fig.height: 5
-#| fig.width: 7
-
-# ARD transition matrix only
-filter(d_models, model == 'all rates different') %>%
+  mutate(transition_rate = round(transition_rate, 2)) %>%
   ggplot(., aes(forcats::fct_reorder(state_2_label, state_2_num), forcats::fct_reorder(state_1_label, desc(state_1_num)))) +
-  geom_tile(aes(alpha = transition_rate), col = 'black', width = 0.9, height = 0.9) +
-  geom_tile(aes(alpha = transition_rate), fill = NA, col = 'red', size = 1.1, filter(d_models, free_param == 'yes' & model == 'all rates different'), width = 0.9, height = 0.9) +
+  geom_tile(aes(alpha = transition_rate, col = free_param), width = 0.9, height = 0.9, size = 1.1) +
   theme_bw(base_size = 14) +
   theme(panel.grid.major = element_blank(),
   legend.position = 'none',
@@ -408,545 +750,64 @@ filter(d_models, model == 'all rates different') %>%
   scale_x_discrete(position = 'top', labels = scales::label_wrap(13)) +
   scale_y_discrete(position = 'left', labels = scales::label_wrap(13)) +
   labs(y = 'state 1',
-  x = 'state 2') +
-  coord_fixed()
+  x = 'state 2',
+  title = paste('all rates different with', length(mod_custom7$par), 'free parameters', sep = ' ')) +
+  coord_fixed() +
+  scale_color_manual(values = c('red', 'black'))
+
+ggsave(here('plots/sequencing_rpoB/analyses/transition_matrix_diversitree.png'), last_plot(), height = 6, width = 8)
+
 ```
 
-The transitions where the rates are estimated to be 0 are:
+We can now pass the best matrix onto phytools to do stochastic character mapping.
 
--   freshwater to marine mud + terrestrial
--   freshwater + terrestrial to marine mud
--   generalist to marine mud
--   marine mud to freshwater + terrestrial
--   marine mud to generalist
--   terrestrial to freshwater + marine mud
--   terrestrial to generalist
+```{r phytools}
 
-We can create a custom matrix and fix these parameters to be 0.
-
-```{r custom_matrix}
+# create transition matrix
 num_states <- unique(hab_pref) %>% length()
 
 # we will set up the custom matrix, this has 49 numbers and then we have to set the correct numbers to 0
-custom_matrix <- matrix(1:num_states^2, nrow=num_states)
+best_matrix <- matrix(1:num_states^2, nrow=num_states)
 
 # make all diagonal numbers NA
-for(i in 1:nrow(custom_matrix)){
-  custom_matrix[i,i] <- 0
+for(i in 1:nrow(best_matrix)){
+  best_matrix[i,i] <- 0
 }
 
-# make specific transitions 0 based on the output of the ARD.
-custom_matrix[custom_matrix %in% c(14, 19, 26, 28, 31, 32, 36)] <- 0
-
-# replace values of non-zeroes with correct vector of 1:n parameters
-custom_matrix[custom_matrix != 0] <- 1:length(custom_matrix[custom_matrix != 0])
-
-custom_matrix
-```
-
-```{r ape_2_save}
-#| eval: false
-#| echo: false
-
-# lets try refit the model with these parameters fixed to zero
-ancestral_states_ape3 <- ace(hab_pref, tree, model=custom_matrix, type="discrete")
-
-saveRDS(ancestral_states_ape3, here('data/sequencing_rpoB/processed/transition_rates/ancestral_states_ape3_mac.rds'))
-```
-
-We can now try and refit the $Mk$ model to the tree and habitat preference data, but using our custom transition matrix.
-
-```{r ape_2_load}
-#| echo: false
-
-ancestral_states_ape3 <- readRDS(here('data/sequencing_rpoB/processed/transition_rates/ancestral_states_ape3_mac.rds'))
-```
-
-```{r ape_2_norun}
-#| eval: false
-# lets try refit the model with these parameters fixed to zero
-ancestral_states_ape3 <- ace(hab_pref, tree, model=custom_matrix, type="discrete")
-
-```
-
-We can now do model simplification, making sure we compare the simpler model (with fewer free parameters) to the more complex model (the all rates different model). We can also compute the AIC and add it to our table.
-
-```{r ape_2_compare}
-# compare the less complicated model with the more complicated model
-anova(ancestral_states_ape3, ancestral_states_ape2)
-
-# check AIC of each model
-mod_compare <- tibble(mod = c('ER', 'SYM', 'ARD', 'ancestral_states_ape3'),
-               aic = c(AIC(ancestral_states_ape), AIC(ancestral_states_ape1), AIC(ancestral_states_ape2), AIC(ancestral_states_ape3)))
-
-arrange(mod_compare, aic)
-
-```
-
-So the model where we explicit remove 0s from the model fitting process fits the model loads better (lower AIC, anova p value = 1 indicating the extra parameters - the ARD model - do not help explain the data any better).
-
-Lets now look at the transition matrix from the most recent model to see what can be removed.
-
-```{r plot_transition_matrix}
-#| fig.height: 5
-#| fig.width: 7
-
-# plot transition matrix
-ace_transition_df(ancestral_states_ape3) %>%
-  left_join(., select(coding, state_1 = hab_pref, state_1_num = hab_pref_num2, state_1_label = hab_pref_axis)) %>%
-  left_join(., select(coding, state_2 = hab_pref, state_2_num = hab_pref_num2, state_2_label = hab_pref_axis)) %>%
-  mutate(transition_rate = round(transition_rate, 2)) %>%
-  ggplot(., aes(forcats::fct_reorder(state_2_label, state_2_num), forcats::fct_reorder(state_1_label, desc(state_1_num)))) +
-  geom_tile(aes(alpha = transition_rate, col = free_param), width = 0.9, height = 0.9, size = 1.1) +
-  theme_bw(base_size = 14) +
-  theme(panel.grid.major = element_blank(),
-  legend.position = 'none',
-  axis.text.x.top = element_text(angle = 90, vjust = 0.5),
-  plot.title.position = "plot") +
-  scale_alpha_continuous(range = c(0, 0.6)) +
-  geom_text(aes(label = transition_rate), size = MicrobioUoE::pts(10)) +
-  scale_x_discrete(position = 'top', labels = scales::label_wrap(13)) +
-  scale_y_discrete(position = 'left', labels = scales::label_wrap(13)) +
-  labs(y = 'state 1',
-  x = 'state 2',
-  title = paste('all rates different with', length(custom_matrix[custom_matrix != 0]), 'free parameters', sep = ' ')) +
-  coord_fixed() +
-  scale_color_manual(values = c('black', 'red'))
-```
-
-The black boxes with 0 in are rates that we fixed to be 0. There are now no other rates that are 0. We will remove the next lowest rate to see whether its presence significantly improves the model fit. This is freshwater + terrestrial to marine mud + terrestrial.
-
-```{r custom_matrix2}
-custom_matrix
-
-# input the rates into the custom matrix
-custom_matrix2 <- custom_matrix
-
-# set some more rates to 0
-custom_matrix2[custom_matrix2 %in% c(15,20,25,26,31,33)] <- 0
-
-# replace values of non-zeroes with correct vector of 1:n parameters
-custom_matrix2[custom_matrix2 != 0] <- 1:length(custom_matrix2[custom_matrix2 != 0])
-```
-
-```{r ape_3_save}
-#| eval: false
-#| echo: false
-# lets try refit the model with these parameters fixed to zero
-ancestral_states_ape4 <- ace(hab_pref, tree, model=custom_matrix2, type="discrete")
-
-saveRDS(ancestral_states_ape4, here('data/sequencing_rpoB/processed/transition_rates/ancestral_states_ape4_mac.rds'))
-```
-
-```{r ape_3_load}
-#| echo: false
-ancestral_states_ape4 <- readRDS(here('data/sequencing_rpoB/processed/transition_rates/ancestral_states_ape4_mac.rds'))
-```
-
-We can now re run the $Mk$ model.
-
-```{r ape_3_norun}
-#| eval: false
-# lets try refit the model with these parameters fixed to zero
-ancestral_states_ape4 <- ace(hab_pref, tree, model=custom_matrix2, type="discrete")
-```
-
-We can do model selection as before, but now this new model (fewer parameters) is compared to the previous custom matrix model (more parameters).
-
-```{r ape_3_compare}
-#| fig.height: 5
-#| fig.width: 7
-
-# compare the less complicated model with the more complicated model
-anova(ancestral_states_ape4, ancestral_states_ape3)
-
-# check AIC of each model
-mod_compare <- tibble(mod = c('ER', 'SYM', 'ARD', 'ancestral_states_ape3', 'ancestral_states_ape4'),
-               aic = c(AIC(ancestral_states_ape), AIC(ancestral_states_ape1), AIC(ancestral_states_ape2), AIC(ancestral_states_ape3),AIC(ancestral_states_ape4)))
-
-arrange(mod_compare, aic)
-
-# plot transition matrix
-ace_transition_df(ancestral_states_ape4) %>%
-  left_join(., select(coding, state_1 = hab_pref, state_1_num = hab_pref_num2, state_1_label = hab_pref_axis)) %>%
-  left_join(., select(coding, state_2 = hab_pref, state_2_num = hab_pref_num2, state_2_label = hab_pref_axis)) %>%
-  mutate(transition_rate = round(transition_rate, 2)) %>%
-  ggplot(., aes(forcats::fct_reorder(state_2_label, state_2_num), forcats::fct_reorder(state_1_label, desc(state_1_num)))) +
-  geom_tile(aes(alpha = transition_rate, col = free_param), width = 0.9, height = 0.9, size = 1.1) +
-  theme_bw(base_size = 14) +
-  theme(panel.grid.major = element_blank(),
-  legend.position = 'none',
-  axis.text.x.top = element_text(angle = 90, vjust = 0.5),
-  plot.title.position = "plot") +
-  scale_alpha_continuous(range = c(0, 0.6)) +
-  geom_text(aes(label = transition_rate), size = MicrobioUoE::pts(10)) +
-  scale_x_discrete(position = 'top', labels = scales::label_wrap(13)) +
-  scale_y_discrete(position = 'left', labels = scales::label_wrap(13)) +
-  labs(y = 'state 1',
-  x = 'state 2',
-  title = paste('all rates different with', length(custom_matrix2[custom_matrix2 != 0]), 'free parameters', sep = ' ')) +
-  coord_fixed() +
-  scale_color_manual(values = c('black', 'red'))
-
-```
-
-These zeroes somehow make the model loads worse, so our best model is apparently **ancestral_states_ape3**. When plotting this model we can see it is doing an extremely bad job.
-
-Instead we can try and refit **ancestral_states_ape3** with values \<0.1 set to 0. This will hopefully allow us to move past this problem.
-
-```{r ape_4}
-#| fig.height: 5
-#| fig.width: 7
-
-# create new custom matrix
-custom_matrix3 <- custom_matrix
-
-# get index of rates which are <0.1
-which(ancestral_states_ape3$rates < 0.1)
-
-custom_matrix3[custom_matrix3 %in% which(ancestral_states_ape3$rates < 0.1)] <- 0
-
-# replace values of non-zeroes with correct vector of 1:n parameters
-custom_matrix3[custom_matrix3 != 0] <- 1:length(custom_matrix3[custom_matrix3 != 0])
-
-# fit habitat preference model
-ancestral_states_ape5 <- ace(hab_pref, tree, model=custom_matrix3, type="discrete")
-
-anova(ancestral_states_ape5, ancestral_states_ape3)
-
-# check AIC of each model
-mod_compare <- tibble(mod = c('ER', 'SYM', 'ARD', 'ancestral_states_ape3', 'ancestral_states_ape4', 'ancestral_states_ape5'),
-               aic = c(AIC(ancestral_states_ape), AIC(ancestral_states_ape1), AIC(ancestral_states_ape2), AIC(ancestral_states_ape3),AIC(ancestral_states_ape4), AIC(ancestral_states_ape5)))
-
-arrange(mod_compare, aic)
-
-# plot transition matrix
-ace_transition_df(ancestral_states_ape5) %>%
-  left_join(., select(coding, state_1 = hab_pref, state_1_num = hab_pref_num2, state_1_label = hab_pref_axis)) %>%
-  left_join(., select(coding, state_2 = hab_pref, state_2_num = hab_pref_num2, state_2_label = hab_pref_axis)) %>%
-  mutate(transition_rate = round(transition_rate, 2)) %>%
-  ggplot(., aes(forcats::fct_reorder(state_2_label, state_2_num), forcats::fct_reorder(state_1_label, desc(state_1_num)))) +
-  geom_tile(aes(alpha = transition_rate, col = free_param), width = 0.9, height = 0.9, size = 1.1) +
-  theme_bw(base_size = 14) +
-  theme(panel.grid.major = element_blank(),
-  legend.position = 'none',
-  axis.text.x.top = element_text(angle = 90, vjust = 0.5),
-  plot.title.position = "plot") +
-  scale_alpha_continuous(range = c(0, 0.6)) +
-  geom_text(aes(label = transition_rate), size = MicrobioUoE::pts(10)) +
-  scale_x_discrete(position = 'top', labels = scales::label_wrap(13)) +
-  scale_y_discrete(position = 'left', labels = scales::label_wrap(13)) +
-  labs(y = 'state 1',
-  x = 'state 2',
-  title = paste('all rates different with', length(custom_matrix3[custom_matrix3 != 0]), 'free parameters', sep = ' ')) +
-  coord_fixed() +
-  scale_color_manual(values = c('black', 'red'))
-```
-
-There are no longer any rates less than 0.1. Instead we will remove the lowest rate and refit the model to see if it is better or worse.
-
-```{r ape5}
-#| fig.height: 5
-#| fig.width: 7
-
-custom_matrix4 <- custom_matrix3
-
-custom_matrix4[custom_matrix4 %in% which(ancestral_states_ape5$rates == min(ancestral_states_ape5$rates))] <- 0
-
-# replace values of non-zeroes with correct vector of 1:n parameters
-custom_matrix4[custom_matrix4 != 0] <- 1:length(custom_matrix4[custom_matrix4 != 0])
-
-ancestral_states_ape6 <- ace(hab_pref, tree, model=custom_matrix4, type="discrete")
-
-anova(ancestral_states_ape6, ancestral_states_ape5)
-
-# check AIC of each model
-mod_compare <- tibble(mod = c('ER', 'SYM', 'ARD', 'ancestral_states_ape3', 'ancestral_states_ape4', 'ancestral_states_ape5', 'ancestral_states_ape6'),
-               aic = c(AIC(ancestral_states_ape), AIC(ancestral_states_ape1), AIC(ancestral_states_ape2), AIC(ancestral_states_ape3),AIC(ancestral_states_ape4), AIC(ancestral_states_ape5), AIC(ancestral_states_ape6)))
-
-arrange(mod_compare, aic)
-
-# plot transition matrix
-ace_transition_df(ancestral_states_ape6) %>%
-  left_join(., select(coding, state_1 = hab_pref, state_1_num = hab_pref_num2, state_1_label = hab_pref_axis)) %>%
-  left_join(., select(coding, state_2 = hab_pref, state_2_num = hab_pref_num2, state_2_label = hab_pref_axis)) %>%
-  mutate(transition_rate = round(transition_rate, 2)) %>%
-  ggplot(., aes(forcats::fct_reorder(state_2_label, state_2_num), forcats::fct_reorder(state_1_label, desc(state_1_num)))) +
-  geom_tile(aes(alpha = transition_rate, col = free_param), width = 0.9, height = 0.9, size = 1.1) +
-  theme_bw(base_size = 14) +
-  theme(panel.grid.major = element_blank(),
-  legend.position = 'none',
-  axis.text.x.top = element_text(angle = 90, vjust = 0.5),
-  plot.title.position = "plot") +
-  scale_alpha_continuous(range = c(0, 0.6)) +
-  geom_text(aes(label = transition_rate), size = MicrobioUoE::pts(10)) +
-  scale_x_discrete(position = 'top', labels = scales::label_wrap(13)) +
-  scale_y_discrete(position = 'left', labels = scales::label_wrap(13)) +
-  labs(y = 'state 1',
-  x = 'state 2',
-  title = paste('all rates different with', length(custom_matrix4[custom_matrix4 != 0]), 'free parameters', sep = ' ')) +
-  coord_fixed() +
-  scale_color_manual(values = c('black', 'red'))
-
-```
-
-This parameter was not significant in the model, and we can got an improvement in the AIC score. So this parameter can be removed from the model.
-
-We will do this process again.
-
-```{r ape6}
-#| fig.height: 5
-#| fig.width: 7
-
-custom_matrix5 <- custom_matrix4
-
-custom_matrix5[custom_matrix5 %in% which(ancestral_states_ape6$rates == min(ancestral_states_ape6$rates))] <- 0
-
-# replace values of non-zeroes with correct vector of 1:n parameters
-custom_matrix5[custom_matrix5 != 0] <- 1:length(custom_matrix5[custom_matrix5 != 0])
-
-ancestral_states_ape7 <- ace(hab_pref, tree, model=custom_matrix5, type="discrete")
-
-anova(ancestral_states_ape7, ancestral_states_ape6)
-
-# check AIC of each model
-mod_compare <- tibble(mod = c('ER', 'SYM', 'ARD', 'ancestral_states_ape3', 'ancestral_states_ape4', 'ancestral_states_ape5', 'ancestral_states_ape6', 'ancestral_states_ape7'),
-               aic = c(AIC(ancestral_states_ape), AIC(ancestral_states_ape1), AIC(ancestral_states_ape2), AIC(ancestral_states_ape3),AIC(ancestral_states_ape4), AIC(ancestral_states_ape5), AIC(ancestral_states_ape6), AIC(ancestral_states_ape7)))
-
-arrange(mod_compare, aic)
-
-# plot transition matrix
-ace_transition_df(ancestral_states_ape7) %>%
-  left_join(., select(coding, state_1 = hab_pref, state_1_num = hab_pref_num2, state_1_label = hab_pref_axis)) %>%
-  left_join(., select(coding, state_2 = hab_pref, state_2_num = hab_pref_num2, state_2_label = hab_pref_axis)) %>%
-  mutate(transition_rate = round(transition_rate, 2)) %>%
-  ggplot(., aes(forcats::fct_reorder(state_2_label, state_2_num), forcats::fct_reorder(state_1_label, desc(state_1_num)))) +
-  geom_tile(aes(alpha = transition_rate, col = free_param), width = 0.9, height = 0.9, size = 1.1) +
-  theme_bw(base_size = 14) +
-  theme(panel.grid.major = element_blank(),
-  legend.position = 'none',
-  axis.text.x.top = element_text(angle = 90, vjust = 0.5),
-  plot.title.position = "plot") +
-  scale_alpha_continuous(range = c(0, 0.6)) +
-  geom_text(aes(label = transition_rate), size = MicrobioUoE::pts(10)) +
-  scale_x_discrete(position = 'top', labels = scales::label_wrap(13)) +
-  scale_y_discrete(position = 'left', labels = scales::label_wrap(13)) +
-  labs(y = 'state 1',
-  x = 'state 2',
-  title = paste('all rates different with', length(custom_matrix5[custom_matrix5 != 0]), 'free parameters', sep = ' ')) +
-  coord_fixed() +
-  scale_color_manual(values = c('black', 'red'))
-```
-
-Ok so this parameter is important to the model. So our best model is **ancestral_states_ape6** according to our model simplification process.
-
-We will save this out and also refit the model in **castor** and **diversitree** to see how they compare.
-
-## Estimate ancestral states with castor::asr_mk_model()
-
-We can do an equivalent analysis using **castor::asr_mk_model()**. We can then compare the transition rates and ancestral reconstruction estimates.
-
-We will only fit the model with the best custom transition matrix to compare estimates.
-
-```{r acr_castor}
-saveRDS(ancestral_states_ape6, here('data/sequencing_rpoB/processed/transition_rates/ancestral_states_ape6_mac.rds'))
-
-# rename best transition matrix for using it later
-best_matrix <- custom_matrix4
-
 rownames(best_matrix) <- colnames(best_matrix) <- sort(coding$hab_pref)
 
-saveRDS(best_matrix, here('data/sequencing_rpoB/processed/transition_rates/best_matrix_mk_mac.rds'))
-
-# get dataframe of transition matrix
-d_best_matrix <- ace_transition_df(ancestral_states_ape6) %>%
-  left_join(., select(coding, state_1 = hab_pref, state_1_num = hab_pref_num2, state_1_label = hab_pref_axis)) %>%
-  left_join(., select(coding, state_2 = hab_pref, state_2_num = hab_pref_num2, state_2_label = hab_pref_axis)) %>%
-  mutate(transition_rate = round(transition_rate, 2)) 
-
-
-# with castor
-ancestral_state_castor <- asr_mk_model(tree, 
-                                       hab_pref_num2,
-                                       Ntrials = 5,
-                                       rate_model = best_matrix,
-                                       reroot = FALSE)
-
-# check AIC
-ancestral_state_castor$AIC
-ancestral_state_castor$loglikelihood
-
-```
-
-We can compare the transition rate estimates.
-
-```{r ace_castor_transition}
-#| fig-height: 5
-#| fig-width: 7
-
-# get the castor matrix
-d_castor_matrix <- ancestral_state_castor$transition_matrix
-rownames(d_castor_matrix) <- colnames(d_castor_matrix) <- sort(coding$hab_pref)
-
-d_castor_matrix <- as_tibble(d_castor_matrix, rownames = 'state_1') %>%
-  pivot_longer(freshwater:terrestrial, names_to = 'state_2', values_to = 'transition_rate_castor')
-
-d_transition_compare <- left_join(d_castor_matrix, d_best_matrix) 
-
-# plot
-filter(d_transition_compare, free_param == 'yes') %>%
-  ggplot(., aes(transition_rate, transition_rate_castor)) +
-  geom_point(size = 2) +
-  theme_bw() +
-  labs(x = 'transition rate ape::ace()',
-       y = 'transition rate castor::asr_mk_model') +
-  geom_abline(aes(slope = 1, intercept = 0))
-
-```
-
-The values for **ape::ace()** are very similar to those from **castor::asr_mk_model()**. This is good. There is one shift that is estimated to be 0 using **castor**, but it is \> 2 for **ape**. This is the transition
-
-We can see if this result is the same for **diversitree**, and hints this parameter could be set to 0. However right now we will not do that.
-
-## Estimate ancestral states with diversitree
-
-We can also do the equivalent analysis using **diversitree**. This might be beneficial because it can also be used for BiSSE models later on.
-
-It is a bit more involved in terms of defining the constraints on the transition matrix.
-
-```{r acr_diversitree}
-# all of these methods needs a likelihood function, we can build a Mkn model
-lik <- make.mkn(tree, hab_pref_num2, k = max(hab_pref_num2))
-
-# constrain correct parameters to be 0
-lik_constrain <- constrain(lik, q14~0, q16~0, q17~0,
-                           q26~0, q27~0,
-                           q35~0, q36~0,
-                           q45~0, q47~0,
-                           q51~0, q52~0, q53~0, q54~0, q57~0,
-                           q63~0, q64~0,
-                           q71~0, q72~0, q74~0, q75~0)
-
-argnames(lik_constrain)
-
-# need to pass start values to it - can grab these from the ape::ace, but we will just pass an average rate to the model
-inits <- rep(mean(ancestral_states_ape6$rates), length(argnames(lik_constrain)))
-
-# find the maximum likelihood estimates of this model
-mod_ml <- find.mle(lik_constrain, inits)
-
-# pass inits from the ancestral states model
-#inits2 <- ancestral_states_ape6$rates
-
-#mod_mcmc <- mcmc(lik_constrain, inits2, nsteps = 10, w = 1)
-
-unname(mod_ml$par)
-
-# save out diversitree model
-saveRDS(mod_ml, here("data/sequencing_rpoB/processed/diversitree_mk_model_mac.rds"))
-
-```
-
-We can compare the rates estimated from **ape::ace()** and **diversitree::find.mle()** by putting putting the output of diversitree into a dataframe and combining it with our current comparison dataframe.
-
-```{r compare_ace_findmle}
-#| fig-height: 5
-#| fig-width: 7
- 
-# grab names of q matrices from diversitree
-q_matrix_diversitree <- names(mod_ml$par)
-
-# create dataframe with these
-q_matrix <- tibble(q_matrix_diversitree = q_matrix_diversitree) %>%
-  # grab first and second elements that are the habitat codings
-  mutate(state_1_num = as.numeric(substr(q_matrix_diversitree, 2,2)),
-         state_2_num = as.numeric(substr(q_matrix_diversitree, 3,3)),
-         transition_rate_diversitree = unlist(mod_ml$par)) %>%
-  left_join(select(coding, state_1 = hab_pref, state_1_num = hab_pref_num2)) %>%
-  left_join(select(coding, state_2 = hab_pref, state_2_num = hab_pref_num2)) %>%
-  select(-state_1_num, -state_2_num, -q_matrix_diversitree)
-
-# combine into comparison dataframe
-d_transition_compare <- left_join(d_transition_compare, q_matrix) %>%
-  select(state_1, state_2, transition_rate, transition_rate_castor, transition_rate_diversitree) %>%
-  mutate(across(starts_with('transition'), round, 2))
-
-# plot to see similarity
-ggplot(d_transition_compare, aes(transition_rate, transition_rate_diversitree)) +
-  geom_abline(aes(intercept = 0, slope = 1)) +
-  geom_point(size = 2) +
-  theme_bw()
-
-```
-
-We can see the estimates are equivalent! This is great news! However the model convergence code is also -1 which hints that the model has not converged. So it is complicated.
-
-## Estimate ancestral states using stochastic character mapping using phytools::make.simmap()
-
-An alternative approach is to do stochastic mapping of the ancestral states. What this does is it calculates the conditional likelihood for each character state at each node of the tree, including the root, and then simulate ancestral states at each internal node by sampling from the posterior distribution of states.
-
-We need to do some initial changes to our transition matrix which we can pass to **make_simmap()** so the $M_{k}$ model is not fitted by this model. Importantly we need to make sure the rows add up to 0, so we need to make the diagonal value of the transition matrix be the negative of the sum of each row.
-
-```{r phytools_matrix}
-# rename best transition matrix for using it later
-best_matrix <- custom_matrix4
-
-rownames(best_matrix) <- colnames(best_matrix) <- sort(coding$hab_pref)
-
-# get dataframe of transition matrix
-d_best_matrix <- ace_transition_df(ancestral_states_ape6) %>%
-  left_join(., select(coding, state_1 = hab_pref, state_1_num = hab_pref_num2, state_1_label = hab_pref_axis)) %>%
-  left_join(., select(coding, state_2 = hab_pref, state_2_num = hab_pref_num2, state_2_label = hab_pref_axis)) %>%
-  mutate(transition_rate = round(transition_rate, 2)) 
-
-# get best matrix
-best_matrix_estimates <- select(d_best_matrix, state_1, state_2, transition_rate) %>%
-  spread(state_2, transition_rate) %>%
-  column_to_rownames(var = 'state_1') %>%
-  mutate(across(everything(), replace_na, 0)) %>%
-  as.matrix()
+# populate matrix with estimated parameters from best diversitree model
+best_matrix[best_matrix != 0] <- arrange(diversitree_df, state_2, state_1) %>% pull(transition_rate)
 
 # make diagonal values make things sum to 0
-diag(best_matrix_estimates) <- -rowSums(best_matrix_estimates)
+diag(best_matrix) <- -rowSums(best_matrix)
+
 ```
 
-We can now run **make.simmap()** on our tree. We will run it for 100 simulations for now to reduce object space.
+Run stochastic character mapping
 
-```{r acr_phytools_save}
-#| eval: false
+```{r load_simmap}
 #| echo: false
 
-# do stochastic mapping of character traits using phytools
-# feed in the best transition matrix previously found using other methods
-ancestral_states_phytools <- make.simmap(tree, hab_pref, nsim = 100, Q = best_matrix_estimates)
-
-saveRDS(ancestral_states_phytools, here("data/sequencing_rpoB/processed/transition_rates/simmap_mac.rds"))
+simmap_best <- readRDS(here("data/sequencing_rpoB/processed/transition_rates/simmap_diversitree.rds"))
 
 ```
 
-```{r acr_phytools_load}
-#| echo: false
-
-ancestral_states_phytools <- readRDS(here("data/sequencing_rpoB/processed/transition_rates/simmap_mac.rds"))
-
-```
-
-```{r acr_phytools_norun}
+```{r simmap}
 #| eval: false
 
 # do stochastic mapping of character traits using phytools
 # feed in the best transition matrix previously found using other methods
-ancestral_states_phytools <- make.simmap(tree, hab_pref, nsim = 100, Q = best_matrix_estimates)
+simmap_best <- make.simmap(tree, hab_pref, nsim = 1000, Q = best_matrix)
+
 ```
 
-It has finished! We can count the number of transitions between each state using **describe.simmap()**. We can then plot these to see the distribution of **numbers of transitions**.
-
-```{r acr_phytools_transitions}
+```{r simmap_summary}
 #| fig-height: 8
 #| fig-width: 10
 
 # summarise number of switches between states and time spent in each state
-simmap_summary <- describe.simmap(ancestral_states_phytools, plot=FALSE)
+simmap_summary <- describe.simmap(simmap_best, plot=FALSE)
 
 # coerce transitions into dataframe
 d_transitions <- as.data.frame(simmap_summary$count, col.names = colnames(simmap_summary$count)) %>%
@@ -970,13 +831,11 @@ group_by(d_transitions, transition) %>%
   y = 'Count')
 ```
 
-We can see the number of transitions between states is dominated by the terrestrial and freshwater environments, with relatively few transitions involving the marine mud environment.
+We can then plot the best model as a network.
 
-We can also look at how was spent in each state in each character map iteration.
-
-```{r acr_phytools_time}
-#| fig-height: 8
-#| fig-width: 10
+```{r plot_best_model}
+#| fig-height: 6
+#| fig-width: 8
 
 # coerce time into dataframe
 d_time <- as.data.frame(simmap_summary$times, col.names = colnames(simmap_summary$times)) %>%
@@ -986,144 +845,6 @@ d_time <- as.data.frame(simmap_summary$times, col.names = colnames(simmap_summar
   group_by(n) %>%
   mutate(prop = time/sum(time)) %>%
   ungroup()
-
-# plot these
-group_by(d_time, state) %>%
-  mutate(average = mean(prop)) %>%
-  ungroup() %>%
-  mutate(state = fct_reorder(state, desc(average))) %>%
-  ggplot() +
-  geom_histogram(aes(prop), fill = 'white', col = 'black', binwidth = function(x) (max(x)-min(x))/nclass.FD(x)) +
-  facet_wrap(~ state, scales = 'free_x') +
-  theme_bw() +
-  labs(title = 'Proportion of time spent in each state',
-  subtitle = 'Facets are ordered in terms of time spent',
-  x = 'Proportion of time spent in state',
-  y = 'Count')
-```
-
-From this plot, we can see that the tree is dominated by four states: freshwater+terrestrial, terrestrial, marine mud, and freshwater. However, what is interesting is that even though marine mud is the third most common state, it is involved in very relatively few transitions. Transitions out of being a marine mud specialist only occur into freshwater+marine mud, and this is the second least common transition.
-
-We can also compare the ancestral state estimates garnered from the best **ape::ace()** model and those from the average stochastic character map. These are likely to be extremely similar given we fixed the Q matrix in our stochastic character mapping process to save time.
-
-```{r acr_phytools_ace_castor}
-#| fig.height: 8
-#| fig.width: 9
-
-# grab ancestral state from simmap
-d_acr_phytools <- as.data.frame(simmap_summary$ace, col.names = colnames(simmap_summary$ace), row.names = row.names(simmap_summary$ace)) %>%
-  rownames_to_column(., var = 'node') %>%
-  pivot_longer(cols = all_of(coding$hab_pref), values_to = 'probability_phytools', names_to = 'habitat_preference')
-
-# grab out marginal likelihood for each node from ape::ace()
-d_acr_ape <- ancestral_states_ape6$lik.anc %>%
-  as_tibble(rownames = 'node') %>%
-  pivot_longer(cols = all_of(coding$hab_pref), values_to = 'probability_ape', names_to = 'habitat_preference')
-
-# grab out marginal likelihood for each node from castor::asr_mk_model()
-d_acr_castor <- ancestral_state_castor$ancestral_likelihoods
-colnames(d_acr_castor) <- sort(coding$hab_pref)
-rownames(d_acr_castor) <- rownames(ancestral_states_ape6$lik.anc)
-
-d_acr_castor <- as_tibble(d_acr_castor, rownames = 'node') %>%
-  pivot_longer(cols = all_of(coding$hab_pref), values_to = 'probability_castor', names_to = 'habitat_preference')
-
-# grab out marginal likelihood for each node from diversitree::find.mle()
-d_acr_diversitree <- asr.marginal(lik_constrain, unname(mod_ml$par)) %>%
-  t() %>%
-  as.data.frame(., col.names = colnames(ancestral_states_ape6$lik.anc), row.names = rownames(ancestral_states_ape6$lik.anc)) 
-
-colnames(d_acr_diversitree) <- colnames(ancestral_states_ape6$lik.anc)
-
-d_acr_diversitree <- d_acr_diversitree %>%
-  rownames_to_column(var = 'node') %>%
-  pivot_longer(cols = all_of(coding$hab_pref), values_to = 'probability_diversitree', names_to = 'habitat_preference')
-
-# look at similarity between ace, castor, and phytools approaches
-d_acr_summary <- reduce(list(d_acr_ape, d_acr_phytools, d_acr_castor, d_acr_diversitree), left_join)
-
-# can plot all of these reconstructions to see if they are doing similar things
-# will use ggpairs
-
-ggpairs(d_acr_summary, 
-  columns = c('probability_diversitree', 'probability_ape', 'probability_castor', 'probability_phytools'),
-  mapping = ggplot2::aes(colour = habitat_preference),
-  lower = list(continuous = wrap("smooth", se = FALSE, alpha = 0.3, size=0.1))) +
-  theme_bw(base_size = 14)
-
-```
-
-Stochastic character mapping and the maximum likelihood approach estimate ancestral states in slightly different ways. In **ape::ace()**, ancestral states are inferred using marginal state reconstruction, whereas the estimates from the stochastic character map use the joint reconstruction (I think).
-
-However, if you force the Q matrix to be maximum likelihood estimates then the estimates for the ancestral states should converge. This is what we see happening here. The diversitree estimates based on the marginal state reconstruction are equivalent to phytools. Something strange is going on with the **castor** estimates that I cannot work out, but three of our methods are extremely close with each other. This is good!
-
-## Looking at the best model for ancestral state reconstruction. {#sec-best_model}
-
-We can plot the best transition matrix using **ggplot2**.
-
-```{r best_transition_matrix}
-#| fig.height: 5
-#| fig.width: 7
-
-# rename best transition matrix for using it later
-best_matrix <- custom_matrix4
-
-# get dataframe of transition matrix
-d_best_matrix <- ace_transition_df(ancestral_states_ape6) %>%
-  left_join(., select(coding, state_1 = hab_pref, state_1_num = hab_pref_num2, state_1_label = hab_pref_axis)) %>%
-  left_join(., select(coding, state_2 = hab_pref, state_2_num = hab_pref_num2, state_2_label = hab_pref_axis)) %>%
-  mutate(transition_rate = round(transition_rate, 2)) 
-
-
-# make heatmap of changes
-ggplot(d_best_matrix, aes(forcats::fct_reorder(state_2_label, state_2_num), forcats::fct_reorder(state_1_label, desc(state_1_num)))) +
-  geom_tile(aes(alpha = transition_rate, col = free_param), width = 0.9, height = 0.9, size = 1.1) +
-  theme_bw(base_size = 14) +
-  theme(panel.grid.major = element_blank(),
-  legend.position = 'none',
-  axis.text.x.top = element_text(angle = 90, vjust = 0.5),
-  plot.title.position = "plot") +
-  scale_alpha_continuous(range = c(0, 0.6)) +
-  geom_text(aes(label = transition_rate), size = MicrobioUoE::pts(10)) +
-  scale_x_discrete(position = 'top', labels = scales::label_wrap(13)) +
-  scale_y_discrete(position = 'left', labels = scales::label_wrap(13)) +
-  labs(y = 'state 1',
-  x = 'state 2',
-  title = paste('all rates different with', length(best_matrix[best_matrix != 0]), 'free parameters', sep = ' ')) +
-  coord_fixed() +
-  scale_color_manual(values = c('black', 'red'))
-
-ggsave(here('plots/sequencing_rpoB/analyses/transition_matrix_mac.png'), last_plot(), height = 6, width = 8)
-
-```
-
-From this transition matrix, we can see some really cool patterns.
-
--   The best model has 17 free parameters, down from 42 in the all rates different model.
-
--   It is much more common to transition to being more specialist than being more generalist.
-
-    -   generalist -\> freshwater, generalist -\> freshwater/terrestrial, generalist -\> margine/terrestrial have high rates
-
-    -   freshwater/marine -\> freshwater has high rate
-
-    -   marine/terrestrial -\> marine has high rate
-
-    -   Only freshwater/terrestrial has a transition rate INTO generalist
-
--   Zero rates generally map to transitions across habitats (i.e. freshwater -\> terrestrial).
-
-    -   This is only non-zero in 1 out of 12 cases.
-
-We can have a look at these habitat preferences and their transition rates in a network, to visualise key stepping stones between states and highly connected trait states.
-
-We will do this using [ggraph](https://ggraph.data-imaginist.com/articles/Edges.html). I have not implemented this yet.
-
-First need to change our transition matrix into a network.
-
-```{r make_network_data}
-#| fig-height: 6
-#| fig-width: 8
 
 # set colours
 cols_hab <- met.brewer('Austria', n = 7)
@@ -1135,7 +856,7 @@ d_timespent <- group_by(d_time, state) %>%
   summarise(mean = mean(prop), .groups = 'drop')
 
 # turn transition matrix into network to plot
-d_network <- as_tbl_graph(select(d_best_matrix, state_1, state_2, transition_rate)) %>%
+d_network <- as_tbl_graph(select(diversitree_df, state_1, state_2, transition_rate)) %>%
   activate(edges) %>%
   filter(!is.na(transition_rate) & transition_rate > 0) %>%
   activate(nodes) %>%
@@ -1177,214 +898,10 @@ p + geom_label(aes(nudge_x + x, nudge_y+y, label = label), point_data, size = Mi
   xlim(c(min(point_data$x) + min(point_data$nudge_x) - 0.3), max(point_data$x) + max(point_data$nudge_x) + 0.3) +
   ylim(c(min(point_data$y) + min(point_data$nudge_y) - 0.1), max(point_data$y) + max(point_data$nudge_y) + 0.1)
 
-#ggsave(here('sequencing_rpoB/plots/analyses/transition_plot.pdf'), last_plot(), height = 6, width = 8)
-ggsave(here('plots/sequencing_rpoB/analyses/transition_plot_mac.png'), last_plot(), height = 6, width = 8)
+# save out model
+ggsave(here('plots/sequencing_rpoB/analyses/transition_plot_diversitree.png'), last_plot(), height = 6, width = 8)
 
 ```
-
-This plot is AMAZING and has loads of useful biological interpretation.
-
--   Marine mud is a common state (larger point), but has very low transition rates away from this state (and can only move into freshwater + marine mud)
--   Generalist is a rare state and has high rates transitioning away from it.
--   Rates going from a more polymorphic state to a simpler, more specialised state are generally higher than rates going from a monomorphic to polymorphic state.
--   Freshwater and its associated polymorphic traits (e.g. freshwater + terrestrial, freshwater + marine mud) are important states that facilitate a lot of transitions between other states.
--   Only 1 out of 6 transitions from monomorphic states to each other is possible in the best model (freshwater -\> marine mud).
-
-## Plot ancestral state reconstructions using ggtree
-
-We can plot the ancestral states using methods from **ggtree**. For this we need seven colours, one for each state. This is because it is really important to know whether we are confident the ancestral state reconstruction thinks we are in a polymorphic trait, or whether it is stuck between two (or three), monomorphic states.
-
-The idea is that habitat transitions may result in a change in rate of speciation/diversification, so we can plot the nodes where transitions are most likely to occur over the tree to see if they align with any habitat transitions.\
-We tried this on the whole tree, but it broke my Mac so instead we are doing it on node 4416, which was identified as a parent of nodes which contained a high density of potential transitions.
-
-```{r plot_nodepies1}
-#| fig.height: 8
-#| fig.width: 9
-#| eval: false
-
-# grab out marginal likelihood for each node
-# will use results from the stochastic character mapping
-
-# add new colours to cols_hab
-cols_hab2 <- c(cols_hab, '#00ffdc', '#032a63', '#1e5302')
-names(cols_hab2) <- c(names(cols_hab), 'freshwater:terrestrial', 'freshwater:mud_and_shore', 'mud_and_shore:terrestrial')
-
-# lets plot the nodepies for a subset of the tree. We create a plotly of the bamm transitions and identified a clade with lots of transitions in
-# lets try on a subset of the data for now. Lets try using all tips from node 4416, where we are pretty confident that a transition occurred in at some point
-# replace bootstrap value with node number so we can find it again
-
-# rename tree
-tree2 <- tree
-
-# keep tree data for nodes
-d_tree <- as_tibble(tree2) %>%
-  filter(!str_detect(label, 'otu'))
-
-# check node label is the same as the order in the dataframe
-sum(d_tree$label == tree2$node.label) == length(tree2$node.label)
-
-# replace node label with node number
-tree2$node.label <- d_tree$node
-
-# subset tree
-tree_sub <- extract.clade(tree2, 4416)
-
-# subset tree sub data to just keep nodes
-d_tree_sub <- as_tibble(tree_sub) %>%
-  filter(!str_detect(label, 'otu'))
-
-# tree_sub$node.label <- filter(d_tree, node %in% d_tree_sub$label)
-
-# replace node labels in acr dataset with new node numbers
-d_acr_phytools_sub <- filter(d_acr_phytools, node %in% d_tree_sub$label) %>%
-  pivot_wider(., names_from = 'habitat_preference', values_from = 'probability_phytools')
-d_acr_phytools_sub$node <- d_tree_sub$node
-
-# grab the relevant shift nodes and convert them to the right number for the subsetted tree
-shiftnodes_sub <- shiftnodes[shiftnodes %in% d_tree_sub$label]
-shiftnodes_sub <- tibble(shiftnode_original = as.character(shiftnodes_sub)) %>%
-  left_join(select(d_tree_sub, node, shiftnode_original = label))
-
-# create node pies for each node
-# https://github.com/YuLab-SMU/ggtree/issues/419#issuecomment-877563385
-
-# cols_hab[1:3][sort(names(cols_hab[1:3]))]
-
-pies <- nodepie(d_acr_phytools_sub, cols = 2:ncol(d_acr_phytools_sub), color = cols_hab2[sort(names(cols_hab2))], alpha = 1)
-d_pie <- tibble::tibble(node=as.numeric(d_acr_phytools_sub$node), pies=pies)
-
-# plot node pies on the tree with transition position
-tree_plot_sub <- ggtree(tree_sub, layout = 'circular', branch.length = 'none') %<+% filter(d_meta, tip_label %in% tree_sub$tip.label) +
-new_scale_color() +
-geom_tippoint(aes(x=x+1.5, col = habitat_preference), size = 2, position = position_jitter(width = 1, height = 0)) +
-scale_color_manual('Habitat preference', values = cols_hab2, labels = c('terrestrial', 'freshwater', 'marine mud', 'generalist', 'freshwater + terrestrial', 'freshwater + marine mud', 'marine mud + terrestrial')) +
-scale_fill_manual('Habitat preference', values = cols_hab2, labels = c('terrestrial', 'freshwater', 'marine mud', 'generalist', 'freshwater + terrestrial', 'freshwater + marine mud', 'marine mud + terrestrial')) +
-  geom_point2(aes(subset=(node %in% shiftnodes_sub$node)), col = 'red', shape = 21, fill = NA,size=8)
-
-# plot tree
-p_acr <- tree_plot_sub %<+% d_pie +
-  geom_plot(data=td_filter(!isTip), mapping=aes(x=x,y=y, label=pies), vp.width=0.04, vp.height=0.04, hjust=0.5, vjust=0.5)
-
-ggsave(here('sequencing_rpoB/plots/analyses/acr_plot.png'), p_acr, height = 10, width = 10)
-ggsave(here('sequencing_rpoB/plots/analyses/acr_plot.pdf'), p_acr, height = 10, width = 10)
-
-p_acr
-
-# change probabilities to just be marine, freshwater or terrestrial
-d_acr_single <- filter(d_acr_phytools, habitat_preference %in% c('terrestrial', 'mud_and_shore', 'freshwater'))
-d_acr_double <- filter(d_acr_ape, str_count(habitat_preference, ':') == 1) %>%
-  separate_rows(habitat_preference, sep = ':') %>%
-  mutate(probability_ape = probability_ape/2)
-
-d_acr_general <- filter(d_acr_ape, habitat_preference == 'generalist') %>%
-  group_by(node) %>%
-  do(data.frame(habitat_preference = c('terrestrial', 'mud_and_shore', 'freshwater'), probability_ape = .$probability_ape/3)) %>%
-  ungroup()
-
-# combine to have just three habitats
-d_acr_ape2 <- bind_rows(d_acr_single, d_acr_double, d_acr_general) %>%
-  group_by(node, habitat_preference) %>%
-  summarise(probability_ape = sum(probability_ape), .groups = 'drop') %>%
-  pivot_wider(names_from = 'habitat_preference', values_from = 'probability_ape')
-
-pies <- nodepie(d_acr_phytools_sub, cols = 2:4, color = cols_hab[1:3][sort(names(cols_hab[1:3]))], alpha = 1)
-d_pie <- tibble::tibble(node=as.numeric(d_acr_phytools_sub$node), pies=pies)
-
-# plot node pies on the tree with transition position
-tree_plot_sub <- ggtree(tree_sub, layout = 'circular', branch.length = 'none') %<+% filter(d_meta, tip_label %in% tree_sub$tip.label) +
-new_scale_color() +
-geom_tippoint(aes(x=x+1.5, col = hab1, fill = hab2), size = 2, shape = 21, position = position_jitter(width = 1, height = 0)) +
-scale_color_manual('Habitat preference', values = cols_hab, labels = c('terrestrial', 'freshwater', 'marine mud', 'generalist')) +
-scale_fill_manual('Habitat preference', values = cols_hab, labels = c('terrestrial', 'freshwater', 'marine mud', 'generalist')) +
-  geom_point2(aes(subset=(node %in% shiftnodes_sub$node)), col = 'red', shape = 21, fill = NA,size=8)
-
-
-```
-
-We can see that lots of the shift changes are associated with nodes where the model is confident in the ancestral state (either freshwwater + terrestrial or marine mud). To me there is not clear evidence that the nodes where shifts are thought to occur are in areas where a transition is likely to have occurred.
-
-An alternative approach here is to not only plot each monomorphic state in the pie charts at the node, and split each polymorphic state into the probability of it either being marine mud, terrestrial, or freshwater. I do not think I favour this approach in the long-term, but it produces a graph that is slightly more consistent with our previous colour schemes.
-
-```{r plot_nodepies2}
-#| fig.height: 8
-#| fig.width: 9
-#| eval: false
-
-# change probabilities to just be marine, freshwater or terrestrial
-d_acr_single <- filter(d_acr_phytools, habitat_preference %in% c('terrestrial', 'mud_and_shore', 'freshwater'))
-
-d_acr_double <- filter(d_acr_phytools, str_count(habitat_preference, ':') == 1) %>%
-  separate_rows(habitat_preference, sep = ':') %>%
-  mutate(probability_phytools = probability_phytools/2)
-
-d_acr_general <- filter(d_acr_phytools, habitat_preference == 'generalist') %>%
-  group_by(node) %>%
-  do(data.frame(habitat_preference = c('terrestrial', 'mud_and_shore', 'freshwater'), probability_phytools = .$probability_phytools/3)) %>%
-  ungroup()
-
-# combine to have just three habitats
-d_acr2 <- bind_rows(d_acr_single, d_acr_double, d_acr_general) %>%
-  group_by(node, habitat_preference) %>%
-  summarise(probability_phytools = sum(probability_phytools), .groups = 'drop') %>%
-  filter(., node %in% d_tree_sub$label) %>%
-  pivot_wider(names_from = 'habitat_preference', values_from = 'probability_phytools')
-
-d_acr2$node <- d_tree_sub$node
-
-pies <- nodepie(d_acr2, cols = 2:4, color = cols_hab[1:3][sort(names(cols_hab[1:3]))], alpha = 1)
-d_pie <- tibble::tibble(node=as.numeric(d_acr2$node), pies=pies)
-
-# plot node pies on the tree with transition position
-tree_plot_sub <- ggtree(tree_sub, layout = 'circular', branch.length = 'none') %<+% filter(d_meta, tip_label %in% tree_sub$tip.label) +
-new_scale_color() +
-geom_tippoint(aes(x=x+1.5, col = hab1, fill = hab2), size = 2, shape = 21, position = position_jitter(width = 1, height = 0)) +
-scale_color_manual('Habitat preference', values = cols_hab, labels = c('terrestrial', 'freshwater', 'marine mud', 'generalist')) +
-scale_fill_manual('Habitat preference', values = cols_hab, labels = c('terrestrial', 'freshwater', 'marine mud', 'generalist')) +
-  geom_point2(aes(subset=(node %in% shiftnodes_sub$node)), col = 'red', shape = 21, fill = NA,size=8)
-
-# plot tree
-p_acr <- tree_plot_sub %<+% d_pie +
-  geom_plot(data=td_filter(!isTip), mapping=aes(x=x,y=y, label=pies), vp.width=0.04, vp.height=0.04, hjust=0.5, vjust=0.5)
-
-ggsave(here('sequencing_rpoB/plots/analyses/acr_plot2.png'), p_acr, height = 10, width = 10)
-ggsave(here('sequencing_rpoB/plots/analyses/acr_plot2.pdf'), p_acr, height = 10, width = 10)
-
-p_acr
-
-```
-
-## How to compare BAMM results to ancestral state reconstructions
-
-A key question here is how to link the BAMM analysis to these ancestral state reconstructions. One idea I had was to compare all the nodes which have rate shifts to the rest of the nodes in terms of marginal probabilities of ancestral states.
-
-We can pretty easily do this by filtering the data on marginal state probabilities by whether they have been identified as a shift node or not.
-
-We probably need to control for time from tip in this analysis somehow. Obviously deeper tips are more likely to be less certain in the evolutionary model.
-
-This plot shows a density plot for the marginal probability of each node for each state (habitat preference) split by whether the node was a shift node or not.
-
-If there is no difference in ancestral state reconstruction between shift nodes and non-shift nodes, all the distributions should overlay on each other.
-
-```{r shift_node_explore}
-#| fig-height: 8
-#| fig-width: 10
-#| eval: false
-
-# check whether internal node has a shift in or not
-d_acr_phytools <- mutate(d_acr_phytools, shift = ifelse(node %in% shiftnodes, 'shift', 'noshift'))
-
-ggplot(d_acr_phytools, aes(probability_phytools)) +
-  geom_density(aes(col = shift, fill = shift, probability_phytools, ..scaled..), alpha = 0.1) +
-  facet_wrap(~habitat_preference, scales = 'free') +
-  scale_fill_manual(values = c('black', 'red')) +
-  scale_color_manual(values = c('black', 'red')) +
-  theme_bw()
-
-```
-
-Most of the panels overlay each other pretty consistently. However a couple of them do not (i.e. terrestrial and freshwater + terrestrial). The problem is I do not really understand how to interpret this at the moment and think it is kind of meaningless. For example, the panel for freshwater + terrestrial says that shift nodes are predicted to contain more freshwater + terrestrial. But this is true even when the probability of being freshwater + terrestrial in that node is 0.25.
-
-Think how to cleverly look at these things is something I would really like to discuss further.
 
 ## Useful links used
 

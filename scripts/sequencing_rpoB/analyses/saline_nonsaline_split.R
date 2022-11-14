@@ -5,6 +5,7 @@
 # load packages
 library(tidyverse)
 library(phytools)
+library(flextable)
 
 # load in best output from simmap - the mac results because the model is better
 simmap_res <- readRDS("data/sequencing_rpoB/processed/transition_rates/simmap_mac.rds")
@@ -18,6 +19,33 @@ d_transitions <- as.data.frame(simmap_summary$count, col.names = colnames(simmap
   pivot_longer(cols = c(everything(), -N, -iter), names_to = 'transition', values_to = 'n_transitions') %>%
   separate(transition, c('state_1', 'state_2'), sep = ',', remove = FALSE) %>%
   mutate(label = gsub(',', ' -> ', transition))
+
+d_transitions_summary <- group_by(d_transitions, iter) %>%
+  mutate(prop = n_transitions/sum(n_transitions)) %>%
+  group_by(state_1, state_2) %>%
+  summarise(ave_prop = mean(prop),
+            lower_ci = quantile(prop, 0.025),
+            upper_ci = quantile(prop, 0.975),
+            .groups = 'drop') %>%
+  arrange(desc(ave_prop))
+
+table <- select(d_transitions_summary, state_1, state_2, ave_prop) %>%
+  mutate(across(starts_with('state'), function(x) gsub('mud_and_shore', 'marine mud', x)),
+         across(starts_with('state'), function(x) gsub(':', ' + ', x)),
+         across(starts_with('ave'), round, 2))
+
+table_flex <- flextable(table) %>%
+  set_header_labels(state_1 = 'from',
+                    state_2 = 'to',
+                    ave_prop = 'proportion of all transitions') %>%
+  align(align = 'center', part = 'header') %>%
+  bold(part = 'header') %>%
+  font(fontname = 'Times', part = 'all') %>%
+  fontsize(size = 12, part = 'all') %>%
+  autofit()
+
+# save out
+save_as_image(table_flex, 'plots/sequencing_rpoB/analyses/proportion_of_transitions.png', zoom = 3, webshot = 'webshot2')
 
 # calculate number of transitions from saline/non saline compared to within saline
 
