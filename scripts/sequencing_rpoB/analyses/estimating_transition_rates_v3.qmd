@@ -87,10 +87,7 @@ library(ggtree)
 library(ggnewscale)
 library(RColorBrewer)
 library(patchwork)
-library(ape)
 library(phytools)
-library(BAMMtools)
-library(coda)
 library(MetBrewer)
 library(ggpp)
 library(castor)
@@ -100,6 +97,7 @@ library(igraph)
 library(ggraph)
 library(GGally)
 library(ggrepel)
+library(flextable)
 
 # set where I am in the project
 here::i_am('scripts/sequencing_rpoB/analyses/estimating_transition_rates_v3.qmd')
@@ -125,6 +123,26 @@ shiftnodes <- readRDS(here('data/sequencing_rpoB/processed/shiftnodes.rds'))
 ## Custom function
 
 We will write a custom function for getting the transition matrix into a format that is easy to plot using **ggplot2**.
+
+```{r custom_function}
+
+# function for getting a data frame from a diversitree object
+get_diversitree_df <- function(div_obj, trait_vec, replace_vec){
+  
+  temp <- tibble(param = names(div_obj$par.full)) %>%
+    mutate(state_1_num = as.numeric(substr(param, 2,2)),
+         state_2_num = as.numeric(substr(param, 3,3)),
+         transition_rate = unlist(div_obj$par.full),
+         state_1 = stringi::stri_replace_all_regex(state_1_num, pattern = trait_vec, replacement = replace_vec, vectorize=FALSE),
+         state_2 = stringi::stri_replace_all_regex(state_2_num, pattern = trait_vec, replacement = replace_vec, vectorize=FALSE)) %>%
+    select(param, state_1, state_2, state_1_num, state_2_num, transition_rate) %>%
+    mutate(free_param = ifelse(param %in% names(div_obj$par), 'yes', 'no'),
+           num_params = length(div_obj$par))
+  
+  return(temp)
+  
+}
+```
 
 ## Create a master dataframe for the trait states
 
@@ -274,6 +292,8 @@ anova(mod_ard, mod_sym)
 anova(mod_ard, mod_er)
 
 ```
+
+### Model simplificiation of the ARD model
 
 So the ARD model is the best model by a considerable margin using AIC. We can do model simplification of this model to see what parameters can be removed to further improve the model. First we will just plot the distribution of estimated parameters. As most rates are very small we shall do another histogram filtering out the larger rates.
 
@@ -675,6 +695,8 @@ mod_custom8$par %>% sort()
 
 This parameter is important in the model. Consequently our best model is **mod_custom7**.
 
+## Run MCMC chain for the best Mk model
+
 We can try and run mcmc on this model.
 
 ```{r mcmc_load}
@@ -710,27 +732,15 @@ fit_mcmc3 <- mcmc(lik_custom7, inits_mcmc, nsteps=1000, w=w, upper = upper_mcmc,
 
 ```
 
+We can easily plot the distribution of these parameter estimates.
+
+## Plot the best transition matrix
+
 We can plot the transition matrix of the best model.
 
 ```{r plot_transition_matrix}
 #| fig.height: 6
 #| fig.width: 8
-
-get_diversitree_df <- function(div_obj, trait_vec, replace_vec){
-  
-  temp <- tibble(param = names(div_obj$par.full)) %>%
-    mutate(state_1_num = as.numeric(substr(param, 2,2)),
-         state_2_num = as.numeric(substr(param, 3,3)),
-         transition_rate = unlist(div_obj$par.full),
-         state_1 = stringi::stri_replace_all_regex(state_1_num, pattern = trait_vec, replacement = replace_vec, vectorize=FALSE),
-         state_2 = stringi::stri_replace_all_regex(state_2_num, pattern = trait_vec, replacement = replace_vec, vectorize=FALSE)) %>%
-    select(param, state_1, state_2, state_1_num, state_2_num, transition_rate) %>%
-    mutate(free_param = ifelse(param %in% names(div_obj$par), 'yes', 'no'),
-           num_params = length(div_obj$par))
-  
-  return(temp)
-  
-}
 
 diversitree_df <- get_diversitree_df(mod_custom8, coding$hab_pref_num2, coding$hab_pref)
 
@@ -759,6 +769,8 @@ ggsave(here('plots/sequencing_rpoB/analyses/transition_matrix_diversitree.png'),
 
 ```
 
+## Stochastic character mapping with phytools
+
 We can now pass the best matrix onto phytools to do stochastic character mapping.
 
 ```{r phytools}
@@ -786,13 +798,6 @@ diag(best_matrix) <- -rowSums(best_matrix)
 
 Run stochastic character mapping
 
-```{r load_simmap}
-#| echo: false
-
-simmap_best <- readRDS(here("data/sequencing_rpoB/processed/transition_rates/simmap_diversitree.rds"))
-
-```
-
 ```{r simmap}
 #| eval: false
 
@@ -800,18 +805,56 @@ simmap_best <- readRDS(here("data/sequencing_rpoB/processed/transition_rates/sim
 # feed in the best transition matrix previously found using other methods
 simmap_best <- make.simmap(tree, hab_pref, nsim = 1000, Q = best_matrix)
 
+# need to split this result up so that files are less than 50MB for GitHub
+
+# number of splits
+n_splits <- 10
+# find start of each split
+splits <- seq(from = 1, to = 1000, by = 1000/10)
+
+# save files out
+for(i in 1:length(splits)){
+  # save out every 100 sims
+  saveRDS(simmap_best[splits[i]:(splits[i]+99)], here(paste("data/sequencing_rpoB/processed/transition_rates/simmap/simmap_", i, '.rds', sep = '')))
+}
+
 ```
+
+We can then re-load the stochastic character maps in.
+
+```{r load_simmap}
+# reload simmap files in
+simmap_files <- list.files(here("data/sequencing_rpoB/processed/transition_rates/simmap"), full.names = TRUE)
+
+simmap_best <- purrr::map(simmap_files, readRDS)
+
+simmap_best <- do.call(c, simmap_best)
+
+# load in summary as well!
+```
+
+We can then summarise the stochastic character maps.
+
+```{r summarise_phytools}
+#| eval: false
+
+# summarise number of switches between states and time spent in each state
+simmap_summary <- describe.simmap(simmap_best, plot=FALSE)
+
+# remove the tree element - this is the simmap_best
+simmap_summary$tree <- NULL
+```
+
+We can now visualise the results. First we can look at the most common transitions.
 
 ```{r simmap_summary}
 #| fig-height: 8
 #| fig-width: 10
 
-# summarise number of switches between states and time spent in each state
-simmap_summary <- describe.simmap(simmap_best, plot=FALSE)
-
 # coerce transitions into dataframe
 d_transitions <- as.data.frame(simmap_summary$count, col.names = colnames(simmap_summary$count)) %>%
-  pivot_longer(cols = c(everything(), -N), names_to = 'transition', values_to = 'n_transitions') %>%
+  mutate(iter = 1:n()) %>%
+  pivot_longer(cols = c(everything(), -N, -iter), names_to = 'transition', values_to = 'n_transitions') %>%
   separate(transition, c('state_1', 'state_2'), sep = ',', remove = FALSE) %>%
   mutate(label = gsub(',', ' -> ', transition))
 
@@ -831,7 +874,44 @@ group_by(d_transitions, transition) %>%
   y = 'Count')
 ```
 
-We can then plot the best model as a network.
+We can look at how common transitions are by plotting the averages in a table.
+
+```{r common_transitions}
+
+d_transitions_summary <- group_by(d_transitions, iter) %>%
+  mutate(prop = n_transitions/sum(n_transitions)) %>%
+  group_by(state_1, state_2) %>%
+  summarise(ave_prop = mean(prop),
+            lower_ci = quantile(prop, 0.025),
+            upper_ci = quantile(prop, 0.975),
+            .groups = 'drop') %>%
+  arrange(desc(ave_prop)) %>%
+  filter(ave_prop > 0)
+
+table <- select(d_transitions_summary, state_1, state_2, ave_prop) %>%
+  mutate(across(starts_with('state'), function(x) gsub('mud_and_shore', 'marine mud', x)),
+         across(starts_with('state'), function(x) gsub(':', ' + ', x)),
+         across(starts_with('ave'), round, 2))
+
+table_flex <- flextable(table) %>%
+  set_header_labels(state_1 = 'from',
+                    state_2 = 'to',
+                    ave_prop = 'proportion of all transitions') %>%
+  align(align = 'center', part = 'header') %>%
+  bold(part = 'header') %>%
+  font(fontname = 'Times', part = 'all') %>%
+  fontsize(size = 12, part = 'all') %>%
+  autofit()
+
+# save out
+save_as_image(table_flex, here('plots/sequencing_rpoB/analyses/proportion_of_transitions.png'), zoom = 3, webshot = 'webshot2')
+
+table_flex
+```
+
+## Plot best transition matrix
+
+We can then plot the best model as a network. The output from the stochastic character mapping also contains information as to the time spent in each state in the phylogenetic tree.
 
 ```{r plot_best_model}
 #| fig-height: 6
