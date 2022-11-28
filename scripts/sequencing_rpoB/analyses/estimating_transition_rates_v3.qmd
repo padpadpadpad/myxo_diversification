@@ -98,6 +98,7 @@ library(ggraph)
 library(GGally)
 library(ggrepel)
 library(flextable)
+library(ggridges)
 
 # set where I am in the project
 here::i_am('scripts/sequencing_rpoB/analyses/estimating_transition_rates_v3.qmd')
@@ -695,6 +696,41 @@ mod_custom8$par %>% sort()
 
 This parameter is important in the model. Consequently our best model is **mod_custom7**.
 
+## Plot the best transition matrix
+
+We can plot the transition matrix of the best model.
+
+```{r plot_transition_matrix}
+#| fig.height: 6
+#| fig.width: 8
+
+diversitree_df <- get_diversitree_df(mod_custom7, coding$hab_pref_num2, coding$hab_pref)
+
+diversitree_df %>%
+  left_join(., select(coding, state_1 = hab_pref, state_1_num = hab_pref_num2, state_1_label = hab_pref_axis)) %>%
+  left_join(., select(coding, state_2 = hab_pref, state_2_num = hab_pref_num2, state_2_label = hab_pref_axis)) %>%
+  mutate(transition_rate = round(transition_rate, 2)) %>%
+  ggplot(., aes(forcats::fct_reorder(state_2_label, state_2_num), forcats::fct_reorder(state_1_label, desc(state_1_num)))) +
+  geom_tile(aes(alpha = transition_rate, col = free_param), width = 0.9, height = 0.9, size = 1.1) +
+  theme_bw(base_size = 14) +
+  theme(panel.grid.major = element_blank(),
+  legend.position = 'none',
+  axis.text.x.top = element_text(angle = 90, vjust = 0.5),
+  plot.title.position = "plot") +
+  scale_alpha_continuous(range = c(0, 0.6)) +
+  geom_text(aes(label = transition_rate), size = MicrobioUoE::pts(10)) +
+  scale_x_discrete(position = 'top', labels = scales::label_wrap(13)) +
+  scale_y_discrete(position = 'left', labels = scales::label_wrap(13)) +
+  labs(y = 'state 1',
+  x = 'state 2',
+  title = paste('all rates different with', length(mod_custom7$par), 'free parameters', sep = ' ')) +
+  coord_fixed() +
+  scale_color_manual(values = c('red', 'black'))
+
+ggsave(here('plots/sequencing_rpoB/analyses/transition_matrix_diversitree.png'), last_plot(), height = 6, width = 8)
+
+```
+
 ## Run MCMC chain for the best Mk model
 
 We can try and run mcmc on this model.
@@ -734,40 +770,68 @@ fit_mcmc3 <- mcmc(lik_custom7, inits_mcmc, nsteps=1000, w=w, upper = upper_mcmc,
 
 We can easily plot the distribution of these parameter estimates.
 
-## Plot the best transition matrix
-
-We can plot the transition matrix of the best model.
-
-```{r plot_transition_matrix}
+```{r plot_mcmc}
 #| fig.height: 6
-#| fig.width: 8
+#| fig.width: 5
 
-diversitree_df <- get_diversitree_df(mod_custom8, coding$hab_pref_num2, coding$hab_pref)
+# make data long format
+d_mcmc <- pivot_longer(fit_mcmc3, names_to = 'param', values_to = 'transition_rate', cols = starts_with('q')) %>%
+  left_join(., select(diversitree_df, param, state_1, state_2)) %>%
+  left_join(., select(coding, state_1 = hab_pref, state_1_num = hab_pref_num2, state_1_label = initials)) %>%
+  left_join(., select(coding, state_2 = hab_pref, state_2_num = hab_pref_num2, state_2_label = initials)) %>%
+  mutate(parameter = paste(state_1_label, '->', state_2_label))
 
-diversitree_df %>%
-  left_join(., select(coding, state_1 = hab_pref, state_1_num = hab_pref_num2, state_1_label = hab_pref_axis)) %>%
-  left_join(., select(coding, state_2 = hab_pref, state_2_num = hab_pref_num2, state_2_label = hab_pref_axis)) %>%
-  mutate(transition_rate = round(transition_rate, 2)) %>%
-  ggplot(., aes(forcats::fct_reorder(state_2_label, state_2_num), forcats::fct_reorder(state_1_label, desc(state_1_num)))) +
-  geom_tile(aes(alpha = transition_rate, col = free_param), width = 0.9, height = 0.9, size = 1.1) +
+# find 95% CIs and bind with ML estimates
+d_mcmc_summary <- d_mcmc %>%
+  group_by(parameter, state_1, state_2) %>%
+  tidybayes::mean_qi(transition_rate) %>%
+  left_join(., select(diversitree_df, state_1, state_2, ml_estimate = transition_rate))
+
+# plot ridge plot
+ggplot(d_mcmc, aes(transition_rate, forcats::fct_reorder(parameter, transition_rate))) +
+  geom_density_ridges() +
   theme_bw(base_size = 14) +
-  theme(panel.grid.major = element_blank(),
-  legend.position = 'none',
-  axis.text.x.top = element_text(angle = 90, vjust = 0.5),
-  plot.title.position = "plot") +
-  scale_alpha_continuous(range = c(0, 0.6)) +
-  geom_text(aes(label = transition_rate), size = MicrobioUoE::pts(10)) +
-  scale_x_discrete(position = 'top', labels = scales::label_wrap(13)) +
-  scale_y_discrete(position = 'left', labels = scales::label_wrap(13)) +
-  labs(y = 'state 1',
-  x = 'state 2',
-  title = paste('all rates different with', length(mod_custom7$par), 'free parameters', sep = ' ')) +
-  coord_fixed() +
-  scale_color_manual(values = c('red', 'black'))
+  labs(x = 'transition rate',
+       y = 'transition')
 
-ggsave(here('plots/sequencing_rpoB/analyses/transition_matrix_diversitree.png'), last_plot(), height = 6, width = 8)
 
 ```
+
+From this it is really clear that the model does not have a very good idea about the value of two transitions: (1) generalist -\> freshwater and (2) generalist -\> freshwater + terrestrial.
+
+We can take 95% CIs and plot these alongside the maximum likelihood estimates.
+
+```{r}
+#| fig.height: 6
+#| fig.width: 6
+
+# plot 95% CIs
+ggplot(d_mcmc_summary, aes(transition_rate, forcats::fct_reorder(parameter, transition_rate))) +
+  geom_linerange(aes(xmin = .lower, xmax = .upper)) +
+  geom_point(size = 3) +
+  geom_point(aes(x = ml_estimate), size = 3, col = 'red') +
+  theme_bw(base_size = 14) +
+  labs(x = 'transition rate',
+       y = 'transition',
+       caption = 'red points are ML estimate\nblack points are MCMC average')
+
+
+```
+
+So it is abundantly clear that the maximum likelihood model is struggling with some parameters. These are linked to transitions that are not very common. It generally does a much better job when parameters are smaller.
+
+One thing that could be happening is that when one of those transitions is high, the other is lower, we can look at the correlation between generalist -\> freshwater (q41) and generalist -\> freshwater + terrestrial (q43).
+
+```{r}
+
+# look at whether the two crazy estimates correlate with each other.
+ggplot(fit_mcmc3, aes(q41, q43)) +
+  geom_point() +
+  theme_bw()
+
+```
+
+Nope there is no correlation here. The model just does not really have a great idea what the transition rate is for these two.
 
 ## Stochastic character mapping with phytools
 
@@ -831,6 +895,7 @@ simmap_best <- purrr::map(simmap_files, readRDS)
 simmap_best <- do.call(c, simmap_best)
 
 # load in summary as well!
+simmap_summary <- readRDS(here('data/sequencing_rpoB/processed/transition_rates/simmap/simmap_summary.rds'))
 ```
 
 We can then summarise the stochastic character maps.
@@ -881,22 +946,25 @@ We can look at how common transitions are by plotting the averages in a table.
 d_transitions_summary <- group_by(d_transitions, iter) %>%
   mutate(prop = n_transitions/sum(n_transitions)) %>%
   group_by(state_1, state_2) %>%
-  summarise(ave_prop = mean(prop),
+  summarise(ave_num = mean(n_transitions),
+            ave_prop = mean(prop),
             lower_ci = quantile(prop, 0.025),
             upper_ci = quantile(prop, 0.975),
             .groups = 'drop') %>%
   arrange(desc(ave_prop)) %>%
-  filter(ave_prop > 0)
+  filter(ave_num > 0)
 
-table <- select(d_transitions_summary, state_1, state_2, ave_prop) %>%
+table <- select(d_transitions_summary, state_1, state_2, ave_num, ave_prop) %>%
   mutate(across(starts_with('state'), function(x) gsub('mud_and_shore', 'marine mud', x)),
          across(starts_with('state'), function(x) gsub(':', ' + ', x)),
-         across(starts_with('ave'), round, 2))
+         ave_prop = round(ave_prop, 2),
+         ave_num = round(ave_num, 0))
 
 table_flex <- flextable(table) %>%
   set_header_labels(state_1 = 'from',
                     state_2 = 'to',
-                    ave_prop = 'proportion of all transitions') %>%
+                    ave_prop = 'proportion of all transitions',
+                    ave_num = 'number of transitions') %>%
   align(align = 'center', part = 'header') %>%
   bold(part = 'header') %>%
   font(fontname = 'Times', part = 'all') %>%
