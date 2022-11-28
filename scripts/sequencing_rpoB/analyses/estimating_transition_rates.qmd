@@ -641,8 +641,6 @@ mod_compare <- tibble(mod = c('ER', 'SYM', 'ARD', 'ancestral_states_ape3', 'ance
 
 arrange(mod_compare, aic)
 
-saveRDS(ancestral_states_ape7, here('data/sequencing_rpoB/processed/transition_rates/ancestral_states_ape7.rds'))
-
 ```
 
 This model is again better than the previous model! We can again plot the results.
@@ -1053,7 +1051,7 @@ ggsave(here('plots/sequencing_rpoB/analyses/transition_matrix.png'), last_plot()
 
 From this transition matrix, we can see some really cool patterns.
 
--   The best model has 17 free parameters, down from 42 in the all rates different model.
+-   The best model has 20 free parameters, down from 42 in the all rates different model.
 
 -   It is much more common to transition to being more specialist than being more generalist.
 
@@ -1078,6 +1076,7 @@ First need to change our transition matrix into a network.
 ```{r make_network_data}
 #| fig-height: 6
 #| fig-width: 8
+
 # set colours
 cols_hab <- met.brewer('Austria', n = 7)
 names(cols_hab) <- c('mud_and_shore', 'freshwater', 'terrestrial', 'freshwater:terrestrial', 'generalist', 'mud_and_shore:terrestrial', 'freshwater:mud_and_shore')
@@ -1132,6 +1131,7 @@ p + geom_label(aes(nudge_x + x, nudge_y+y, label = label), point_data, size = Mi
 
 #ggsave(here('sequencing_rpoB/plots/analyses/transition_plot.pdf'), last_plot(), height = 6, width = 8)
 ggsave(here('plots/sequencing_rpoB/analyses/transition_plot.png'), last_plot(), height = 6, width = 8)
+
 
 ```
 
