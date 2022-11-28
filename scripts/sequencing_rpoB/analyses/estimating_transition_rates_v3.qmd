@@ -189,7 +189,7 @@ First lets fit each of the models (ER, SYM, and ARD) using **diversitree::fit_mk
 
 **diversitree** is good because it makes us implicitly code the transitions we want to set to 0 or make equivalent, which aids our understanding of the models we are trying to fit. Its downside is that it takes numbers only, so we have to back-transform our model estimates into their biologically meaningful trait values.
 
-```{r diversitree_1_load}
+```{r diversitree_load}
 #| echo: false
 
 # save out files
@@ -234,7 +234,7 @@ inits_sym <- rep(1, length(argnames(lik_sym)))
 inits_er <- rep(1, length(argnames(lik_er)))
 ```
 
-```{r diversitree_1_setup}
+```{r diversitree_setup}
 #| eval: false
 
 # all of these methods needs a likelihood function, we can build a Mkn model
@@ -285,7 +285,7 @@ AIC(mod_ard)
 
 We can compare model fit using AIC and anovas
 
-```{r diversitree_1_compare}
+```{r diversitree_compare}
 
 AIC(mod_sym, mod_ard, mod_er) %>% arrange(AIC)
 
@@ -330,7 +330,7 @@ mod_ard$par[mod_ard$par < 1e-03] %>% names(.)
 
 We can immediately see there are many parameters that are extremely close to 0. We shall set these to zero and refit the model. This plot identifies a bunch of parameters that are extremely close to 1. By sorting them we can see the split here is from e-06 to e-02.
 
-```{r diversitree_2_load}
+```{r diversitree_1_load}
 #| echo: false
 
 # read in files
@@ -345,7 +345,7 @@ inits_custom1 <- rep(1, length(argnames(lik_custom1)))
 
 ```
 
-```{r diversitree_2_setup}
+```{r diversitree_1_setup}
 #| eval: false
 
 # make custom matrix model
@@ -363,7 +363,7 @@ mod_custom1 <- find.mle(lik_custom1, inits_custom1, method = 'subplex', control 
 
 We can now do model comparison again.
 
-```{r diversitree_2_compare}
+```{r diversitree_1_compare}
 # do AIC comparison
 AIC(mod_sym, mod_ard, mod_er, mod_custom1) %>% arrange(AIC)
 
@@ -398,7 +398,7 @@ mod_custom1$par %>% sort()
 
 The lowest rate (q17) is around five times smaller than the other low rates. So we shall remove this rate first and compare models.
 
-```{r diversitree_3_load}
+```{r diversitree_2_load}
 #| echo: false
 
 # read in files
@@ -412,7 +412,7 @@ lik_custom2 <- constrain(lik_ard,
 inits_custom2 <- rep(1, length(argnames(lik_custom2)))
 ```
 
-```{r diversitree_3_setup}
+```{r diversitree_2_setup}
 #| eval: false
 
 # make custom matrix model
@@ -428,7 +428,7 @@ mod_custom2 <- find.mle(lik_custom2, inits_custom2, method = 'subplex', control 
 
 We can now again do model comparison.
 
-```{r diversitree_3_compare}
+```{r diversitree_2_compare}
 # do AIC comparison
 AIC(mod_sym, mod_ard, mod_er, mod_custom1, mod_custom2) %>% arrange(AIC)
 
@@ -441,7 +441,7 @@ mod_custom2$par %>% sort()
 
 This model is once again better. We will do the same procedure to remove the next parameters that are extremely low. We can see that q75 and q71 are both extremely low and similar (difference is \~0.008). We will remove q75 first.
 
-```{r diversitree_4_load}
+```{r diversitree_3_load}
 #| echo: false
 
 # read in files
@@ -456,7 +456,7 @@ inits_custom3 <- rep(1, length(argnames(lik_custom3)))
 
 ```
 
-```{r diversitree_4_setup}
+```{r diversitree_3_setup}
 #| eval: false
 
 # make custom matrix model
@@ -472,7 +472,7 @@ mod_custom3 <- find.mle(lik_custom3, inits_custom3, method = 'subplex', control 
 
 We can now again do model comparison.
 
-```{r diversitree_4_compare}
+```{r diversitree_3_compare}
 # do AIC comparison
 AIC(mod_sym, mod_ard, mod_er, mod_custom1, mod_custom2, mod_custom3) %>% arrange(AIC)
 
@@ -822,7 +822,9 @@ So it is abundantly clear that the maximum likelihood model is struggling with s
 
 One thing that could be happening is that when one of those transitions is high, the other is lower, we can look at the correlation between generalist -\> freshwater (q41) and generalist -\> freshwater + terrestrial (q43).
 
-```{r}
+```{r mcmc_cor}
+#| fig.width: 7
+#| fig.height: 5
 
 # look at whether the two crazy estimates correlate with each other.
 ggplot(fit_mcmc3, aes(q41, q43)) +
@@ -889,6 +891,7 @@ We can then re-load the stochastic character maps in.
 ```{r load_simmap}
 # reload simmap files in
 simmap_files <- list.files(here("data/sequencing_rpoB/processed/transition_rates/simmap"), full.names = TRUE)
+simmap_files <- simmap_files[simmap_files != here('data/sequencing_rpoB/processed/transition_rates/simmap/simmap_summary.rds')]
 
 simmap_best <- purrr::map(simmap_files, readRDS)
 
@@ -942,6 +945,7 @@ group_by(d_transitions, transition) %>%
 We can look at how common transitions are by plotting the averages in a table.
 
 ```{r common_transitions}
+#| tbl-cap: common_transitions
 
 d_transitions_summary <- group_by(d_transitions, iter) %>%
   mutate(prop = n_transitions/sum(n_transitions)) %>%
@@ -977,7 +981,7 @@ save_as_image(table_flex, here('plots/sequencing_rpoB/analyses/proportion_of_tra
 table_flex
 ```
 
-## Plot best transition matrix
+## Plot best transition matrix as a network
 
 We can then plot the best model as a network. The output from the stochastic character mapping also contains information as to the time spent in each state in the phylogenetic tree.
 
@@ -1050,6 +1054,140 @@ p + geom_label(aes(nudge_x + x, nudge_y+y, label = label), point_data, size = Mi
 ggsave(here('plots/sequencing_rpoB/analyses/transition_plot_diversitree.png'), last_plot(), height = 6, width = 8)
 
 ```
+
+Ok so this shows a bunch of cool things. Instead of moving between specialist states directly, transitions between environments are mediated by the evolution of generalism.
+
+We can look at whether any given state is a net sink or net source using both the total number of transitions and the instantaneous transition rates.
+
+```{r}
+# first with the transition rates
+d_source_sink_rate <- select(diversitree_df, away = state_1, into = state_2, transition_rate) %>%
+  pivot_longer(cols = c(away, into), names_to = 'direction', values_to = 'habitat_preference') %>%
+  group_by(habitat_preference, direction) %>%
+  summarise(total_rate = sum(transition_rate), .groups = 'drop') %>%
+  pivot_wider(names_from = direction, values_from = total_rate) %>%
+  mutate(source_sink1 = away / into,
+         source_sink2 = away - into)
+
+table_rate <- select(d_source_sink_rate, habitat_preference, away, into, source_sink1) %>%
+  mutate(across(away:source_sink1, round, 2),
+         habitat_preference = gsub(':', ' + ', habitat_preference),
+         habitat_preference = gsub('_', ' ', habitat_preference)) %>%
+  arrange(desc(source_sink1)) %>%
+  flextable(.) %>%
+  set_header_labels(habitat_preference = 'habitat preference',
+                    source_sink1 = 'source sink ratio') %>%
+  align(align = 'center', part = 'all') %>%
+  align(align = 'left', part = 'body', j = 1) %>%
+  bold(part = 'header') %>%
+  font(fontname = 'Times', part = 'all') %>%
+  fontsize(size = 12, part = 'all') %>%
+  autofit()
+
+# save out
+save_as_image(table_rate, here('plots/sequencing_rpoB/analyses/source_sink_rate.png'), zoom = 3, webshot = 'webshot2')
+
+table_rate
+
+# next with simulated counts of transitions on the tree
+d_source_sink_count <- select(d_transitions_summary, away = state_1, into = state_2, ave_num) %>%
+  pivot_longer(cols = c(away, into), names_to = 'direction', values_to = 'habitat_preference') %>%
+  group_by(habitat_preference, direction) %>%
+  summarise(total_count = sum(ave_num), .groups = 'drop') %>%
+  pivot_wider(names_from = direction, values_from = total_count) %>%
+  mutate(source_sink1 = away / into,
+         source_sink2 = away - into)
+  
+table_count <- select(d_source_sink_count, habitat_preference, away, into, source_sink1) %>%
+  mutate(across(away:source_sink1, round, 2),
+         habitat_preference = gsub(':', ' + ', habitat_preference),
+         habitat_preference = gsub('_', ' ', habitat_preference)) %>%
+  arrange(desc(source_sink1)) %>%
+  flextable(.) %>%
+  set_header_labels(habitat_preference = 'habitat preference',
+                    source_sink1 = 'source sink ratio') %>%
+  align(align = 'center', part = 'all') %>%
+  align(align = 'left', part = 'body', j = 1) %>%
+  bold(part = 'header') %>%
+  font(fontname = 'Times', part = 'all') %>%
+  fontsize(size = 12, part = 'all') %>%
+  autofit()
+
+# save out
+save_as_image(table_count, here('plots/sequencing_rpoB/analyses/source_sink_count.png'), zoom = 3, webshot = 'webshot2')
+
+table_count
+
+```
+## Look at whether some states have more transitions than would be expected
+
+We have a tip estimate of the diversification rate from our BAMM analysis that we have binned into either being "high" or "slow" diversification. We want to run a discrete character evolution model to look at whether transitions across environments result in a shift into the "high" diversification rate state. However, the model would be too big to combine our diversification rate bin and our seven habitat preferences.
+
+Instead we can look for a logical split in the dataset. To do this we can use the mass action expectation that the number of transitions between two habitat preferences should be equivalent to their prevalence in our tip states. We will do this for all available transitions and see which ones are over- or under-represented.
+
+```{r mass_action}
+#| tbl-cap: mass_action
+
+# work out proportion of tips are each habitat preference
+d_hab_pref <- group_by(d_meta, habitat_preference) %>%
+  tally() %>%
+  ungroup() %>%
+  mutate(prop = n/sum(n))
+
+# work out expectation
+d_expectation <- diversitree_df %>%
+  filter(free_param == 'yes') %>%
+  select(state_1, state_2) %>%
+  left_join(., select(d_hab_pref, state_1 = habitat_preference, state_1_prop = prop)) %>%
+  left_join(., select(d_hab_pref, state_2 = habitat_preference, state_2_prop = prop)) %>%
+  mutate(expected_prop = state_1_prop * state_2_prop,
+         normalised_expectation = expected_prop/sum(expected_prop))
+
+# observed numbers of transitions
+d_expectation <- left_join(d_expectation, select(d_transitions_summary, state_1, state_2, ave_num)) %>%
+  mutate(ave_num = replace_na(ave_num, 0),
+         tot_transitions = sum(ave_num),
+         expected_num = tot_transitions*normalised_expectation,
+         ratio = ave_num/expected_num) %>%
+  select(state_1, state_2, ave_num, expected_num, ratio)
+
+# make this into a table
+table_expect <- mutate(d_expectation,
+                       across(ave_num:ratio, round, 2),
+                       state_1 = gsub(':', ' + ', state_1),
+                       state_1 = gsub('_', ' ', state_1),
+                       state_2 = gsub(':', ' + ', state_2),
+                       state_2 = gsub('_', ' ', state_2)) %>%
+  arrange(desc(ratio)) %>%
+  flextable(.) %>%
+  set_header_labels(state_1 = 'from',
+                    state_2 = 'to',
+                    ave_num = 'observed number of transitions',
+                    expected_num = 'expected number of transitions',
+                    ratio = 'ratio'
+                    ) %>%
+  align(align = 'center', part = 'all') %>%
+  align(align = 'left', part = 'body', j = 1) %>%
+  bold(part = 'header') %>%
+  font(fontname = 'Times', part = 'all') %>%
+  fontsize(size = 12, part = 'all') %>%
+  autofit()
+
+# save out
+save_as_image(table_expect, here('plots/sequencing_rpoB/analyses/expected_transitions.png'), zoom = 3, webshot = 'webshot2')
+
+table_expect
+
+```
+
+
+## Calculate the time of evolutionary transitions
+
+There does not seem to be any sensible, easy way of doing this using the stochastic character mapping I have done. Will email Liam Revell but will be a while I imagine.
+
+## Does a habitat transition lead to a faster diversification rate?
+
+## Do generalists and specialists in different environments have different diversification rates
 
 ## Useful links used
 
