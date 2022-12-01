@@ -99,6 +99,7 @@ library(GGally)
 library(ggrepel)
 library(flextable)
 library(ggridges)
+library(hisse)
 
 # set where I am in the project
 here::i_am('scripts/sequencing_rpoB/analyses/estimating_transition_rates_v3.qmd')
@@ -129,6 +130,8 @@ We will write a custom function for getting the transition matrix into a format 
 
 # function for getting a data frame from a diversitree object
 get_diversitree_df <- function(div_obj, trait_vec, replace_vec){
+  
+  if(is.null(div_obj$par.full)){div_obj$par.full <- div_obj$par}
   
   temp <- tibble(param = names(div_obj$par.full)) %>%
     mutate(state_1_num = as.numeric(substr(param, 2,2)),
@@ -981,6 +984,8 @@ save_as_image(table_flex, here('plots/sequencing_rpoB/analyses/proportion_of_tra
 table_flex
 ```
 
+The take home is that 66% of all transitions occur between terrestrial and freshwater + terrestrial generalists. And 76% of all transitions occur between species that are not good at living in marine mud (terrestrial and freshwater specialists, and freshwater + terrestrial generalists).
+
 ## Plot best transition matrix as a network
 
 We can then plot the best model as a network. The output from the stochastic character mapping also contains information as to the time spent in each state in the phylogenetic tree.
@@ -1057,7 +1062,13 @@ ggsave(here('plots/sequencing_rpoB/analyses/transition_plot_diversitree.png'), l
 
 Ok so this shows a bunch of cool things. Instead of moving between specialist states directly, transitions between environments are mediated by the evolution of generalism.
 
-We can look at whether any given state is a net sink or net source using both the total number of transitions and the instantaneous transition rates.
+Is there a cool way to show this. Given the time spent in each state (the nodes), and the transition rates (the edges), is there a way to look at the most likely paths between habitat preferences. For example, what are the most likely paths to move between freshwater terrestrial specialism?
+
+## Source or sink?
+
+We can look at whether any given habitat preference is a net sink or net source using both the total number of transitions and the instantaneous transition rates. If you are a sink, you have more transitions into you than away from you, or you the combined transition rate into you is greater than going away from you. Likewise if you are a source, you have a tendency to rapidly move away from your state and do not stay in it for very long.
+
+We will first do it with the instantaneous transition rates.
 
 ```{r}
 # first with the transition rates
@@ -1067,7 +1078,7 @@ d_source_sink_rate <- select(diversitree_df, away = state_1, into = state_2, tra
   summarise(total_rate = sum(transition_rate), .groups = 'drop') %>%
   pivot_wider(names_from = direction, values_from = total_rate) %>%
   mutate(source_sink1 = away / into,
-         source_sink2 = away - into)
+         source_sink2 = into - away)
 
 table_rate <- select(d_source_sink_rate, habitat_preference, away, into, source_sink1) %>%
   mutate(across(away:source_sink1, round, 2),
@@ -1088,6 +1099,13 @@ table_rate <- select(d_source_sink_rate, habitat_preference, away, into, source_
 save_as_image(table_rate, here('plots/sequencing_rpoB/analyses/source_sink_rate.png'), zoom = 3, webshot = 'webshot2')
 
 table_rate
+```
+
+In this table, a value above one means the rates away from that habitat preference are greater than the rates into that habitat preference. We can see that mud and shore and freshwater specialists are extreme sinks, with marine mud and terrestrial generalists and total generalists being extreme sources. The sources are transient states, being very unstable as soon as they appear.
+
+We can make the same table but for estimated numbers of transitions based on the stochastic character mapping.
+
+```{r}
 
 # next with simulated counts of transitions on the tree
 d_source_sink_count <- select(d_transitions_summary, away = state_1, into = state_2, ave_num) %>%
@@ -1096,7 +1114,7 @@ d_source_sink_count <- select(d_transitions_summary, away = state_1, into = stat
   summarise(total_count = sum(ave_num), .groups = 'drop') %>%
   pivot_wider(names_from = direction, values_from = total_count) %>%
   mutate(source_sink1 = away / into,
-         source_sink2 = away - into)
+         source_sink2 = into - away)
   
 table_count <- select(d_source_sink_count, habitat_preference, away, into, source_sink1) %>%
   mutate(across(away:source_sink1, round, 2),
@@ -1117,15 +1135,21 @@ table_count <- select(d_source_sink_count, habitat_preference, away, into, sourc
 save_as_image(table_count, here('plots/sequencing_rpoB/analyses/source_sink_count.png'), zoom = 3, webshot = 'webshot2')
 
 table_count
-
 ```
+
+This table has much the same information. However we can see that freshwater + terrestrial generalism is no longer a sink, with the number of transitions into and away from it being \~1. Marine mud and terrestrial generalists have 12% more transitions going away from that state than into it, generalists have 17% more, and freshwater + marine mud generalists have 24% more.
+
+In contrast freshwater and marine mud specialists remain sources, having 23% and 35% fewer transitions into that habitat preference than away from it.
+
 ## Look at whether some states have more transitions than would be expected
 
-We have a tip estimate of the diversification rate from our BAMM analysis that we have binned into either being "high" or "slow" diversification. We want to run a discrete character evolution model to look at whether transitions across environments result in a shift into the "high" diversification rate state. However, the model would be too big to combine our diversification rate bin and our seven habitat preferences.
+From our BAMM analysis, we have a tip estimate of the diversification rate that we have binned into either being "high" or "slow" diversification. This means each species has been classified as being either "fast" or "slow" in terms of diversification. We want to run a discrete character evolution model to look at whether transitions across environments result in a shift to "high" diversification rate. However, the model would be too big to combine our diversification rate bin and our seven habitat preferences.
 
-Instead we can look for a logical split in the dataset. To do this we can use the mass action expectation that the number of transitions between two habitat preferences should be equivalent to their prevalence in our tip states. We will do this for all available transitions and see which ones are over- or under-represented.
+Instead we can look for a logical split in the dataset. One way of doing this might be to use the mass action expectation that the number of transitions between two habitat preferences should be equivalent to their prevalence in our tip states. We will do this for all available transitions and see which ones are over- or under-represented.
 
-```{r mass_action}
+We calculate an expected rate of transitions by multiplying the proportions of both states together. We then calculate the proportion of transitions they should account for by normalising this over all possible transitions.
+
+```{r mass_action_rate}
 #| tbl-cap: mass_action
 
 # work out proportion of tips are each habitat preference
@@ -1136,7 +1160,7 @@ d_hab_pref <- group_by(d_meta, habitat_preference) %>%
 
 # work out expectation
 d_expectation <- diversitree_df %>%
-  filter(free_param == 'yes') %>%
+  #filter(free_param == 'yes') %>%
   select(state_1, state_2) %>%
   left_join(., select(d_hab_pref, state_1 = habitat_preference, state_1_prop = prop)) %>%
   left_join(., select(d_hab_pref, state_2 = habitat_preference, state_2_prop = prop)) %>%
@@ -1180,6 +1204,13 @@ table_expect
 
 ```
 
+Firstly, I am not sure this method is very useful. This mass action null model would assume that tips are distributed randomly on the tree.
+
+However, in this method, if you are above 1 then that transition occurs more than would be expected from their abundance in the extant species. If you are below 1 then you occur less than would be expected by the prevalence in the extant species. Unsurprisingly, the two possible transitions (from the best transition matrix) that occur much less than expected are the transitions between specialist states.
+
+What I was hoping for was justification to split generalist states in a specific way to give us a marine - non marine split, or possible a terrestrial - non terrestrial split, but it is much more difficult to interpret than I expected.
+
+Instead I think we will just split it by the obvious marine - non marine split. Anything that is capable of live in the marine mud environment will be grouped together.
 
 ## Calculate the time of evolutionary transitions
 
@@ -1187,7 +1218,588 @@ There does not seem to be any sensible, easy way of doing this using the stochas
 
 ## Does a habitat transition lead to a faster diversification rate?
 
+To look at whether a shift from one state to another leads to a faster diversification rate, we are going to bin our habitat preferences to marine/non marine, and combine them with our diversification rate trait which bins species into either being "fast" or "slow" diversification rate.
+
+First we will load in our diversification rate trait and add it to our metadata.
+
+```{r div_model_prep}
+
+# read in diversification classification
+div <- readRDS(here('data/sequencing_rpoB/processed/div_rate_bins.rds'))
+
+# combine d_meta with the diversification rate df
+d_meta <- left_join(d_meta, div)
+
+# make sure order of habitat preference is the same in the trait vector as the tip labels
+sum(d_meta$tip_label == tree$tip.label) == length(tree$tip.label)
+# SUCCESS if TRUE
+
+# create new habitat preference vector that is just saline/non-saline
+d_meta <- mutate(d_meta, hab_pref_new = ifelse(str_detect(habitat_preference, 'generalist|mud_and_shore'), 'saline', 'non-saline'),
+                 new_trait = paste(hab_pref_new, div_rate, sep = '_'))
+
+# check it is right
+group_by(d_meta, new_trait) %>%
+  tally()
+
+# replace NA of outgroup - make it freshwater:terrestrial - the most common state
+# phytools::make.simmap cannot take NAs
+hab_pref_new <- setNames(d_meta$new_trait, d_meta$tip_label)
+hab_pref_new2 <- as.numeric(as.factor(hab_pref_new))
+names(hab_pref_new2) <- d_meta$tip_label
+
+# create dataframe to easily convert back to actual values
+coding_new <- tibble(hab_pref = unname(hab_pref_new), hab_pref_num = unname(hab_pref_new2)) %>%
+  distinct() %>%
+  arrange(hab_pref) %>%
+  mutate(hab_pref_axis = gsub('_', ' ', hab_pref))
+
+coding_new
+
+# check the renaming has worked!
+sum(names(hab_pref_new2) == tree$tip.label) == length(tree$tip.label)
+
+```
+
+Next we can run an ARD, SYM, and ER model.
+
+```{r saline_diversitree_noshow}
+#| echo: false
+
+# read in models
+mod_er_div <- readRDS(here('data/sequencing_rpoB/processed/transition_rates/mod_er_div.rds'))
+mod_ard_div <- readRDS(here('data/sequencing_rpoB/processed/transition_rates/mod_ard_div.rds'))
+mod_sym_div <- readRDS(here('data/sequencing_rpoB/processed/transition_rates/mod_sym_div.rds'))
+
+# all of these methods needs a likelihood function, we can build a Mkn model
+lik_ard_div <- make.mkn(tree, hab_pref_new2, k = max(hab_pref_new2))
+```
+
+```{r div_diversitree_norun}
+#| eval: false
+
+# all of these methods needs a likelihood function, we can build a Mkn model
+lik_ard_div <- make.mkn(tree, hab_pref_new2, k = max(hab_pref_new2))
+
+argnames(lik_ard_div)
+
+# make symmetric rates model
+lik_sym_div <- constrain(lik_ard_div, 
+                     q12~q21, q13~q31, q14~q41,
+                     q23~q32, q24~q42,
+                     q34~q43
+                     )
+
+argnames(lik_sym_div)
+
+# make equal rates model
+lik_er_div <- constrain(lik_ard_div,
+                    q13~q12, q14~q12,
+                    q21~q12, q23~q12, q24~q12,
+                    q31~q12, q32~q12, q34~q12,
+                    q41~q12, q42~q12, q43~q12)
+
+argnames(lik_er_div)
+
+# need to pass start values to it - can grab these from the ape::ace, but we will just pass an average rate to the model
+inits_ard <- rep(1, length(argnames(lik_ard_div)))
+inits_sym <- rep(1, length(argnames(lik_sym_div)))
+inits_er <- rep(1, length(argnames(lik_er_div)))
+
+# find the maximum likelihood estimates of this model
+mod_er_div <- find.mle(lik_er_div, inits_er, method = 'subplex', control = list(maxit = 50000))
+mod_sym_div <- find.mle(lik_sym_div, inits_sym, method = 'subplex', control = list(maxit = 50000))
+mod_ard_div <- find.mle(lik_ard_div, inits_ard, method = 'subplex', control = list(maxit = 50000))
+```
+
+We can do model selection to see which model is best.
+
+```{r}
+# check AIC
+AIC(mod_er_div, mod_sym_div, mod_ard_div) %>% 
+  arrange(AIC)
+
+```
+
+The all rates different model is the best. We can plot the transition matrix to see if transitioning across habitats results in increased diversification rates.
+
+```{r plot_div}
+#| fig.height: 6
+#| fig.width: 8
+
+get_diversitree_df(mod_ard_div, coding_new$hab_pref_num, coding_new$hab_pref) %>%
+  left_join(., select(coding_new, state_1 = hab_pref, state_1_num = hab_pref_num, state_1_label = hab_pref_axis)) %>%
+  left_join(., select(coding_new, state_2 = hab_pref, state_2_num = hab_pref_num, state_2_label = hab_pref_axis)) %>%
+  mutate(transition_rate = round(transition_rate, 2)) %>%
+  ggplot(., aes(forcats::fct_reorder(state_2_label, state_2_num), forcats::fct_reorder(state_1_label, desc(state_1_num)))) +
+  geom_tile(aes(alpha = transition_rate, col = free_param), width = 0.9, height = 0.9, size = 1.1) +
+  theme_bw(base_size = 14) +
+  theme(panel.grid.major = element_blank(),
+  legend.position = 'none',
+  axis.text.x.top = element_text(angle = 90, vjust = 0.5),
+  plot.title.position = "plot") +
+  scale_alpha_continuous(range = c(0, 0.6)) +
+  geom_text(aes(label = transition_rate), size = MicrobioUoE::pts(10)) +
+  scale_x_discrete(position = 'top', labels = scales::label_wrap(13)) +
+  scale_y_discrete(position = 'left', labels = scales::label_wrap(13)) +
+  labs(y = 'state 1',
+  x = 'state 2',
+  title = paste('all rates different with', length(mod_ard_div$par), 'free parameters', sep = ' ')) +
+  coord_fixed() +
+  scale_color_manual(values = c('red', 'black'))
+
+ggsave(here('plots/sequencing_rpoB/analyses/transition_matrix_fast_slow.png'), last_plot(), height = 6, width = 8)
+
+```
+
+From this analysis it does not look like movements across the saline boundary result in a faster diversification rate. For example, non-saline low to saline high is not supported, and saline low to saline high does occur but the rate is relatively very low. Instead what happens is movements within states are more likely. Moving across habitats but remaining in the same diversification rate bin, or staying in the same habitat but moving from low to high diversification rate.
+
+So it very much does not look like habitat transitions result in increased diversification rate, but there are other ways this could be tested.
+
 ## Do generalists and specialists in different environments have different diversification rates
+
+A different question we can ask for this split is whether marine / non-marine specialists and generalists have different diversification rates. This should allow us to run (a) a MuSSE model using **diversitree** and (b) a MuHiSSE using **hisse**. Collapsing our seven state model to 4 states should (theoretically) make everything more achievable.
+
+First of all we need to set up a new trait and our new coding for it.
+
+```{r setup_new_trait}
+
+# create new habitat preference vector that is just saline/non-saline generalist / non generalist
+d_meta <- mutate(d_meta, saline_or_no = ifelse(str_detect(habitat_preference, 'generalist|mud_and_shore'), 'saline', 'non-saline'),
+                 specialist_or_no = ifelse(str_detect(habitat_preference, ':|generalist'), 'generalist', 'specialist'),
+                 new_trait = paste(saline_or_no, specialist_or_no, sep = '_'))
+
+# check it is right
+group_by(d_meta, new_trait) %>%
+  tally()
+
+# replace NA of outgroup - make it freshwater:terrestrial - the most common state
+# phytools::make.simmap cannot take NAs
+hab_pref_new <- setNames(d_meta$new_trait, d_meta$tip_label)
+hab_pref_new2 <- as.numeric(as.factor(hab_pref_new))
+names(hab_pref_new2) <- d_meta$tip_label
+
+# create dataframe to easily convert back to actual values
+coding_new <- tibble(hab_pref = unname(hab_pref_new), hab_pref_num = unname(hab_pref_new2)) %>%
+  distinct() %>%
+  arrange(hab_pref) %>%
+  mutate(hab_pref_axis = gsub('_', ' ', hab_pref))
+
+coding_new
+
+# check the renaming has worked!
+sum(names(hab_pref_new2) == tree$tip.label) == length(tree$tip.label)
+```
+
+### Fit standard Mk model
+
+We can now try and fit the MuSSE model. It probably makes sense to constrain transitions based on a model of discrete character evolution BEFORE fitting this model.
+
+```{r premusse_ard_noshow}
+#| echo: false
+
+# read in models
+mod_ard_premusse <- readRDS(here('data/sequencing_rpoB/processed/transition_rates/mod_ard_premusse.rds'))
+mod_sym_premusse <- readRDS(here('data/sequencing_rpoB/processed/transition_rates/mod_sym_premusse.rds'))
+mod_premusse1 <- readRDS(here('data/sequencing_rpoB/processed/transition_rates/mod_premusse1.rds'))
+mod_premusse2 <- readRDS(here('data/sequencing_rpoB/processed/transition_rates/mod_premusse2.rds'))
+
+# set up likelihood model for diversitree
+lik_premusse <- make.mkn(tree, hab_pref_new2, k = max(hab_pref_new2))
+
+# make custom matrix model
+lik_premusse1 <- constrain(lik_premusse, 
+                   q14~0, q23~0, q41~0)
+```
+
+```{r do_ard_selection}
+#| eval: false
+
+# set up likelihood model for diversitree
+lik_premusse <- make.mkn(tree, hab_pref_new2, k = max(hab_pref_new2))
+
+lik_sym_premusse <- constrain(lik_premusse,
+                     q12 ~ q21, q13 ~ q31, q14 ~ q41,
+                     q23 ~ q32, q24 ~ q42,
+                     q34 ~ q43)
+
+inits <- rep(1, length(argnames(lik_premusse)))
+inits_sym <- rep(1, length(argnames(lik_sym_premusse)))
+
+argnames(lik_sym)
+
+# run ARD model
+mod_ard_premusse <- find.mle(lik, inits_ard, method = 'subplex', control = list(maxit = 50000))
+mod_sym_premusse <- find.mle(lik_sym, inits_sym, method = 'subplex', control = list(maxit = 50000))
+
+```
+
+We can look at the estimates and see a big split between estimates at e-01 and e-06, so we will try removing those and see if the fit improves.
+
+```{r do_ard_selection2}
+# check AIC
+AIC(mod_ard_premusse, mod_sym_premusse) %>%
+  arrange(AIC)
+
+# look at estimates
+mod_ard_premusse$par %>% sort()
+
+# make custom matrix model
+lik_premusse1 <- constrain(lik_premusse, 
+                   q14~0, q23~0, q41~0)
+
+# make start parameters
+inits_custom1 <- rep(1, length(argnames(lik_premusse1)))
+```
+
+We can then fit the model.
+
+```{r}
+#| eval: false
+
+# run model
+mod_premusse1 <- find.mle(lik_premusse1, inits_custom1, method = 'subplex', control = list(maxit = 50000))
+```
+
+We can check if the model with fewer parameters is better and then remove the next lowest parameter.
+
+```{r}
+# do model selection
+AIC(mod_ard_premusse, mod_premusse1) %>%
+  arrange(AIC)
+
+anova(mod_ard_premusse, mod_premusse1)
+
+mod_premusse1$par %>% sort()
+
+# make custom matrix model
+lik_premusse2 <- constrain(lik_premusse1, 
+                   q24~0)
+
+# make start parameters
+inits_custom2 <- rep(1, length(argnames(lik_premusse2)))
+```
+
+We can then fit this new model.
+
+```{r}
+#| eval: false
+
+# run model
+mod_premusse2 <- find.mle(lik_2, inits_custom2, method = 'subplex', control = list(maxit = 50000))
+
+```
+
+We can then once again do model selection.
+
+```{r}
+
+# do ANOVAs
+anova(mod_premusse1, mod_premusse2)
+
+# check AIC
+AIC(mod_ard_premusse, mod_premusse1, mod_premusse2) %>%
+  arrange(AIC)
+```
+
+So **mod_premusse1** is the best model here. We can plot the transition matrix out to see what it looks like.
+
+```{r plot_matrix_again}
+#| fig.height: 6
+#| fig.width: 8
+
+# code to plot transition matrix
+get_diversitree_df(mod_premusse1, coding_new$hab_pref_num, coding_new$hab_pref) %>%
+  left_join(., select(coding_new, state_1 = hab_pref, state_1_num = hab_pref_num, state_1_label = hab_pref_axis)) %>%
+  left_join(., select(coding_new, state_2 = hab_pref, state_2_num = hab_pref_num, state_2_label = hab_pref_axis)) %>%
+  mutate(transition_rate = round(transition_rate, 2)) %>%
+  ggplot(., aes(forcats::fct_reorder(state_2_label, state_2_num), forcats::fct_reorder(state_1_label, desc(state_1_num)))) +
+  geom_tile(aes(alpha = transition_rate, col = free_param), width = 0.9, height = 0.9, size = 1.1) +
+  theme_bw(base_size = 14) +
+  theme(panel.grid.major = element_blank(),
+  legend.position = 'none',
+  axis.text.x.top = element_text(angle = 90, vjust = 0.5),
+  plot.title.position = "plot") +
+  scale_alpha_continuous(range = c(0, 0.6)) +
+  geom_text(aes(label = transition_rate), size = MicrobioUoE::pts(10)) +
+  scale_x_discrete(position = 'top', labels = scales::label_wrap(13)) +
+  scale_y_discrete(position = 'left', labels = scales::label_wrap(13)) +
+  labs(y = 'state 1',
+  x = 'state 2',
+  title = paste('all rates different with', length(mod_premusse1$par), 'free parameters', sep = ' ')) +
+  coord_fixed() +
+  scale_color_manual(values = c('red', 'black'))
+
+ggsave(here('plots/sequencing_rpoB/analyses/transition_matrix_premusse.png'), last_plot(), height = 6, width = 8)
+
+```
+
+So there are very low rates between saline specialist and non-saline specialist, with higher rates for all other available transitions. There are no transitions between saline specialists -\> non-saline generalists, non-saline specialists -\> saline generalists and non-saline generalists -\> saline specialists.
+
+This actually all makes perfect sense. Now we can move on to doing a MuSSE. We will pass these estimates of transition rates onto MuSSE.
+
+### Fit MuSSE
+
+We will first set up the MuSSE model and run it.
+
+```{r fit_musse_noshow}
+#| echo: false
+
+# read in models
+fit_musse <- readRDS(here('data/sequencing_rpoB/processed/transition_rates/mod_musse_full.rds'))
+fit_musse_no_se <- readRDS(here('data/sequencing_rpoB/processed/transition_rates/mod_musse_no_se.rds'))
+fit_musse_no_ss <- readRDS(here('data/sequencing_rpoB/processed/transition_rates/mod_musse_no_ss.rds'))
+fit_musse_no_se2 <- readRDS(here('data/sequencing_rpoB/processed/transition_rates/mod_musse_no_se2.rds'))
+fit_musse_no_sse <- readRDS(here('data/sequencing_rpoB/processed/transition_rates/mod_musse_no_sse.rds'))
+fit_mcmc3 <- readRDS(here('data/sequencing_rpoB/processed/transition_rates/fit_mcmc_musse.rds'))
+
+```
+
+```{r fit_musse}
+#| eval: false
+
+# set up sampling fractions, set them all to 1
+sampling_frac <- setNames(rep(1, times = 4), sort(unique(hab_pref_new2)))
+
+# set up likelihood model for diversitree
+lik_musse <- make.musse(tree, hab_pref_new2, k = max(hab_pref_new2), sampling.f = sampling_frac)
+
+# set constraints for transitions that do not occur
+lik_musse <- constrain(lik_musse, q14~0, q23~0, q41~0)
+
+# we can estimate starting values using starting.point.musse()
+start_vals <- starting.point.musse(tree, k = max(hab_pref_new2))
+
+for(i in 1:length(mod_1$par)){
+    start_vals[names(start_vals) == names(mod_1$par)[i]] <- unname(mod_1$par[i])
+}
+
+# fit musse model
+fit_musse <- find.mle(lik_musse, x.init = start_vals[argnames(lik_musse)], method = 'subplex', control = list(maxit = 50000))
+
+```
+
+We want to compare this to a null model where diversification rates do not vary between states. To do this we do another **constrain()** call.
+
+### Run null model MuSSE
+
+We will set up three null models which each have different constraints:
+
+-   no state-dependent variation in speciation or extinction
+-   no state-dependent variation in speciation only
+-   no state-dependent variation in extinction only
+
+```{r run_null_models}
+#| eval: false
+
+# remove state dependent speciation and extinction parameters
+lik_null_no_sse <- constrain(lik_musse, lambda2 ~ lambda1, lambda3 ~ lambda1, lambda4 ~ lambda1,
+                             mu2 ~ mu1, mu3 ~ mu1, mu4 ~ mu1)
+
+# remove only speciation parameters
+lik_null_no_ss <- constrain(lik_musse, lambda2 ~ lambda1, lambda3 ~ lambda1, lambda4 ~ lambda1)
+
+# remove only extinction parameters
+lik_null_no_se <- constrain(lik_musse, mu2 ~ mu1, mu3 ~ mu1, mu4 ~ mu1)
+
+# fit model
+fit_musse_no_sse <- find.mle(lik_null_no_sse, x.init = start_vals[argnames(lik_null_no_sse)], method = 'subplex', control = list(maxit = 50000))
+fit_musse_no_ss <- find.mle(lik_null_no_ss, x.init = start_vals[argnames(lik_null_no_ss)],method = 'subplex', control = list(maxit = 50000))
+fit_musse_no_se <- find.mle(lik_null_no_se, x.init = start_vals[argnames(lik_null_no_se)], method = 'subplex', control = list(maxit = 50000))
+
+```
+
+We can do model simplification on these to see how they perform.
+
+```{r musse_anova}
+# run anova
+anova(no_sse = fit_musse_no_sse,
+      no_ss = fit_musse_no_ss,
+      no_se = fit_musse_no_se,
+      fit_musse)
+
+# make AIC table
+d_musse_aic <- data.frame(model = c('full_sse', 'no_se', 'no_ss', 'no_sse'), aic = c(AIC(fit_musse), AIC(fit_musse_no_se), AIC(fit_musse_no_ss), AIC(fit_musse_no_sse))) %>%
+    dplyr::arrange(., aic) %>%
+    mutate(weights = round(MuMIn::Weights(aic), 3))
+
+d_musse_aic
+```
+
+So the best model is with no state dependent extinction. We can re-run this model with other start values (not passing the values from **diversitree**) to see how it does.
+
+```{r rerun_best}
+#| eval: false
+
+# we can estimate starting values using starting.point.musse()
+start_vals <- starting.point.musse(tree, k = max(hab_pref_new2))
+
+fit_musse_no_se2 <- find.mle(lik_null_no_se, x.init = start_vals[argnames(lik_null_no_se)], method = 'subplex', control = list(maxit = 50000))
+```
+
+We can check the difference between the models in terms of AIC score.
+
+```{r compare_sse_models}
+
+AIC(fit_musse_no_se, fit_musse_no_se2)
+
+fit_musse_no_se$lnLik
+fit_musse_no_se2$lnLik
+
+```
+
+We can see that the first model where we passed the estimated transition rates from a non-SSE model to the data has a much, much lower AIC value, and a much much higher log likelihood. Consequently this model should be favoured, however it does hint that our model is perhaps sensitive to the start values. We can try and run MCMC to get a better handle on the variation in the parameter estimates.
+
+However first we can look at the parameters, specifically the diversificiation parameters.
+
+```{r}
+
+fit_musse_no_se$par %>% round(2)
+
+coding_new
+```
+
+So from this we can see that diversification rate faster in generalist than specialist states, but specifically is super fast in generalists adapted to live in marine mud.
+
+### Run mcmc MuSSE
+
+```{r musse_mcmc}
+#| message: false
+#| eval: false
+
+# set up initial start values
+inits_mcmc <- fit_musse_no_se$par
+
+# set up upper and lower limits - limit the values to be < 10 times the max value
+lower_mcmc <- rep(0, length(inits_mcmc))
+upper_mcmc <- rep(max(inits_mcmc)*100, length(inits_mcmc))
+
+# run first mcmc to tune w
+fit_mcmc <- mcmc(lik_null_no_se, inits_mcmc, nsteps = 10, w = 0.1, upper = upper_mcmc, lower = lower_mcmc)
+
+# tune w for each parameter
+w <- diff(sapply(fit_mcmc[2:(ncol(fit_mcmc)-1)], quantile, c(.05, .95)))
+
+# run second mcmc to tune w
+fit_mcmc2 <- mcmc(lik_null_no_se, inits_mcmc, nsteps=100, w=w, upper = upper_mcmc, lower = lower_mcmc)
+
+# tune w for each parameter
+w <- diff(sapply(fit_mcmc2[2:(ncol(fit_mcmc2)-1)], quantile, c(.05, .95)))
+
+# run third mcmc for 1000 iter
+fit_mcmc3 <- mcmc(lik_null_no_se, inits_mcmc, nsteps=1000, w=w, upper = upper_mcmc, lower = lower_mcmc)
+
+```
+
+We can plot the distribution for speciation rates.
+
+```{r plot_speciation}
+#| fig.height: 5
+#| fig.width: 7
+
+# first grab the mcmc results for speciation
+d_speciation <- select(fit_mcmc3, i, starts_with('lambda')) %>%
+  pivot_longer(cols = starts_with('lambda'), names_to = 'hab_pref_num', values_to = 'speciation_rate', names_prefix = 'lambda') %>%
+  mutate(hab_pref_num = as.numeric(hab_pref_num)) %>%
+  left_join(., coding_new) %>%
+  separate(hab_pref, c('habitat', 'type'), sep = '_', remove = FALSE)
+
+d_speciation_summary <- group_by(d_speciation, hab_pref_num, hab_pref, habitat, type, hab_pref_axis) %>%
+  tidybayes::mean_qi(speciation_rate)
+
+# grab out the maximum likelihood estimates
+d_speciation_ml <- fit_musse_no_se$par[grepl('lambda', names(fit_musse_no_se$par))] %>%
+  data.frame(speciation_rate = ., hab_pref_num = parse_number(names(.)), row.names = NULL) %>%
+  left_join(., coding_new) %>%
+  separate(hab_pref, c('habitat', 'type'), sep = '_', remove = FALSE)
+
+# plot
+ggplot(d_speciation_summary, aes(hab_pref_axis, speciation_rate, col = type)) +
+  geom_point(size = 4, show.legend = FALSE) +
+  geom_linerange(aes(ymin = .lower, ymax = .upper), show.legend = FALSE) +
+  geom_point(aes(hab_pref_axis, speciation_rate), col = 'grey', data = d_speciation_ml) +
+  theme_bw(base_size = 16) +
+  scale_color_manual(values = c('black', 'dark grey')) +
+  ylim(c(0,16)) +
+  scale_x_discrete(labels = function(x) str_wrap(x, width = 15)) +
+  labs(x = 'Habitat preference',
+       y = 'Speciation rate')
+  
+ggsave(here('plots/sequencing_rpoB/analyses/musse_speciation.png'), last_plot(), height = 5, width = 7)
+  
+```
+
+Ok this is super cool. So if you are adapted to live in the saline environment, you have a faster speciation rate (and diversification rate) than the non-saline environments, but within environments generalists have higher diversification rates than specialists.
+
+So it is environments and specialism that drive diversification rates, not transitions per se.
+
+We can also plot the estimates of the transition rates in a plot.
+
+```{r plot_musse_transitions}
+
+# set colours
+cols_hab <- met.brewer('Ingres', n = 4)
+names(cols_hab) <- c('saline_specialist', 'saline_generalist', 'non-saline_generalist', 'non-saline_specialist')
+hab_labels <- c('saline specialist', 'saline generalist', 'non-saline generalist', 'non-saline specialist')
+
+# grab out transition rates
+d_transition_musse <- select(fit_mcmc3, i, starts_with('q')) %>%
+  pivot_longer(cols = starts_with('q'), names_to = 'transition', values_to = 'transition_rate', names_prefix = 'q') %>%
+  mutate(state_1_num = as.numeric(substr(transition, 1,1)),
+         state_2_num = as.numeric(substr(transition, 2,2))) %>%
+  left_join(., select(coding_new, state_1_num = hab_pref_num, state_1 = hab_pref)) %>%
+  left_join(., select(coding_new, state_2_num = hab_pref_num, state_2 = hab_pref)) %>%
+  group_by(state_1_num, state_1, state_2_num, state_2) %>%
+  tidybayes::mean_qi(transition_rate)
+
+# check it is right
+d_size <- group_by(d_meta, new_trait) %>%
+  tally() %>%
+  mutate(prop = n/sum(n))
+
+# turn transition matrix into network to plot
+d_network <- as_tbl_graph(select(d_transition_musse, state_1, state_2, transition_rate)) %>%
+  activate(edges) %>%
+  filter(!is.na(transition_rate) & transition_rate > 0) %>%
+  activate(nodes) %>%
+  left_join(., select(d_size, name = new_trait, prop)) %>%
+  mutate(label = name,
+         label = gsub('_', ' ', label),
+  order = c(1, 2, 3, 4)) %>%
+  arrange(order)
+
+p <- ggraph(d_network, layout = 'linear', circular = TRUE) + 
+  geom_edge_fan(aes(alpha = transition_rate, 
+                width = transition_rate),
+                arrow = arrow(length = unit(4, 'mm')),
+                end_cap = circle(10, 'mm'),
+                start_cap = circle(10, 'mm'),
+                show.legend = FALSE) + 
+  geom_node_point(aes(size = prop,
+                col = name),
+                show.legend = FALSE) +
+  theme_void() +
+  scale_size(range = c(2,20)) +
+  scale_edge_width(range = c(0.5, 2)) +
+  scale_color_manual(values = cols_hab)
+
+# grab data for points
+point_data <- p$data %>%
+  select(x, y, label) %>%
+  mutate(nudge_x = ifelse(x < 0, -0.5, 0.5),
+  nudge_y = ifelse(y < 0, -0.3, 0.3),
+  label = gsub(' ', '\n', label))
+
+p + geom_label(aes(nudge_x + x, nudge_y+y, label = label), point_data, size = MicrobioUoE::pts(18)) +
+  theme(legend.position = 'none',
+  panel.background = element_rect(fill = 'white', colour = 'white')) +
+  coord_cartesian(clip = "off") +
+  xlim(c(min(point_data$x) + min(point_data$nudge_x) - 0.3), max(point_data$x) + max(point_data$nudge_x) + 0.3) +
+  ylim(c(min(point_data$y) + min(point_data$nudge_y) - 0.1), max(point_data$y) + max(point_data$nudge_y) + 0.1)
+
+# save out model
+ggsave(here('plots/sequencing_rpoB/analyses/transition_plot_musse.png'), last_plot(), height = 6, width = 8)
+```
 
 ## Useful links used
 
