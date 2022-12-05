@@ -1697,6 +1697,11 @@ We can plot the distribution for speciation rates.
 #| fig.height: 5
 #| fig.width: 7
 
+# set colours
+cols_hab <- met.brewer('Ingres', n = 4)
+names(cols_hab) <- c('saline_specialist', 'saline_generalist', 'non-saline_generalist', 'non-saline_specialist')
+hab_labels <- c('saline specialist', 'saline generalist', 'non-saline generalist', 'non-saline specialist')
+
 # first grab the mcmc results for speciation
 d_speciation <- select(fit_mcmc3, i, starts_with('lambda')) %>%
   pivot_longer(cols = starts_with('lambda'), names_to = 'hab_pref_num', values_to = 'speciation_rate', names_prefix = 'lambda') %>%
@@ -1714,12 +1719,12 @@ d_speciation_ml <- fit_musse_no_se$par[grepl('lambda', names(fit_musse_no_se$par
   separate(hab_pref, c('habitat', 'type'), sep = '_', remove = FALSE)
 
 # plot
-ggplot(d_speciation_summary, aes(hab_pref_axis, speciation_rate, col = type)) +
-  geom_point(size = 4, show.legend = FALSE) +
+ggplot(d_speciation_summary, aes(hab_pref_axis, speciation_rate, col = hab_pref)) +
+  geom_point(size = 8, show.legend = FALSE) +
   geom_linerange(aes(ymin = .lower, ymax = .upper), show.legend = FALSE) +
   geom_point(aes(hab_pref_axis, speciation_rate), col = 'grey', data = d_speciation_ml) +
   theme_bw(base_size = 16) +
-  scale_color_manual(values = c('black', 'dark grey')) +
+  scale_color_manual(values = cols_hab) +
   ylim(c(0,16)) +
   scale_x_discrete(labels = function(x) str_wrap(x, width = 15)) +
   labs(x = 'Habitat preference',
@@ -1736,11 +1741,6 @@ So it is environments and specialism that drive diversification rates, not trans
 We can also plot the estimates of the transition rates in a plot.
 
 ```{r plot_musse_transitions}
-
-# set colours
-cols_hab <- met.brewer('Ingres', n = 4)
-names(cols_hab) <- c('saline_specialist', 'saline_generalist', 'non-saline_generalist', 'non-saline_specialist')
-hab_labels <- c('saline specialist', 'saline generalist', 'non-saline generalist', 'non-saline specialist')
 
 # grab out transition rates
 d_transition_musse <- select(fit_mcmc3, i, starts_with('q')) %>%
