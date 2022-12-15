@@ -1571,7 +1571,7 @@ lik_musse <- constrain(lik_musse, q14~0, q23~0, q41~0)
 start_vals <- starting.point.musse(tree, k = max(hab_pref_new2))
 
 for(i in 1:length(mod_1$par)){
-    start_vals[names(start_vals) == names(mod_1$par)[i]] <- unname(mod_1$par[i])
+    start_vals[names(start_vals) == names(mod_premusse1$par)[i]] <- unname(mod_premusse1$par[i])
 }
 
 # fit musse model
@@ -1801,6 +1801,59 @@ p + geom_label(aes(nudge_x + x, nudge_y+y, label = label), point_data, size = Mi
 ggsave(here('plots/sequencing_rpoB/analyses/transition_plot_musse.png'), last_plot(), height = 6, width = 8)
 ```
 
+### Fit a MuHiSSE model
+
+We will now try and fit a MuHiSSE, allowing for a hidden state within each character combination.
+
+For these models we have to set the extinction fraction (the estimated proportion of extant species).
+
+I think the MuHiSSE implementations need the trait to be in a 00, 01, 10, 11 format so will implement that where non-saline (0) or saline (1) is the first digit, followed by generalist (0) or specialist (1).
+
+```{r setup muhisse}
+# make new coding
+hab_pref_new3 <- case_when(hab_pref_new2 == 1 ~ '00',
+                           hab_pref_new2 == 2 ~ '01',
+                           hab_pref_new2 == 3 ~ '10',
+                           hab_pref_new2 == 4 ~ '11')
+names(hab_pref_new3) <- names(hab_pref_new2)
+
+coding_new <- mutate(coding_new, muhisse_coding = c('00', '01', '10', '11'))
+
+# check the renaming has worked!
+sum(names(hab_pref_new3) == tree$tip.label) == length(tree$tip.label)
+
+# create transition rate matrix
+trans_mat <- TransMatMakerMuHiSSE(hidden.traits = 1)
+
+# we now need to customise some of the transition rates and make some of them possible that are not currently
+# namely 10 (saline generalism) to 01 (non-saline specialist)
+trans_mat['(10A)', '(01A)'] <- max(trans_mat, na.rm = TRUE) + 1
+trans_mat['(10B)', '(01B)'] <- max(trans_mat, na.rm = TRUE) + 1
+
+# As the best MuSSE model just has variation in speciation, this is what we will fit here
+turnover <- c(1,2,3,4,5,6,7,8)
+extinction_fraction <- rep(1, 8) 
+
+# set estimated proportion of extant species
+f = c(1,1,1,1)
+
+# get the dataset ready
+muhisse_df <- data.frame(tip_label = names(hab_pref_new3),
+                         saline = substr(hab_pref_new3, 1,1),
+                         specialist = substr(hab_pref_new3, 2,2))
+```
+Now lets try and run the MuHiSSE... The process for setting start parameters does not seem as flexible as in **diversitree**.
+
+```{r run MuHiSSE}
+muhisse_1 <- MuHiSSE(phy=tree, data=muhisse_df, f=f,
+                     turnover=turnover, 
+                     eps=extinction_fraction, 
+                     hidden.states=TRUE, 
+                     trans.rate=trans_mat)
+```
+
+
+
 ## Useful links used
 
 -   [Chapter 13](https://lukejharmon.github.io/pcm/chapter13_chardiv/#ref-Beaulieu2016-ww) of Luke Harmon's book on phylogenetic comparative methods on "Characters and diversification rates".
@@ -1808,3 +1861,22 @@ ggsave(here('plots/sequencing_rpoB/analyses/transition_plot_musse.png'), last_pl
 -   [Documentation](https://yulab-smu.top/treedata-book/) of the R package **ggtree** used for plotting phylogenies.
 -   [Phylo-wiki](https://www.r-phylo.org/wiki/HowTo/Ancestral_State_Reconstruction) help page on ancestral state reconstruction.
 -   [Github Issue](https://github.com/YuLab-SMU/ggtree/issues/419#issuecomment-877563385) on plotting pie charts for ancestral state reconstructions.
+
+```{r old_code}
+#| eval: false
+#| echo: false
+
+# first get the trait matrix into a data frame we can use
+trans_mat_df <- as_tibble(trans_mat) %>%
+  mutate(state1_full = row.names(trans_mat)) %>%
+  pivot_longer(cols = starts_with('('), values_to = 'param_num', names_to = 'state2_full') %>%
+  mutate(state1 = substr(state1_full, 2,3),
+         state2 = substr(state2_full, 2,3)) %>%
+  left_join(., get_diversitree_df(mod_premusse1, trait_vec = coding_new$hab_pref_num, replace_vec = coding_new$muhisse_coding))
+
+premusse_rates <- get_diversitree_df(mod_premusse1, trait_vec = coding_new$hab_pref_num, replace_vec = coding_new$muhisse_coding) %>%
+  select(state1 = state_1, state2 = state_2, transition_rate)
+
+trans_mat_df <- left_join(trans_mat_df, premusse_rates)
+
+```
