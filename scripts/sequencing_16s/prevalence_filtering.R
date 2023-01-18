@@ -41,6 +41,11 @@ filter(meta_new, !row.names(meta_new) %in% sample_names(ps))
 # samples missing
 # 45 - beach_seaweed
 
+# check number of samples in each habitat
+filter(meta_new, row.names(meta_new) %in% sample_names(ps)) %>%
+  group_by(habitat_group) %>%
+  tally()
+
 # look at object
 ps
 # SO MANY TREE NODES
