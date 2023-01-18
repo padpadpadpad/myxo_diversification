@@ -1842,17 +1842,17 @@ muhisse_df <- data.frame(tip_label = names(hab_pref_new3),
                          saline = substr(hab_pref_new3, 1,1),
                          specialist = substr(hab_pref_new3, 2,2))
 ```
-Now lets try and run the MuHiSSE... The process for setting start parameters does not seem as flexible as in **diversitree**.
 
-```{r run MuHiSSE}
+Now lets try and run the MuHiSSE... The process for setting start parameters does not seem as flexible as in **diversitree**. We currently do not run the MuHiSSE as it has not converged. See `scripts/sequencing_rpoB/analyses/draft/run_muhisse.R` for code to try and fit a MuHiSSE model with this data.
+
+```{r run_MuHiSSE}
+#| eval: false
 muhisse_1 <- MuHiSSE(phy=tree, data=muhisse_df, f=f,
                      turnover=turnover, 
                      eps=extinction_fraction, 
                      hidden.states=TRUE, 
                      trans.rate=trans_mat)
 ```
-
-
 
 ## Useful links used
 
