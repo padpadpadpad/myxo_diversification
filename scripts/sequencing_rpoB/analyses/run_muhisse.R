@@ -8,7 +8,7 @@ library(ape)
 tree <- read.tree('data/sequencing_rpoB/processed/muhisse/tree_clean.tree')
 
 # load in data for muhisse
-muhisse_df <- readRDS('data/sequencing_rpoB/processed/muhisse/muhisse_trat_data.rds')
+muhisse_df <- readRDS('data/sequencing_rpoB/processed/muhisse/muhisse_trait_data.rds')
 
 # load in coding to know what the 0s and 1s mean
 coding <- readRDS('data/sequencing_rpoB/processed/muhisse/coding_for_states.rds')
