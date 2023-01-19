@@ -15,6 +15,8 @@
 library(phyloseq)
 library(dada2)
 library(DECIPHER)
+library(here)
+library(tidyverse)
 
 # set number of processors to use
 num_processors <- 4
@@ -49,11 +51,16 @@ attr(guide_tree, "height") <- 0.5
 attr(guide_tree, "members") <- length(seqs)
 class(guide_tree) <- "dendrogram"
 
-# align sequences
+# align sequences - this takes a long time on a single machine
 alignment <- AlignSeqs(seqs, guideTree = guide_tree, anchor = NA, processors = num_processors)
+
+# save alignment
+writeXStringSet(alignment, file='~/Desktop/gdrive/work_googledrive/alignment.fasta', compress = FALSE)
+
 
 # calculate distance matrix for each sequence
 dist_matrix <- DECIPHER::DistanceMatrix(alignment, processors = num_processors)
+saveRDS(dist_matrix, '~/Desktop/gdrive/work_googledrive/dist_matrix.rds')
 
 # set percent similarity
 percent_similarity <- c(99:90, 97.7, 85, 80)
