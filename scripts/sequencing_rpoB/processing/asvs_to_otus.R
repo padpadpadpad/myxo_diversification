@@ -88,12 +88,12 @@ for(i in 1:length(cut_off))
   )
   
   # save this out
-  saveRDS(ps0, here(paste('data/sequencing_rpoB/phyloseq/myxococcus/clustered/ps_otu', percent_similarity[i], 'percent.rds', sep = '')))
+  saveRDS(ps0, here(paste('data/sequencing_rpoB/phyloseq/myxococcus/clustered/ps_otu_', percent_similarity[i], 'percent.rds', sep = '')))
   
   # do prevalence filtering
   # remove things that are only present in 3 or fewer samples & abundance > 100 overall
   ps0_sub <- microViz::tax_filter(ps0, min_prevalence = 4, min_total_abundance = 100)
   
   # save this out
-  saveRDS(ps0_sub, here(paste('data/sequencing_rpoB/phyloseq/myxococcus/prevalence_filtered/ps_otu', percent_similarity[i], 'percent_filt.rds', sep = '')))
+  saveRDS(ps0_sub, here(paste('data/sequencing_rpoB/phyloseq/myxococcus/prevalence_filtered/ps_otu_', percent_similarity[i], 'percent_filt.rds', sep = '')))
 }

@@ -13,64 +13,54 @@
 library(phyloseq)
 library(tidyverse)
 library(speedyseq)
+library(here)
+
+# set where we are
+here::i_am('scripts/sequencing_rpoB/processing/assign_habitat_preference_all.R')
 
 # set percent similarity - those used in asvs_to_otus.R
-percent_similarity <- c(99:90, 97.7, 85, 80)
+percent_similarity <- c(99:90, 97.7, 85, 80, 'asv')
 
 # read in group clusters from the 16S analysis
+clusters <- read.csv('data/sequencing_16s/sample_cluster_assignments.csv') %>%
+  mutate(across(where(is.numeric), as.character))
 
-
+head(clusters)
 
 #------------------------------#
 # assign habitat preference ####
 #------------------------------#
 
-# do this for each percent similarity object
-
 # rules and methods
 # 1. If you are only present in a single cluster, you are assigned to that cluster
 # 2. create dataframe for "availability" of clusters, essentially based on our sampling
 
+# do this for each percent similarity object
 for(i in 1:length(percent_similarity)){
   
   # read in phyloseq object #
   
   # define which level of OTU similarity we are using
   otu_similarity <- paste(percent_similarity[i], 'percent', sep = '')
+  if(percent_similarity[i] == 'asv'){otu_similarity == 'asv'}
   
   # get number of raw taxa
-  raw_taxa_n <- readRDS(paste('sequencing_rpoB/data/output/run_myxo_gtdbr202/ps_otu_', otu_similarity,  '.rds', sep = '')) %>% ntaxa()
+  raw_taxa_n <- readRDS(here(paste('data/sequencing_rpoB/phyloseq/myxococcus/clustered/ps_otu_', otu_similarity,  '.rds', sep = ''))) %>% ntaxa()
   
   # load in prevalence filtered myxococcus object
-  ps_myxo <- readRDS(paste('sequencing_rpoB/data/output/run_myxo_gtdbr202/prevalence_filtered/ps_myxo_', otu_similarity,  '.rds', sep = ''))
+  ps_myxo <- readRDS(here(paste('data/sequencing_rpoB/phyloseq/myxococcus/prevalence_filtered/ps_otu_', otu_similarity,  '_filt.rds', sep = '')))
   prev_taxa_n <- ntaxa(ps_myxo)
   
-  #----------------------------------------------#
-  # add in group clusters into this ps object ####
-  #----------------------------------------------#
-  
-  clusters <- read.csv('sequencing_16S/data/analysis/asv_cluster_assignments.csv') %>%
-    mutate(across(where(is.numeric), as.character))
-  
-  head(clusters)
-  
+  # add in group clusters into this ps object #
   meta <- sample_data(ps_myxo) %>% data.frame() %>%
     mutate(sample = paste('sample_s', id, sep = '')) %>%
     left_join(., clusters)
   row.names(meta) <- paste('sample_s', meta$id, sep = '')
   sample_data(ps_myxo) <- sample_data(meta)
-  
-  sample_data(ps_myxo)
-  
-  # check number of reads in each sample ####
-  sample_sums(ps_myxo) %>% sort()
-  ps_myxo
-  
-  #-----------------------------------------------#
-  # calculate summary data for phyloseq object ####
-  #-----------------------------------------------#
-  
+
   # three of the clustering methods. Hierarchical NB, hierarchical gap, and medoid clustering NB give almost exactly the same results. 3 clusters, broadly defined as terrestrial, freshwater, and mud and shore.
+  # the hierarchical clustering methods have a perfect matching where each of the "habitats" resides within a single cluster so use one of those for assigning habitat preferences
+  # will use hierarchical_nbclust
   
   # get dataset out of phyloseq
   d_ps <- psmelt(ps_myxo) %>%
@@ -99,8 +89,6 @@ for(i in 1:length(percent_similarity)){
   #------------------------------#
   # define habitat preference ####
   #------------------------------#
-  
-
   
   # look at availability of clusters
   d_habitats <- d_ps %>% 
