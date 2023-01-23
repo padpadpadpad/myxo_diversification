@@ -23,7 +23,7 @@ library(MicrobioUoE) # remotes::install_github('padpadpadpad/MicrobioUoE')
 path_fig <- 'plots/sequencing_16s'
 
 # source extra functions
-source('scripts/extra_functions.R')
+source('scripts/sequencing_16s/extra_functions.R')
 
 # load data
 ps <- readRDS('data/sequencing_16s/ps_16s_low_depth_removed.rds')
@@ -100,10 +100,11 @@ p1 + MicrobioUoE::theme_black(base_size = 24) +
   
 ggsave(file.path(path_fig, 'ordination_16S_presentation.pdf'), last_plot(), width = 10, height = 7)
 
-
 #-----------------------------------------------------#
 # 2. look at pairwise differences between habitats ####
 #-----------------------------------------------------#
+
+mod <- adonis2(ps_wunifrac ~ habitat_group_fac + location_fac, d_samp, n_perm = 9999)
 
 mods <- calc_pairwise_permanovas(ps_wunifrac, d_samp, 'habitat_group_fac', n_perm = 9999)
 
