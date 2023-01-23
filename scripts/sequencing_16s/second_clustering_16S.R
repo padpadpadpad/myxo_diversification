@@ -175,7 +175,7 @@ d_gap <- data.frame(pam_clusters$Tab, k=1:nrow(pam_clusters$Tab)) %>%
   data.frame()
 
 # this errors!
-pam_nbclust <- NbClust(d_pcoa_samples, method = 'kmeans', max.nc = 12)
+#pam_nbclust <- NbClust(d_pcoa_samples, method = 'kmeans', max.nc = 12)
 # because of negative eigenvectors
 
 # create a pcoa data set - choose only eigenvalues that are > 0
@@ -362,7 +362,7 @@ ggsave(file.path(path_fig, 'hierarchical_clustering_groups.png'), p5, width = 10
 d_clusters <- left_join(cluster_medoid, cluster_hclust) %>%
   mutate(across(everything(), as.character))
 
-write.csv(d_clusters, 'data/sample_cluster_assignments.csv', row.names = FALSE)
+write.csv(d_clusters, 'data/sequencing_16S/sample_cluster_assignments.csv', row.names = FALSE)
 
 # compare clusters
 d_compare_cluster <- left_join(d_clusters, rownames_to_column(d_samp, var = 'sample')) %>%

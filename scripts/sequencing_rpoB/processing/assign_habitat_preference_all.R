@@ -58,9 +58,9 @@ for(i in 1:length(percent_similarity)){
   row.names(meta) <- paste('sample_s', meta$id, sep = '')
   sample_data(ps_myxo) <- sample_data(meta)
 
-  # three of the clustering methods. Hierarchical NB, hierarchical gap, and medoid clustering NB give almost exactly the same results. 3 clusters, broadly defined as terrestrial, freshwater, and mud and shore.
-  # the hierarchical clustering methods have a perfect matching where each of the "habitats" resides within a single cluster so use one of those for assigning habitat preferences
-  # will use hierarchical_nbclust
+  # all four of the clustering methods give almost exactly the same results. 3 clusters, broadly defined as terrestrial, freshwater, and marine mud.
+  # the medoid clustering methods have a perfect matching where each of the "habitats" resides within a single cluster so use one of those for assigning habitat preferences
+  # will use medoid_nbclust
   
   # get dataset out of phyloseq
   d_ps <- psmelt(ps_myxo) %>%
