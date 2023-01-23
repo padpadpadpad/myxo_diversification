@@ -14,19 +14,17 @@
 # clean workspace
 rm(list = ls())
 
+# set seed to always get the same clustering assignments
+set.seed(42)
+
 # load packages ####
 library(microViz)
 library(phyloseq)
 library(vegan)
-library(patchwork) 
-library(lme4)
-library(flextable)
+library(patchwork)
 library(tidyverse)
-library(palettetown)
 library(MicrobioUoE)
-library(clusterMany)
 library(cluster)
-library(ggtree)
 library(NbClust)
 library(fpc)
 library(dendextend)
@@ -37,7 +35,7 @@ path_fig <- 'sequencing_16S/plots/analyses'
 path_fig <- 'plots/sequencing_16s'
 
 # source extra functions
-source('scripts/extra_functions.R')
+source('scripts/sequencing_16S/extra_functions.R')
 
 # load data
 ps <- readRDS('data/sequencing_16s/ps_16s_low_depth_removed.rds')
@@ -134,7 +132,6 @@ ggsave(file.path(path_fig, 'ordination_axis_split.pdf'), last_plot(), width = 12
 # plot PCoA
 p1 <- ggplot() +
   geom_point(aes(PCoA1*-1, PCoA2, col = group, shape = location),d_fig$eigenvector) +
-  #ggrepel::geom_label_repel(aes(PCoA1, PCoA2, col = habitat, label = id), data = to_label) +
   geom_point(aes(PCoA1*-1, PCoA2, col = group), d_fig$centroids, size = 5, show.legend = FALSE) +
   geom_segment(aes(x = PCoA1.x*-1, y = PCoA2.x, yend = PCoA2.y, xend = PCoA1.y*-1, group = sample, col = group), betadisper_lines) +
   theme_bw(base_size = 14) +
@@ -146,11 +143,6 @@ p1 <- ggplot() +
        x = 'Axis 1 (34.69%)')
 ggsave(file.path(path_fig, 'ordination_16S_clean.pdf'), p1, width = 10, height = 7)
 ggsave(file.path(path_fig, 'ordination_16S_clean.png'), p1, width = 10, height = 7)
-
-p1 + theme_bw(base_size = 24) +
-  theme(legend.position = 'none')
-
-ggsave(file.path(path_fig, 'ordination_16S_clean_presentation.pdf'), last_plot(), width = 10, height = 7)
 
 # look at pairwise differences between groups
 # pairwise permanovas
@@ -184,12 +176,13 @@ d_gap <- data.frame(pam_clusters$Tab, k=1:nrow(pam_clusters$Tab)) %>%
 
 # this errors!
 pam_nbclust <- NbClust(d_pcoa_samples, method = 'kmeans', max.nc = 12)
+# because of negative eigenvectors
 
 # create a pcoa data set - choose only eigenvalues that are > 0
 #https://stackoverflow.com/questions/8924488/applying-the-pvclust-r-function-to-a-precomputed-dist-object#27148408
 # error message tells how may eigenvalues are > 0
-d_pcoa_correct <- cmdscale(ps_wunifrac, length(labels(ps_wunifrac))-1)
-d_pcoa_correct <- cmdscale(ps_wunifrac, 45)
+d_pcoa_correct <- cmdscale(ps_wunifrac, length(labels(ps_wunifrac))-1, eig=TRUE)
+d_pcoa_correct <- cmdscale(ps_wunifrac, sum(d_pcoa_correct$eig > 0))
 
 # redo clustering on corrected PCoA plot
 pam_clusters = clusGap(d_pcoa_correct, FUN = pamfun, K.max = 12, B = 300, verbose = TRUE)
@@ -197,7 +190,6 @@ d_gap <- data.frame(pam_clusters$Tab, k=1:nrow(pam_clusters$Tab)) %>%
   data.frame()
 
 # calculate the optimal number of clusters
-maxSE(d_gap$gap, d_gap$SE.sim, method = 'firstSEmax')
 maxSE(d_gap$gap, d_gap$SE.sim, method = 'Tibs2001SEmax')
 
 # do NbClust on the pcoa_correct
@@ -205,19 +197,28 @@ pam_nbclust <- NbClust(d_pcoa_correct, method = 'kmeans', max.nc = 12) # uses km
 # says the best is 3
 
 # visualise both cluster sets
-clustering <- pam(d_pcoa_correct, k = 11)
+clustering <- pam(d_pcoa_correct, k = 3)
 
+# put cluster assignment into dataframe
+# align cluster assignments when numbers do not match
 cluster_numbers <- data.frame(sample = names(clustering$clustering), cluster_gap = clustering$clustering,
                               cluster_nbclust = pam_nbclust$Best.partition) %>%
-  mutate(across(starts_with('cluster'), as.character)) %>%
+  mutate(across(starts_with('cluster'), as.character),
+         cluster_nbclust = case_when(cluster_nbclust == '2' ~ '1',
+                                     cluster_nbclust == '3' ~ '2',
+                                     cluster_nbclust == '1' ~ '3')) %>%
   pivot_longer(starts_with('cluster'), names_to = 'method', names_prefix = 'cluster_', values_to = 'cluster')
-
-cluster_medoid <- data.frame(sample = names(clustering$clustering), medoid_gap = clustering$clustering,
-                             medoid_nbclust = pam_nbclust$Best.partition) %>%
-  mutate(across(starts_with('cluster'), as.character))
 
 d_clustering <- rownames_to_column(d_pcoa_samples, var = 'sample') %>%
   left_join(cluster_numbers)
+
+# make dataset for medoid clustering
+cluster_medoid <- data.frame(sample = names(clustering$clustering), medoid_gap = clustering$clustering,
+                             medoid_nbclust = pam_nbclust$Best.partition) %>%
+  mutate(across(starts_with('cluster'), as.character),
+         medoid_nbclust = case_when(medoid_nbclust == '2' ~ '1',
+                                    medoid_nbclust == '3' ~ '2',
+                                    medoid_nbclust == '1' ~ '3'))
 
 d_centroids <- d_clustering %>%
   group_by(., cluster, method) %>%
@@ -227,9 +228,7 @@ d_lines <- merge(select(d_clustering, sample, method, cluster, PCoA1, PCoA2), se
   mutate(distances = dist_between_points(PCoA1.x, PCoA2.x, PCoA1.y, PCoA2.y))
 
 p3 <- ggplot() +
-  geom_point(aes(PCoA1, PCoA2, col = cluster),d_clustering, show.legend = FALSE) +
-  #ggforce::geom_mark_hull(aes(PCoA1, PCoA2, col = cluster), d_clustering, show.legend = FALSE, concavity = 2) +
-  #ggrepel::geom_label_repel(aes(PCoA1, PCoA2, col = habitat, label = id), data = to_label) +
+  geom_point(aes(PCoA1, PCoA2, col = cluster),d_clustering, show.legend = TRUE) +
   geom_point(aes(PCoA1, PCoA2, col = cluster), d_centroids, size = 3, show.legend = FALSE) +
   geom_segment(aes(x = PCoA1.x, y = PCoA2.x, yend = PCoA2.y, xend = PCoA1.y, group = sample, col = cluster), d_lines, show.legend = FALSE) +
   theme_bw(base_size = 14) +
@@ -239,21 +238,7 @@ p3 <- ggplot() +
 
 ggsave(file.path(path_fig, 'partition_clustering.png'), p3, width = 10, height = 5)
 
-ggplot(filter(d_clustering, method == 'nbclust')) +
-  geom_segment(aes(x = PCoA1.x*-1, y = PCoA2.x, yend = PCoA2.y, xend = PCoA1.y*-1, group = sample, col = cluster), filter(d_lines, method == 'nbclust'), show.legend = TRUE) +
-  geom_point(aes(PCoA1*-1, PCoA2, fill = cluster), show.legend = FALSE, shape = 21, col = 'white') +
-  geom_point(aes(PCoA1*-1, PCoA2, fill = cluster), shape = 21, col = 'white', filter(d_centroids, method == 'nbclust'), size = 5, show.legend = FALSE)  +
-  theme(strip.background = element_blank(),
-        strip.text = element_text(hjust = 0, size = 12)) +
-  labs(y = 'Axis 2 (14.24%)',
-       x = 'Axis 1 (34.69%)') +
-  theme_bw(base_size = 24) +
-  theme( legend.position = "none") +
-  scale_fill_manual(values = c('sienna4', 'green4', '#1E90FE')) +
-  scale_color_manual(values = c('sienna4', 'green4', '#1E90FE'))
-
-ggsave(file.path(path_fig, 'clustering_presentation.pdf'), last_plot(), width = 10, height = 7)
-
+# plot the gap statistic
 ggplot(d_gap, aes(k, gap)) +
   geom_line() +
   geom_point(size = 5) +
@@ -264,22 +249,6 @@ ggplot(d_gap, aes(k, gap)) +
   scale_x_continuous(breaks = 1:12)
 
 rownames(d_samp) == rownames(cluster_numbers)
-
-d_compare_cluster <- left_join(cluster_numbers, rownames_to_column(d_samp, var = 'sample')) %>%
-  group_by(habitat_group, cluster, method) %>%
-  tally() %>%
-  ungroup() %>%
-  mutate(habitat2 = gsub('_', '\n', habitat_group))
-
-ggplot(d_compare_cluster, aes(x = forcats::fct_reorder(habitat2, cluster), y = n, fill = cluster)) +
-  geom_bar(stat = 'identity', col = 'black', show.legend = FALSE) +
-  theme_bw(base_size = 14) +
-  labs(y = 'Number of samples',
-       x = 'habitat type') +
-  facet_wrap(~method) +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
-
-ggsave(file.path(path_fig, 'partition_cluster_assignment.png'), last_plot(), width = 7, height = 5)
 
 #---------------------------------------------------------#
 # 3. cluster 16S samples using hierarchical clustering ####
@@ -305,9 +274,8 @@ cor(cophenetic(hier_clust3), ps_wunifrac)
 cor(cophenetic(hier_clust4), ps_wunifrac)
 # average method gives the best representation of the data
 
-# decided to use the ward method
-
 # calculate the optimum number of clusters as earlier
+# do this on both average and ward methods and compare
 hier_clusgap <- clusGap(d_pcoa_correct, FUN = factoextra::hcut, K.max = 12, B = 300, hc_func = 'agnes', hc_method = 'ward')
 hier_clusgap2 <- clusGap(d_pcoa_correct, FUN = factoextra::hcut, K.max = 12, B = 300, hc_func = 'agnes', hc_method = 'average')
 
@@ -323,26 +291,7 @@ maxSE(d_gap2$gap, d_gap2$SE.sim, method = 'firstSEmax')
 maxSE(d_gap2$gap, d_gap2$SE.sim, method = 'Tibs2001SEmax')
 # average says there is only a single cluster - not right
 
-# look at other methods
-factoextra::fviz_nbclust(d_pcoa_correct, FUN = hcut, method = "wss", hc_method = 'average')
-factoextra::fviz_nbclust(d_pcoa_correct, FUN = hcut, method = "wss", hc_method = 'ward.D2')
-fviz_nbclust(d_pcoa_correct, FUN = hcut, method = "silhouette", hc_method = 'ward.D2')
-fviz_nbclust(d_pcoa_correct, FUN = hcut, method = "silhouette", hc_method = 'average')
-fviz_nbclust(d_pcoa_correct, FUN = hcut, method = "gap", hc_method = 'ward.D', maxSE = list(method = 'Tibs2001SEmax', SE.factor = 1))
-fviz_nbclust(d_pcoa_correct, FUN = hcut, method = "gap", hc_method = 'average', maxSE = list(method = 'Tibs2001SEmax', SE.factor = 1))
-
-# do NbClustering on Ward method
-hier_nbclust <- NbClust::NbClust(d_pcoa_correct, method = 'ward.D', max.nc = 12)
-summary(hier_nbclust)
-
-ggplot(d_gap2, aes(k, gap)) +
-  geom_line() +
-  geom_point(size = 5) +
-  geom_linerange(aes(ymin = gap - SE.sim, ymax = gap + SE.sim)) +
-  theme_bw(base_size = 14) +
-  labs(y = 'Gap statistic',
-       x = 'Number of clusters') +
-  scale_x_continuous(breaks = 1:12)
+# decided to use the ward method, but hard to test which is "better"
 
 # can compare the dendograms of different clusterings
 
@@ -365,6 +314,19 @@ cor.dendlist(list_of_dends, method = "common")
 entanglement(dend_ward, dend_average)
 entanglement(dend_ward, dend_complete)
 entanglement(dend_ward, dend_single)
+
+# do NbClustering on Ward method
+hier_nbclust <- NbClust::NbClust(d_pcoa_correct, method = 'ward.D', max.nc = 12)
+summary(hier_nbclust)
+
+ggplot(d_gap2, aes(k, gap)) +
+  geom_line() +
+  geom_point(size = 5) +
+  geom_linerange(aes(ymin = gap - SE.sim, ymax = gap + SE.sim)) +
+  theme_bw(base_size = 14) +
+  labs(y = 'Gap statistic',
+       x = 'Number of clusters') +
+  scale_x_continuous(breaks = 1:12)
 
 # assign clusters for hierarchical clusterings 
 clustering <- cutree(hier_clust, k = 3)
@@ -397,6 +359,27 @@ p5 <- ggplot() +
 ggsave(file.path(path_fig, 'hierarchical_clustering_groups.png'), p5, width = 10, height = 5)
 
 # create dataframe for cluster assignments for each sample
-d_clusters <- left_join(cluster_medoid, cluster_hclust)
+d_clusters <- left_join(cluster_medoid, cluster_hclust) %>%
+  mutate(across(everything(), as.character))
 
 write.csv(d_clusters, 'data/sample_cluster_assignments.csv', row.names = FALSE)
+
+# compare clusters
+d_compare_cluster <- left_join(d_clusters, rownames_to_column(d_samp, var = 'sample')) %>%
+  pivot_longer(cols = c(medoid_gap:hier_nbclust), names_to = 'method', values_to = 'cluster') %>%
+  group_by(habitat_group, cluster, method) %>%
+  tally() %>%
+  ungroup() %>%
+  mutate(habitat2 = gsub('_', '\n', habitat_group)) 
+
+ggplot(d_compare_cluster, aes(x = forcats::fct_reorder(habitat2, cluster), y = n, fill = cluster)) +
+  geom_bar(stat = 'identity', col = 'black', show.legend = FALSE) +
+  theme_bw(base_size = 14) +
+  labs(y = 'Number of samples',
+       x = 'habitat type') +
+  facet_wrap(~method) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+ggsave(file.path(path_fig, 'partition_cluster_assignment.png'), last_plot(), width = 11, height = 9)
+# partition assignment here is great
+

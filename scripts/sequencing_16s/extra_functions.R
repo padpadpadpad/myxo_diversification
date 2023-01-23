@@ -84,18 +84,18 @@ calc_pairwise_permanovas <- function (dm, metadata_map, compare_header, extra_he
                                         keep_vals = TRUE)
     if (!missing(n_perm)) {
       if(!is.null(extra_header)){
-        m = vegan::adonis(dm_w_map_filt$dm_loaded ~ dm_w_map_filt$map_loaded[, compare_header] + dm_w_map_filt$map_loaded[, extra_header], permutations = n_perm)
+        m = vegan::adonis2(dm_w_map_filt$dm_loaded ~ dm_w_map_filt$map_loaded[, compare_header] + dm_w_map_filt$map_loaded[, extra_header], permutations = n_perm)
       }
-      m = vegan::adonis(dm_w_map_filt$dm_loaded ~ dm_w_map_filt$map_loaded[, compare_header], permutations = n_perm)
+      m = vegan::adonis2(dm_w_map_filt$dm_loaded ~ dm_w_map_filt$map_loaded[, compare_header], permutations = n_perm)
     }
     else {
       if(!is.null(extra_header)){
-        m = vegan::adonis(dm_w_map_filt$dm_loaded ~ dm_w_map_filt$map_loaded[, compare_header] + dm_w_map_filt$map_loaded[, extra_header])
+        m = vegan::adonis2(dm_w_map_filt$dm_loaded ~ dm_w_map_filt$map_loaded[, compare_header] + dm_w_map_filt$map_loaded[, extra_header])
       }
-      m = vegan::adonis(dm_w_map_filt$dm_loaded ~ dm_w_map_filt$map_loaded[, compare_header])
+      m = vegan::adonis2(dm_w_map_filt$dm_loaded ~ dm_w_map_filt$map_loaded[, compare_header])
     }
-    pval = c(pval, m$aov.tab$`Pr(>F)`[1])
-    R2 = c(R2, m$aov.tab$R2[1])
+    pval = c(pval, m$`Pr(>F)`[1])
+    R2 = c(R2, m$R2[1])
   }
   results = data.frame(t(comp_pairs), R2, pval)
   results$pvalBon = p.adjust(pval, 'bonferroni')
