@@ -15,6 +15,9 @@ library(tidyverse)
 library(speedyseq)
 library(here)
 
+# set seed to always get the same answer
+set.seed(42)
+
 # set where we are
 here::i_am('scripts/sequencing_rpoB/processing/assign_habitat_preference_all.R')
 
@@ -24,6 +27,25 @@ percent_similarity <- c(99:90, 97.7, 85, 80, 'asv')
 # read in group clusters from the 16S analysis
 clusters <- read.csv('data/sequencing_16s/sample_cluster_assignments.csv') %>%
   mutate(across(where(is.numeric), as.character))
+
+# we will use medoid clustering
+clusters <- clusters %>%
+  select(., sample, medoid_nbclust) %>%
+  mutate(clusters, clust = case_when(medoid_nbclust == '1' ~ 'terrestrial',
+                                     medoid_nbclust == '2' ~ 'freshwater',
+                                     medoid_nbclust == '3' ~ 'marine_mud'))
+
+# look at availability of clusters
+d_habitats <- clusters %>% 
+  select(sample, clust) %>%
+  distinct() %>%
+  group_by(clust) %>%
+  tally() %>%
+  mutate(prop_available = n / sum(n)) %>%
+  rename(num_available = n)
+
+d_habitats
+# terrestrial is more commonly sampled than mud and shore and freshwater is our least well sampled cluster
 
 head(clusters)
 
@@ -38,11 +60,9 @@ head(clusters)
 # do this for each percent similarity object
 for(i in 1:length(percent_similarity)){
   
-  # read in phyloseq object #
-  
   # define which level of OTU similarity we are using
   otu_similarity <- paste(percent_similarity[i], 'percent', sep = '')
-  if(percent_similarity[i] == 'asv'){otu_similarity == 'asv'}
+  if(percent_similarity[i] == 'asv'){otu_similarity = 'asv'}
   
   # get number of raw taxa
   raw_taxa_n <- readRDS(here(paste('data/sequencing_rpoB/phyloseq/myxococcus/clustered/ps_otu_', otu_similarity,  '.rds', sep = ''))) %>% ntaxa()
@@ -57,10 +77,6 @@ for(i in 1:length(percent_similarity)){
     left_join(., clusters)
   row.names(meta) <- paste('sample_s', meta$id, sep = '')
   sample_data(ps_myxo) <- sample_data(meta)
-
-  # all four of the clustering methods give almost exactly the same results. 3 clusters, broadly defined as terrestrial, freshwater, and marine mud.
-  # the medoid clustering methods have a perfect matching where each of the "habitats" resides within a single cluster so use one of those for assigning habitat preferences
-  # will use medoid_nbclust
   
   # get dataset out of phyloseq
   d_ps <- psmelt(ps_myxo) %>%
@@ -69,9 +85,6 @@ for(i in 1:length(percent_similarity)){
     mutate(total_otu_abundance = sum(abundance),
            prop_of_all_otu = abundance / total_otu_abundance) %>%
     ungroup() %>%
-    mutate(clust = case_when(medoid_nbclust == '2' ~ 'terrestrial',
-                             medoid_nbclust == '3' ~ 'freshwater',
-                             medoid_nbclust == '1' ~ 'mud_and_shore')) %>%
     group_by(sample) %>%
     mutate(rel_abund = abundance / sum(abundance)) %>%
     ungroup()
@@ -89,18 +102,6 @@ for(i in 1:length(percent_similarity)){
   #------------------------------#
   # define habitat preference ####
   #------------------------------#
-  
-  # look at availability of clusters
-  d_habitats <- d_ps %>% 
-    select(sample, clust) %>%
-    distinct() %>%
-    group_by(clust) %>%
-    tally() %>%
-    mutate(prop_available = n / sum(n)) %>%
-    rename(num_available = n)
-  
-  d_habitats
-  # terrestrial is more commonly sampled than mud and shore and freshwater is our least well sampled cluster
   
   # calculate statistics for each otu
   # 1. average abundance in each cluster when present
@@ -143,6 +144,7 @@ for(i in 1:length(percent_similarity)){
   n_boots=1000
   
   # resample from the original data (length of each new dataset is 100)
+  # calculate proportion present in each habitat cluster in each new bootstrapped replicate dataset
   boots <- d_pref_multiple %>%
     select(., otu, clust, num_present) %>%
     uncount(weights = num_present) %>%
@@ -167,11 +169,7 @@ for(i in 1:length(percent_similarity)){
   # calculate which quantile the available proportion is in of the distribution of used proportions
   d_quantiles <- group_by(boots, otu, clust) %>%
     summarise(quantile = sum(prop_present <= unique(prop_available))/n(), .groups = 'drop',
-              quantile_threshold = quantile(prop_present, 0.975),
-              prop_present_mean = mean(prop_present),
-              prop_present_max = max(prop_present),
-              prop_present_min = min(prop_present),
-              prop_available = unique(prop_available))
+              quantile_threshold = quantile(prop_present, 0.975))
   
   # define affinity
   # you either can or cannot live there - affinity or no affinity
@@ -183,9 +181,6 @@ for(i in 1:length(percent_similarity)){
   
   d_quantiles2 <- filter(d_quantiles, habitat_preference != 'no affinity')
   
-  unique(d_quantiles$otu) %>% length()
-  unique(d_quantiles2$otu) %>% length() # not lost any this is good
-  
   d_quantile_summary <- select(d_quantiles2, otu, clust, quantile_threshold)
   
   #  calculate number of preferences for each otu
@@ -193,33 +188,12 @@ for(i in 1:length(percent_similarity)){
     tally() %>%
     rename(number_habitats = n)
   
-  quantiles_to_plot <- select(d_quantiles2, otu, clust, quantile_threshold) %>%
-    left_join(., d_pref_multiple2)
-  filter(quantiles_to_plot, number_habitats == 3)
-  
-  boots2 <- left_join(boots, quantiles_to_plot)
-
   # calculate summary of habitats
   boots_summary <- group_by(d_quantiles2, otu) %>%
     arrange(clust) %>%
     summarise(habitat_number = n(),
               habitat_preference = paste0(clust, collapse = ':'),
               .groups = 'drop')
-  
-  boots_summary %>% group_by(habitat_preference, habitat_number) %>%
-    tally() %>%
-    arrange(habitat_number)
-  # lots of freshwater:mud and shore and freshwater:terrestrial
-  # very few true generalists or mud and shore:terrestrial
-  
-  quantiles_to_plot <- select(d_quantiles, otu, clust, quantile_threshold) %>%
-    left_join(., boots_summary)
-  
-  filter(quantiles_to_plot, otu == 'otu_5960')
-  
-  boots2 <- left_join(boots, quantiles_to_plot)
-  
-  filter(boots2, otu == 'otu_5960')
   
   d_quantile_summary <- left_join(d_quantile_summary, boots_summary)
   
@@ -230,7 +204,6 @@ for(i in 1:length(percent_similarity)){
   
   d_pref_all <- bind_rows(d_pref_single, d_pref_multiple2)
   
-
   d_pref_all_summary <- group_by(d_pref_all, otu, habitat_preference) %>%
     summarise(average_prop = mean(average_prop),
               average_abundance = mean(average_abundance),
@@ -243,12 +216,11 @@ for(i in 1:length(percent_similarity)){
   # save everything out ####
   #------------------------#
   
-  # save out number of otus
-  tibble(otu_similarity = otu_similarity, raw_otu_n = raw_taxa_n, prev_otu_n = prev_taxa_n) %>%
-    write.csv(., paste('sequencing_rpoB/data/summary_stats/total_species_stats_', otu_similarity, '.csv', sep = ''), row.names = FALSE)
+  # save out the bootstraps (useful for plotting)
+  saveRDS(boots, paste('data/sequencing_rpoB/phyloseq/myxococcus/habitat_preference/bootstraps/habpref_boots_', otu_similarity, '.rds', sep = ''))
   
   # save out habitat preferences
-  write.csv(d_pref_all_summary, paste('sequencing_rpoB/data/habitat_preference/habitat_preference_', otu_similarity, '.csv', sep = ''), row.names = FALSE)
+  write.csv(d_pref_all_summary, paste('data/sequencing_rpoB/phyloseq/myxococcus/habitat_preference/summary/habitat_preference_', otu_similarity, '.csv', sep = ''), row.names = FALSE)
   
   # sample stats
   # d_sample is first
@@ -258,11 +230,10 @@ for(i in 1:length(percent_similarity)){
     group_by(sample, habitat_preference) %>%
     tally() %>%
     pivot_wider(names_from = 'habitat_preference', values_from = 'n') %>%
-    mutate(across(everything(), function(x) replace_na(x, 0))) %>%
-    select(., sample, freshwater, terrestrial, mud_and_shore, `freshwater:terrestrial`, `freshwater:mud_and_shore`, `mud_and_shore:terrestrial`, `freshwater:mud_and_shore:terrestrial`)
+    mutate(across(everything(), function(x) replace_na(x, 0)))
   
   left_join(d_sample, d_ps2) %>%
-    write.csv(., paste('sequencing_rpoB/data/summary_stats/sample_stats_', otu_similarity, '.csv', sep = ''), row.names = FALSE)
+    write.csv(., paste('data/sequencing_rpoB/phyloseq/myxococcus/sample_summary/sample_stats_', otu_similarity, '.csv', sep = ''), row.names = FALSE)
 
 }
 
