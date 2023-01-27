@@ -23,7 +23,9 @@ here::i_am('scripts/sequencing_rpoB/tree_building/make_tree_ultrametric.R')
 percent_similarity <- c(99:90, 97.7, 85, 80, 'asv')
 
 # read in tree
+# use either just rooted or after adding tiny tips to the branches
 tree <- read.tree(here('data/sequencing_rpoB/raxml/trees/myxo_91percent/myxo_91.raxml.reroot2'))
+tree <- read.tree(here('data/sequencing_rpoB/raxml/trees/myxo_91percent/myxo_91.raxml.reroot'))
 
 # check if tree is rooted
 is.rooted(tree)
