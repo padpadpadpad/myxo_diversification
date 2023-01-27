@@ -26,7 +26,7 @@ asv_names <- read_csv(here('data/sequencing_rpoB/phyloseq/myxococcus/myxo_seq_na
 asv_names
 
 # set backbone tree
-backbone <- here('data/sequencing_rpoB/raxml_prep/backbone.tre')
+backbone <- here('data/sequencing_rpoB/raxml/backbone.tre')
 
 # run for loop to align sequences
 for(i in 1:length(percent_similarity)){
@@ -64,7 +64,7 @@ for(i in 1:length(percent_similarity)){
   alignment <- AlignSeqs(seqs, guideTree = guide_tree, anchor = NA, processors = 3)
   
   # save out alignment
-  writeXStringSet(alignment, file=here(paste('data/sequencing_rpoB/raxml_prep/alignment/alignment_', otu_similarity,  '.fasta', sep = '')), compress = FALSE)
+  writeXStringSet(alignment, file=here(paste('data/sequencing_rpoB/raxml/alignment/alignment_', otu_similarity,  '.fasta', sep = '')), compress = FALSE)
   
   # try and run the perl script to create a backbone tree using perl
   
@@ -79,7 +79,7 @@ for(i in 1:length(percent_similarity)){
   write.csv(tax_table, temp_file, row.names = FALSE)
   
   # define output file
-  out_file <- here(paste('data/sequencing_rpoB/raxml_prep/constraint_trees/constraint_tree_', otu_similarity,  '.tre', sep = ''))
+  out_file <- here(paste('data/sequencing_rpoB/raxml/constraint_trees/constraint_tree_', otu_similarity,  '.tre', sep = ''))
   
   # run perl script to create constraint tree
   system(paste('perl' ,'~/Desktop/myxo_diversification/scripts/sequencing_rpoB/tree_building/csv2constraint.pl', '-i', temp_file, '-b', backbone, '>', out_file, sep = ' '))
