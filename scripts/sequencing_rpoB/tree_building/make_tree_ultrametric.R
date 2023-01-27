@@ -26,6 +26,8 @@ percent_similarity <- c(99:90, 97.7, 85, 80, 'asv')
 # use either just rooted or after adding tiny tips to the branches
 tree <- read.tree(here('data/sequencing_rpoB/raxml/trees/myxo_91percent/myxo_91.raxml.reroot2'))
 tree <- read.tree(here('data/sequencing_rpoB/raxml/trees/myxo_91percent/myxo_91.raxml.reroot'))
+#tree <- read.tree(here('data/sequencing_rpoB/raxml/rerooted.tre'))
+plot(tree)
 
 # check if tree is rooted
 is.rooted(tree)
@@ -33,22 +35,27 @@ is.ultrametric(tree)
 
 # make tree ultrametric using ape::chronos
 tree_ultra <- chronos(tree, lambda = 10)
-tree_ultra <- chronopl(tree, lambda = 10)
+tree_ultra <- chronopl(tree, lambda = 1)
 
+# try make tree smaller to see if it works
+tree_sub <- keep.tip(tree, sample(tree$tip.label, 500))
 
+plot(tree_sub)
 
-# make tree ultrametric
-tree_ultrametric <- force.ultrametric(tree)
+# make tree ultrametric using ape::chronos
+tree_ultra <- chronos(tree_sub, lambda = 10)
+tree_ultra <- chronopl(tree_sub, lambda = 10)
 
-is.rooted(tree_ultrametric)
-
-
-# this does not look great LOL.
-
+plot(tree_sub)
 
 #------------------------------#
 # old code do not run this! ####
 #------------------------------#
+
+# make tree ultrametric
+#tree_ultrametric <- force.ultrametric(tree)
+
+#is.rooted(tree_ultrametric)
 
 # run perl script to fix nonzero branches
 # tree_file <- here('data/sequencing_rpoB/raxml/trees/myxo_91percent/myxo_91.raxml.reroot')
