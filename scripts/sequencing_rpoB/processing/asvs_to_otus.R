@@ -17,6 +17,7 @@ library(dada2)
 library(DECIPHER)
 library(here)
 library(tidyverse)
+library(speedyseq)
 
 # set number of processors to use
 num_processors <- 4
@@ -26,6 +27,12 @@ here::i_am('scripts/sequencing_rpoB/processing/asvs_to_otus.R')
 
 # read in phyloseq object
 ps <- readRDS(here('data/sequencing_rpoB/phyloseq/myxococcus/clustered/ps_otu_asv.rds'))
+
+# get taxonomy table from ps object
+tax_table <- tax_table(ps) %>%
+  data.frame() %>%
+  rownames_to_column(var = 'tip_label') %>%
+  janitor::clean_names()
 
 # prevalence filter the raw ASV data
 ps_sub <- microViz::tax_filter(ps, min_prevalence = 4, min_total_abundance = 100)
