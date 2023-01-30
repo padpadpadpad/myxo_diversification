@@ -6,10 +6,10 @@
 #--------------------------#
 
 # reads in myxo asv object
-# aligns this object and creates a disatnace matrix
+# does prevalence filtering: present in at least four samples and have a total abundance > 100
+# aligns this object and creates a distnace matrix
 # clusters the ASVs at a given similarity
 # saves out clustered phyloseq object
-# does prevalence filtering: present in at least four samples and have a total abundance > 100
 
 # load in packages
 library(phyloseq)
@@ -42,7 +42,7 @@ saveRDS(ps_sub, here('data/sequencing_rpoB/phyloseq/myxococcus/prevalence_filter
 
 # read in myxo seq name conversion
 seqs_df <- read.csv(here('data/sequencing_rpoB/phyloseq/myxococcus/myxo_seq_name_conversion.csv')) %>%
-  filter(otu_name %in% taxa_names(ps))
+  filter(otu_name %in% taxa_names(ps_sub))
 
 seqs <- DNAStringSet(seqs_df$seq)
 names(seqs) <- seqs_df$otu_name # This propagates to the tip labels of the tree 
@@ -90,7 +90,7 @@ for(i in 1:length(cut_off))
   
   # create new phyloseq object from the 
   ps0 <- merge_taxa_vec(
-    ps, 
+    ps_sub, 
     group = clusters$cluster,
   )
   
