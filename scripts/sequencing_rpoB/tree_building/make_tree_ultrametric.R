@@ -7,16 +7,15 @@
 # for each rerooted tree data/sequencing_rpoB/phyloseq/myxococcus/clustered
 # 1. reads in tree
 # 2. checks it is rooted
-# 3. makes the tree ultrametric
+# 3. makes the tree ultrametric by re-estimating the tree using the topology of the original raxml tree and the sequence alignment
 # 4. checks the tree is ultrametric
 # 5. saves out the ultrametric tree twice - one with family names in the tip labels and one without
 
 # load in packages
 library(phytools)
-library(ape)
+library(phangorn)
 library(tidyverse)
 library(here)
-library(ggtree)
 
 here::i_am('scripts/sequencing_rpoB/tree_building/make_tree_ultrametric.R')
 
@@ -25,24 +24,52 @@ percent_similarity <- c(99:90, 97.7, 85, 80, 'asv')
 
 # read in tree
 # use either just rooted or after adding tiny tips to the branches
-tree2 <- read.tree(here('data/sequencing_rpoB/raxml/trees/myxo_91percent/myxo_91.raxml.reroot2'))
 tree <- read.tree(here('data/sequencing_rpoB/raxml/trees/myxo_91percent/myxo_91.raxml.reroot'))
-tree_root_old <- read.tree(here('data/sequencing_rpoB/raxml/rerooted-pruned.tre'))
-tree_ultra_old <- read.tree(here('data/sequencing_rpoB/raxml/rerooted-pruned-chronopl10.tre'))
-#tree <- read.tree(here('data/sequencing_rpoB/raxml/rerooted.tre'))
+#tree_root_old <- read.tree(here('data/sequencing_rpoB/raxml/rerooted-pruned.tre'))
+#tree_ultra_old <- read.tree(here('data/sequencing_rpoB/raxml/rerooted-pruned-chronopl10.tre'))
 
 plot(tree)
-plot(tree_root_old)
 
 # check if tree is rooted
 is.rooted(tree)
 is.ultrametric(tree)
 
-# make tree ultrametric using ape::chronos
+# re-estimate ultrametric phylogenetic tree from the topology of the original tree and the sequencing alignment
 
-# doesnt work for the 91% tree
-tree_ultra <- chronos(reorder(tree), lambda = 10, model = 'correlated')
-tree_ultra <- chronopl(tree, lambda = 10)
+# read in alignment for myxo 91%
+# has to be phyDat object
+alignment <- read.FASTA(here('data/sequencing_rpoB/raxml/alignment/alignment_91percent.fasta')) %>%
+  as.phyDat()
+
+# create distance matrix
+# use hamming distance but this could be changes
+dist_matrix <- dist.hamming(alignment)
+
+# alter tip labels to remove family as they will not link to the distance matrix
+# write function to remove family labels
+strsplit_mod <- function(x)(strsplit(x, split = '_') %>% unlist() %>% .[1:2] %>% paste0(., collapse = '_'))
+tree2 <- tree
+tree2$tip.label <- purrr::map_chr(tree2$tip.label, strsplit_mod)
+
+# make tree ultrametric
+tree_ultra <- nnls.phylo(tree2, dist_matrix, method = 'ultrametric')
+
+# optimise ultrametric tree using ml
+fit <- pml(tree_ultra, alignment, k=4, model = 'GTR')
+# optimise ultrametric tree using another method
+fit2 <- optim.pml(fit, optRooted = TRUE, model = 'GTR', optGamma = TRUE)
+
+# check tree is still rooted
+is.rooted(fit2$tree)
+# check tree is now ultrametric
+is.ultrametric(fit2$tree)
+
+# save out ultrametric tree
+write.tree(fit2$tree, here('data/sequencing_rpoB/raxml/trees/myxo_91percent/myxo_91.phangorn.ultrametric.tre'))
+
+#------------------------------#
+# old code do not run this! ####
+#------------------------------#
 
 # does work for the old tree - albeit it takes a long time
 tree_ultra_old <- chronopl(tree_root_old, lambda = 10)
@@ -55,6 +82,8 @@ hist(tree$edge.length)
 hist(tree2$edge.length)
 hist(tree_root_old$edge.length)
 hist(tree_ultra_old$edge.length)
+hist(fit2$tree$edge.length)
+
 
 # now only on the tiny lengths
 hist(tree$edge.length[tree$edge.length<0.04])
@@ -67,12 +96,6 @@ min(tree$edge.length)
 min(tree2$edge.length)
 min(tree_root_old$edge.length)
 min(tree_ultra_old$edge.length)
-
-# look at difference in tip labels between old tree and new tree. All of the new tip labels should be present in the old ones
-tree$tip.label[tree$tip.label %in% tree_root_old$tip.label] %>% length()
-tree$tip.label[!tree$tip.label %in% tree_root_old$tip.label] %>% length()
-
-plot(tree_sub)
 
 # make tree ultrametric using ape::chronos
 tree_ultra <- chronos(keep.tip(tree, sample(tree$tip.label, 750)), lambda = 10)
@@ -90,13 +113,12 @@ ggtree(tree) %<+% d +
   geom_tiplab(aes(color=included))
 
 tree_ultra <- chronopl(keep.tip(tree, sample(tree$tip.label, 750)), lambda = 10)
-tree_ultra <- chronoMPL(tree)
 
-plot(tree_ultra)
-
-#------------------------------#
-# old code do not run this! ####
-#------------------------------#
+# make tree ultrametric using ape::chronos
+# doesnt work for the 91% tree
+# tree_ultra <- chronos(tree2, lambda = 10, model = 'correlated')
+# tree_ultra <- chronopl(tree, lambda = 10)
+# Cannot understand why it does work sometimes but not at others. It is not because of zero length terminal branches as I have checked their distribution and there are not any.
 
 # make tree ultrametric
 #tree_ultrametric <- force.ultrametric(tree)
