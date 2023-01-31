@@ -56,10 +56,10 @@ We can load each in and then do some data wrangling.
 #| results: false
 
 # set where I am in the project
-here::i_am('scripts/sequencing_rpoB/analyses/plot_phylogeny.qmd')
+here::i_am('scripts/sequencing_rpoB/analyses/phylogenetics/plot_phylogeny.qmd')
 
 # load in the tree
-tree <- ape::read.tree(here('data/sequencing_rpoB/bamm/rerooted-pruned-chronopl10.tre'))
+tree <- ape::read.tree(here('data/sequencing_rpoB/raxml/trees/myxo_asv/myxo_asv_chronopl10.tre'))
 
 #tree$tip.label <- tolower(tree$tip.label)
 
@@ -70,11 +70,24 @@ d_labels <- data.frame(tip_label = tree$tip.label) %>%
 
 tree$tip.label <- d_labels$tip_label_new
 
-# read in metadata
-d_meta <- read.csv(here('data/sequencing_rpoB/processed/asv_metadata.csv'))
+# read in habitat preference
+d_habpref <- read.csv(here('data/sequencing_rpoB/phyloseq/myxococcus/habitat_preference/summary/habitat_preference_asv.csv'))
 
-# read in habitat trait colours
-cols_hab <- readRDS(here('data/sequencing_rpoB/processed/habitat_colours.rds'))
+# read in phyloseq object and grab tax table
+d_taxa <- readRDS(here('data/sequencing_rpoB/phyloseq/myxococcus/prevalence_filtered/ps_otu_asv_filt.rds')) %>%
+  phyloseq::tax_table() %>%
+  data.frame() %>%
+  janitor::clean_names() %>%
+  rownames_to_column('otu')
+
+# create d_meta
+d_meta <- left_join(select(d_habpref, otu, habitat_preference, num_present), select(d_taxa, otu:family)) %>%
+  mutate(family2 = ifelse(is.na(family), 'uncertain', family))
+  
+# set habitat colours
+cols_hab <- met.brewer('Austria', n = 7)
+names(cols_hab) <- c('marine_mud', 'freshwater', 'terrestrial', 'freshwater:terrestrial', 'generalist', 'marine_mud:terrestrial', 'freshwater:marine_mud')
+hab_labels <- c('marine mud', 'freshwater', 'terrestrial', 'freshwater + terrestrial', 'generalist', 'marine mud + terrestrial', 'freshwater + marine mud')
 
 ```
 
@@ -105,7 +118,8 @@ We can now add these into the meta dataframe as a new column, and anything that 
 
 ```{r create_plot_data}
 # add in column for colouring branches
-d_meta <- mutate(d_meta, family_common = ifelse(family2 %in% c(constrained_families, 'uncertain'), family2, 'unconstrained'))
+d_meta <- mutate(d_meta, family_common = ifelse(family2 %in% c(constrained_families, 'uncertain'), family2, 'unconstrained')) %>%
+  rename(tip_label = otu)
 
 # group tip labels together in terms of their order
 to_group <- split(d_meta$tip_label, d_meta$family_common)
@@ -120,7 +134,8 @@ d_meta2 <- filter(d_meta, family_common %in% constrained_families) %>%
   select(family, tip_label) %>%
   group_by(family) %>%
   nest() %>%
-  mutate(mrca = NA)
+  mutate(mrca = NA) %>%
+  ungroup()
 
 for(i in 1:nrow(d_meta2)){
   d_meta2$mrca[i] <- findMRCA(tree2, tips = d_meta2$data[[i]]$tip_label)
@@ -132,34 +147,50 @@ d_meta2 <- select(d_meta2, family2 = family, mrca) %>%
 
 We are now ready to plot the phylogenetic tree. We will plot the tree with different colours for each family, and then place the colours of the habitat preferences around the tips of the tree.
 
-```{r plot_tree, fig.height=10, fig.width=12}
+```{r plot_tree, fig.height=10, fig.width=5}
 # create colour palettes
 
 # for different families - add in black and grey for uncertain and uncommon respectively
 cols <- c(colorRampPalette(brewer.pal(11, "Spectral"))(nrow(d_common)), 'black', 'grey')
 names(cols) <- c(sort(d_common$family2), 'uncertain', 'unconstrained')
 
-# for different habitat preferences
-# I know Mick does not like the brown but I do not want two blues on the plot because it would be more difficult to tell them apart
-cols_hab <- c('green4', '#1E90FE', 'sienna4', 'darkorange')
-cols_hab <- met.brewer('Austria', n = 7)
-names(cols_hab) <- c('mud_and_shore', 'freshwater', 'terrestrial', 'freshwater:terrestrial', 'generalist', 'mud_and_shore:terrestrial', 'freshwater:mud_and_shore')
-hab_labels <- c('marine mud', 'freshwater', 'terrestrial', 'freshwater + terrestrial', 'generalist', 'marine mud + terrestrial', 'freshwater + marine mud')
-
 # make a separate column for the rare states to make their size bigger!
-d_meta <- mutate(d_meta, rare = ifelse(habitat_preference %in% c('generalist', 'mud_and_shore:terrestrial'), 'rare', 'common'))
+d_meta <- mutate(d_meta, rare = ifelse(habitat_preference %in% c('generalist', 'marine_mud:terrestrial'), 'rare', 'common'))
 
-# first only plot taxonomy
+# first only plot taxonomy, also make non circular so we can see groupings properly
+tree_plot <- ggtree(tree2, aes(col = group)) %<+% filter(d_meta) +
+  scale_color_manual('Family (branch colours)', values = cols) +
+  guides(color = guide_legend(override.aes = list(linewidth = 3))) +
+  geom_cladelab(data = d_meta2,
+                mapping = aes(node = mrca,
+                              color = family2,
+                              label = blank_label),
+                offset = 0.1,
+                barsize = 2,
+                show.legend = FALSE)
+
+tree_plot
+
+# save plot out
+#ggsave(here('sequencing_rpoB/plots/analyses/tree_all_taxonomy.pdf'), tree_plot2, height = 9, width = 12)
+ggsave(here('plots/sequencing_rpoB/analyses/tree_check_taxonomy.png'), tree_plot, height = 10, width = 5)
+
+```
+
+We can now plot a circular tree with the habitat preferences imposed on the tree.
+
+```{r plot_tree2, fig.height=9, fig.width=10}
+# first only plot taxonomy, also make non circular so we can see groupings properly
 tree_plot <- ggtree(tree2, layout = 'circular', branch.length = 'none', aes(col = group)) %<+% filter(d_meta) +
   scale_color_manual('Family (branch colours)', values = cols) +
-  guides(color = guide_legend(override.aes = list(size = 5))) +
+  guides(color = guide_legend(override.aes = list(linewidth = 3))) +
   geom_cladelab(data = d_meta2,
                 mapping = aes(node = mrca,
                               color = family2,
                               label = blank_label),
                 offset = 10,
-                barsize = 2)
-  
+                barsize = 2,
+                show.legend = FALSE)
 
 # now plot habitat preference around the tips
 tree_plot2 <- tree_plot +
