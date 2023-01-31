@@ -1,64 +1,64 @@
 "sample","habitat_group","location","clust","sample_depth","n_species","freshwater","freshwater:terrestrial","terrestrial","freshwater:marine_mud","freshwater:marine_mud:terrestrial","marine_mud","marine_mud:terrestrial"
-"sample_s53","estuarine mud_oligohaline","Tamar","marine_mud",279590,364,42,79,19,34,5,183,2
-"sample_s49","woodland_pine","Tamar","terrestrial",234209,143,3,58,82,0,0,0,0
-"sample_s55","estuarine mud_oligohaline","Fal","marine_mud",261979,373,27,61,15,33,3,228,6
-"sample_s46","pasture","Tamar","terrestrial",145671,202,3,4,5,2,1,184,3
-"sample_s42","beach_subtidal","Tamar","marine_mud",215992,155,0,2,0,0,1,151,1
-"sample_s11","woodland_pine","Fal","terrestrial",192020,117,2,42,73,0,0,0,0
-"sample_s6","woodland_oak","Helford","terrestrial",676256,1177,59,748,347,12,8,0,3
-"sample_s38","estuarine mud_full saline","Fowey","marine_mud",184628,205,0,2,1,0,1,201,0
-"sample_s23","estuarine mud_full saline","Looe","marine_mud",200987,248,11,14,0,10,0,210,3
-"sample_s24","beach_subtidal","Looe","marine_mud",229402,233,1,2,1,1,1,225,2
-"sample_s30","estuarine mud_full saline","Fal","marine_mud",203488,179,0,4,1,0,0,172,2
-"sample_s22","river","Looe","freshwater",301640,1060,490,476,17,70,7,0,0
-"sample_s33","reservoir","Looe","freshwater",308776,456,218,227,6,4,1,0,0
-"sample_s60","beach_seaweed","Camel","marine_mud",182969,169,0,1,0,0,0,168,0
-"sample_s72","beach_seaweed","Helford","marine_mud",59161,4,0,0,1,0,0,2,1
-"sample_s39","rock_samphire","Fowey","terrestrial",293874,467,9,251,185,2,5,2,13
-"sample_s52","estuarine mud_full saline","Tamar","marine_mud",112958,163,0,1,2,0,1,157,2
-"sample_s59","beach_subtidal","Camel","marine_mud",88388,197,0,2,0,0,0,195,0
-"sample_s67","marine mud_full saline","Fal","marine_mud",249014,241,0,0,0,0,0,240,1
-"sample_s35","river","Fowey","freshwater",286600,661,374,234,5,42,2,4,0
-"sample_s16","estuarine mud_full saline","Helford","marine_mud",86657,221,1,3,1,1,1,214,0
-"sample_s65","reservoir","Camel","freshwater",82183,357,255,75,2,24,1,0,0
-"sample_s36","field_wheat","Fowey","terrestrial",178371,597,16,363,215,1,2,0,0
-"sample_s32","woodland_oak","Fowey","terrestrial",191106,767,36,505,217,3,1,0,5
-"sample_s62","woodland_pine","Camel","terrestrial",197607,461,12,273,167,3,5,0,1
-"sample_s50","woodland_oak","Tamar","terrestrial",156742,524,8,342,172,1,0,0,1
-"sample_s68","marine mud_full saline","Fal","marine_mud",87009,214,0,2,0,0,0,212,0
-"sample_s37","estuarine mud_oligohaline","Fowey","marine_mud",66987,294,33,34,5,27,2,192,1
-"sample_s57","pasture","Camel","terrestrial",95810,454,28,275,149,0,1,0,1
-"sample_s51","river","Tamar","freshwater",153589,782,389,335,8,47,3,0,0
-"sample_s69","reservoir","Fal","freshwater",270811,508,267,218,3,17,2,1,0
-"sample_s28","beach_seaweed","Helford","marine_mud",63936,63,1,0,0,0,1,61,0
-"sample_s64","estuarine mud_oligohaline","Camel","marine_mud",96403,517,111,100,15,61,8,213,9
-"sample_s18","beach_subtidal","Helford","marine_mud",75525,183,1,3,4,1,0,174,0
-"sample_s58","field_wheat","Tamar","terrestrial",130296,647,21,393,225,2,5,1,0
-"sample_s17","woodland_pine","Helford","terrestrial",111893,192,3,80,108,0,0,0,1
-"sample_s13","river","Helford","freshwater",127845,840,348,440,12,38,2,0,0
-"sample_s66","marine mud_full saline","Fal","marine_mud",75604,224,0,0,1,0,0,223,0
-"sample_s56","river","Camel","freshwater",165041,1043,462,500,21,54,6,0,0
-"sample_s20","estuarine mud_oligohaline","Looe","marine_mud",99149,558,130,145,21,63,8,180,11
-"sample_s12","reservoir","Helford","freshwater",106602,464,223,227,4,8,2,0,0
-"sample_s65b","marine mud_full saline","Fal","marine_mud",74666,225,0,0,0,0,0,225,0
-"sample_s29","rock_samphire","Helford","terrestrial",97773,333,5,164,141,2,5,9,7
-"sample_s26","field_wheat","Looe","terrestrial",175565,744,33,440,256,1,10,1,3
-"sample_s73","rock_samphire","Helford","terrestrial",22200,57,1,21,19,0,0,11,5
-"sample_s54","river","Fal","freshwater",107698,798,397,339,9,52,1,0,0
-"sample_s2","pasture","Fal","terrestrial",75104,347,6,222,119,0,0,0,0
-"sample_s48","field_wheat","Camel","terrestrial",79720,588,11,378,196,0,1,1,1
-"sample_s43","rock_samphire","Tamar","terrestrial",49024,231,0,80,93,0,2,47,9
-"sample_s27","beach_subtidal","Fal","marine_mud",43162,198,0,1,1,0,0,196,0
-"sample_s9","reservoir","Fal","freshwater",45855,314,219,84,1,10,0,0,0
-"sample_s34","pasture","Looe","terrestrial",154003,741,53,478,208,0,2,0,0
-"sample_s8","field_wheat","Helford","terrestrial",85221,718,31,462,221,1,2,0,1
-"sample_s14","estuarine mud_oligohaline","Helford","marine_mud",79994,839,205,295,76,60,13,173,17
-"sample_s31","woodland_pine","Fowey","terrestrial",38536,113,3,47,62,0,0,0,1
-"sample_s71","rock_samphire","Fal","terrestrial",27795,181,0,80,80,0,0,11,10
-"sample_s40","pasture","Fowey","terrestrial",72086,532,8,328,195,0,1,0,0
-"sample_s5","pasture","Helford","terrestrial",89123,557,14,340,201,0,1,0,1
-"sample_s61","woodland_oak","Camel","terrestrial",79000,595,25,386,174,5,4,0,1
-"sample_s21","woodland_oak","Looe","terrestrial",23747,310,8,187,112,0,1,0,2
-"sample_s1","woodland_oak","Fal","terrestrial",16659,98,2,35,61,0,0,0,0
-"sample_s4","field_wheat","Fal","terrestrial",50638,574,12,340,218,1,2,0,1
-"sample_s70","beach_seaweed","Fal","marine_mud",360,5,0,0,3,0,0,1,1
+"sample_s53","estuarine mud_oligohaline","Tamar","marine_mud",257705,207,20,23,5,32,1,125,1
+"sample_s49","woodland_pine","Tamar","terrestrial",175357,46,1,15,30,0,0,0,0
+"sample_s55","estuarine mud_oligohaline","Fal","marine_mud",241639,217,13,21,6,25,0,151,1
+"sample_s46","pasture","Tamar","terrestrial",137368,123,2,3,2,2,0,113,1
+"sample_s42","beach_subtidal","Tamar","marine_mud",164598,92,0,1,0,0,0,91,0
+"sample_s38","estuarine mud_full saline","Fowey","marine_mud",142836,111,0,3,1,0,0,107,0
+"sample_s33","reservoir","Looe","freshwater",154613,121,74,40,0,7,0,0,0
+"sample_s30","estuarine mud_full saline","Fal","marine_mud",158597,85,0,1,0,0,0,84,0
+"sample_s23","estuarine mud_full saline","Looe","marine_mud",182977,138,4,4,0,12,1,117,0
+"sample_s24","beach_subtidal","Looe","marine_mud",193302,119,0,1,0,0,0,118,0
+"sample_s6","woodland_oak","Helford","terrestrial",340355,438,27,219,175,12,4,0,1
+"sample_s22","river","Looe","freshwater",240888,515,299,151,4,59,2,0,0
+"sample_s35","river","Fowey","freshwater",200742,335,205,81,2,43,0,4,0
+"sample_s11","woodland_pine","Fal","terrestrial",68227,33,1,8,24,0,0,0,0
+"sample_s60","beach_seaweed","Camel","marine_mud",108802,97,0,0,0,0,0,97,0
+"sample_s72","beach_seaweed","Helford","marine_mud",53562,2,0,0,0,0,0,2,0
+"sample_s52","estuarine mud_full saline","Tamar","marine_mud",101180,82,0,1,0,0,0,80,1
+"sample_s67","marine mud_full saline","Fal","marine_mud",192991,121,0,0,1,0,0,120,0
+"sample_s59","beach_subtidal","Camel","marine_mud",60193,102,0,0,1,0,0,101,0
+"sample_s65","reservoir","Camel","freshwater",51189,164,127,17,0,20,0,0,0
+"sample_s32","woodland_oak","Fowey","terrestrial",95704,238,16,143,76,2,0,0,1
+"sample_s16","estuarine mud_full saline","Helford","marine_mud",72348,123,1,0,0,2,0,119,1
+"sample_s68","marine mud_full saline","Fal","marine_mud",63236,111,0,0,1,0,0,110,0
+"sample_s37","estuarine mud_oligohaline","Fowey","marine_mud",57808,195,23,14,1,23,1,133,0
+"sample_s50","woodland_oak","Tamar","terrestrial",61104,146,2,77,66,0,0,0,1
+"sample_s12","reservoir","Helford","freshwater",64672,147,94,46,0,7,0,0,0
+"sample_s28","beach_seaweed","Helford","marine_mud",38877,37,0,0,0,0,0,36,1
+"sample_s62","woodland_pine","Camel","terrestrial",37749,80,3,43,34,0,0,0,0
+"sample_s64","estuarine mud_oligohaline","Camel","marine_mud",72028,274,61,28,4,50,1,130,0
+"sample_s56","river","Camel","freshwater",131881,505,285,153,10,55,2,0,0
+"sample_s69","reservoir","Fal","freshwater",159660,182,116,50,1,13,1,1,0
+"sample_s18","beach_subtidal","Helford","marine_mud",62047,98,0,1,2,0,0,95,0
+"sample_s51","river","Tamar","freshwater",117097,390,220,117,9,44,0,0,0
+"sample_s17","woodland_pine","Helford","terrestrial",63769,50,1,16,33,0,0,0,0
+"sample_s13","river","Helford","freshwater",77776,349,184,124,4,36,1,0,0
+"sample_s39","rock_samphire","Fowey","terrestrial",27484,71,1,30,36,3,1,0,0
+"sample_s20","estuarine mud_oligohaline","Looe","marine_mud",72690,287,71,43,7,49,2,115,0
+"sample_s57","pasture","Camel","terrestrial",55084,178,8,93,77,0,0,0,0
+"sample_s36","field_wheat","Fowey","terrestrial",91327,257,7,132,118,0,0,0,0
+"sample_s58","field_wheat","Tamar","terrestrial",75240,243,5,121,115,0,1,1,0
+"sample_s65b","marine mud_full saline","Fal","marine_mud",48369,114,0,0,0,0,0,114,0
+"sample_s29","rock_samphire","Helford","terrestrial",28649,70,1,26,36,1,0,5,1
+"sample_s54","river","Fal","freshwater",88465,414,249,108,3,54,0,0,0
+"sample_s27","beach_subtidal","Fal","marine_mud",36344,107,0,1,1,0,0,104,1
+"sample_s26","field_wheat","Looe","terrestrial",64795,250,7,126,114,2,1,0,0
+"sample_s48","field_wheat","Camel","terrestrial",42064,243,2,129,109,0,1,1,1
+"sample_s5","pasture","Helford","terrestrial",64064,262,4,137,121,0,0,0,0
+"sample_s34","pasture","Looe","terrestrial",85956,295,17,158,120,0,0,0,0
+"sample_s8","field_wheat","Helford","terrestrial",61789,348,18,176,151,2,1,0,0
+"sample_s9","reservoir","Fal","freshwater",21218,120,94,19,0,7,0,0,0
+"sample_s14","estuarine mud_oligohaline","Helford","marine_mud",54679,387,108,90,21,53,3,110,2
+"sample_s2","pasture","Fal","terrestrial",27594,106,2,67,37,0,0,0,0
+"sample_s61","woodland_oak","Camel","terrestrial",33287,189,10,113,62,3,0,0,1
+"sample_s71","rock_samphire","Fal","terrestrial",8336,36,0,12,22,1,0,0,1
+"sample_s66","marine mud_full saline","Fal","marine_mud",34468,113,0,0,1,0,0,112,0
+"sample_s40","pasture","Fowey","terrestrial",50644,244,3,131,110,0,0,0,0
+"sample_s1","woodland_oak","Fal","terrestrial",6126,31,1,8,22,0,0,0,0
+"sample_s4","field_wheat","Fal","terrestrial",29472,254,9,130,115,0,0,0,0
+"sample_s31","woodland_pine","Fowey","terrestrial",8557,22,0,6,16,0,0,0,0
+"sample_s21","woodland_oak","Looe","terrestrial",8839,77,2,47,28,0,0,0,0
+"sample_s43","rock_samphire","Tamar","terrestrial",11979,61,0,12,22,0,1,26,0
+"sample_s73","rock_samphire","Helford","terrestrial",316,4,0,2,2,0,0,0,0
+"sample_s70","beach_seaweed","Fal","marine_mud",28,1,0,0,1,0,0,0,0

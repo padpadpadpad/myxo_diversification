@@ -65,7 +65,7 @@ for(i in 1:length(percent_similarity)){
   if(percent_similarity[i] == 'asv'){otu_similarity = 'asv'}
   
   # get number of raw taxa
-  raw_taxa_n <- readRDS(here(paste('data/sequencing_rpoB/phyloseq/myxococcus/clustered/ps_otu_', otu_similarity,  '.rds', sep = ''))) %>% ntaxa()
+  #raw_taxa_n <- readRDS(here(paste('data/sequencing_rpoB/phyloseq/myxococcus/clustered/ps_otu_', otu_similarity,  '.rds', sep = ''))) %>% ntaxa()
   
   # load in prevalence filtered myxococcus object
   ps_myxo <- readRDS(here(paste('data/sequencing_rpoB/phyloseq/myxococcus/prevalence_filtered/ps_otu_', otu_similarity,  '_filt.rds', sep = '')))
