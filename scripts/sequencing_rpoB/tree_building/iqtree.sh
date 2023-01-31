@@ -20,4 +20,4 @@ iqtree -s alignment/alignment_91percent.fasta -m MF -g constraint_trees/constrai
 iqtree -s alignment/alignment_91percent.fasta -m GTR+F+R13 -g constraint_trees/constraint_tree_91percent.tre --prefix output/myxo_91percent/iq_tree_myxo91 -T 5
 
 # test based on the best model
-iqtree -s alignment/alignment_91percent.fasta -m MF -g constraint_trees/constraint_tree_91percent.tre --prefix output/myxo_91percent/myxo91 -T AUTO -mset raxml
+iqtree -s alignment/alignment_91percent.fasta -m GTR+G -g constraint_trees/constraint_tree_91percent.tre --prefix output/myxo_91percent/iq_tree_myxo91_v2 -T 5 -pers 0.2 -nstop 500

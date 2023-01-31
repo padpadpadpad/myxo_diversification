@@ -42,7 +42,7 @@ for(i in 1:length(percent_similarity)){
   in_tree <- here(paste('data/sequencing_rpoB/raxml/trees/myxo_', otu_similarity, '/myxo_', percent_similarity[i],'.raxml.bestTree', sep = ''))
   
   # define output file
-  out_tree <- here(paste('data/sequencing_rpoB/raxml/trees/myxo_', otu_similarity, '/myxo_', percent_similarity[i],'.raxml.family', sep = ''))
+  out_tree <- here(paste('data/sequencing_rpoB/raxml/trees/myxo_', otu_similarity, '/myxo_', percent_similarity[i],'.raxml.family.tre', sep = ''))
   
   # define script file
   script_file <- here('scripts/sequencing_rpoB/tree_building/extend_labels.pl')

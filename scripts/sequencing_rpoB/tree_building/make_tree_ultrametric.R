@@ -15,6 +15,7 @@
 library(phytools)
 library(phangorn)
 library(tidyverse)
+library(ggtree)
 library(here)
 
 here::i_am('scripts/sequencing_rpoB/tree_building/make_tree_ultrametric.R')
@@ -24,15 +25,32 @@ percent_similarity <- c(99:90, 97.7, 85, 80, 'asv')
 
 # read in tree
 # use either just rooted or after adding tiny tips to the branches
-tree <- read.tree(here('data/sequencing_rpoB/raxml/trees/myxo_91percent/myxo_91.raxml.reroot'))
+tree <- read.nexus(here('data/sequencing_rpoB/raxml/trees/myxo_asv/myxo_asv.raxml_rooted.tre'))
+tree2 <- read.nexus(here('data/sequencing_rpoB/raxml/trees/myxo_91percent/myxo_91.raxml.reroot'))
 #tree_root_old <- read.tree(here('data/sequencing_rpoB/raxml/rerooted-pruned.tre'))
 #tree_ultra_old <- read.tree(here('data/sequencing_rpoB/raxml/rerooted-pruned-chronopl10.tre'))
 
-plot(tree)
+ggtree(tree) + geom_tiplab()
 
 # check if tree is rooted
 is.rooted(tree)
 is.ultrametric(tree)
+
+# try using chronos
+#tree_ultra <- chronos(tree, lambda = 10)
+tree_ultra <- chronopl(tree, lambda = 10)
+
+ggtree(tree_ultra) + geom_tiplab()
+
+# look at edge lengths
+hist(tree$edge.length)
+hist(tree_ultra$edge.length)
+
+is.ultrametric(tree_ultra)
+
+# save out ultrametric tree
+write.tree(tree_ultra, here('data/sequencing_rpoB/raxml/trees/myxo_asv/myxo_asv_chronopl10.tre'))
+
 
 # re-estimate ultrametric phylogenetic tree from the topology of the original tree and the sequencing alignment
 
@@ -71,11 +89,7 @@ write.tree(fit2$tree, here('data/sequencing_rpoB/raxml/trees/myxo_91percent/myxo
 # old code do not run this! ####
 #------------------------------#
 
-# does work for the old tree - albeit it takes a long time
-tree_ultra_old <- chronopl(tree_root_old, lambda = 10)
 
-# try make tree smaller to see if it works
-tree_sub <- keep.tip(tree, sample(tree$tip.label, 750))
 
 # look at distribution of branch lengths to see if there is a difference between the old tree and the new tree
 hist(tree$edge.length)
