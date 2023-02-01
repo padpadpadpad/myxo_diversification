@@ -12,7 +12,8 @@ library(here)
 here::i_am('scripts/sequencing_rpoB/tree_building/append_tiplabels.R')
 
 # set percent similarity - those used in asvs_to_otus.R
-percent_similarity <- c(99:90, 97.7, 85, 80, 'asv')
+# at this point the trees failed at 90, 85, and 80%
+percent_similarity <- c(99:91, 97.7, 'asv')
 
 # read in sequence to otu name converter
 asv_names <- read_csv(here('data/sequencing_rpoB/phyloseq/myxococcus/myxo_seq_name_conversion.csv'))
@@ -39,10 +40,10 @@ for(i in 1:length(percent_similarity)){
   write.csv(tax_table, temp_file, row.names = FALSE)
   
   # define tree file
-  in_tree <- here(paste('data/sequencing_rpoB/raxml/trees/myxo_', otu_similarity, '/myxo_', percent_similarity[i],'.raxml.bestTree', sep = ''))
+  in_tree <- here(paste('data/sequencing_rpoB/raxml/trees/myxo_', percent_similarity[i], '/myxo_', percent_similarity[i],'.raxml.bestTree', sep = ''))
   
   # define output file
-  out_tree <- here(paste('data/sequencing_rpoB/raxml/trees/myxo_', otu_similarity, '/myxo_', percent_similarity[i],'.raxml.family.tre', sep = ''))
+  out_tree <- here(paste('data/sequencing_rpoB/raxml/trees/myxo_', percent_similarity[i], '/myxo_', percent_similarity[i],'.raxml.family.tre', sep = ''))
   
   # define script file
   script_file <- here('scripts/sequencing_rpoB/tree_building/extend_labels.pl')
