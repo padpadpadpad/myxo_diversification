@@ -26,9 +26,6 @@ percent_similarity <- c(99:90, 97.7, 85, 80, 'asv')
 # read in tree
 # use either just rooted or after adding tiny tips to the branches
 tree <- read.nexus(here('data/sequencing_rpoB/raxml/trees/myxo_asv/myxo_asv.raxml_rooted.tre'))
-tree2 <- read.nexus(here('data/sequencing_rpoB/raxml/trees/myxo_91percent/myxo_91.raxml.reroot'))
-#tree_root_old <- read.tree(here('data/sequencing_rpoB/raxml/rerooted-pruned.tre'))
-#tree_ultra_old <- read.tree(here('data/sequencing_rpoB/raxml/rerooted-pruned-chronopl10.tre'))
 
 ggtree(tree) + geom_tiplab()
 
@@ -48,6 +45,12 @@ hist(tree_ultra$edge.length)
 
 is.ultrametric(tree_ultra)
 
+# alter tip labels to remove family as they will not link to the distance matrix
+# write function to remove family labels
+strsplit_mod <- function(x)(strsplit(x, split = '_') %>% unlist() %>% .[1:2] %>% paste0(., collapse = '_'))
+
+tree_ultra$tip.label <- purrr::map_chr(tree_ultra$tip.label, strsplit_mod)
+
 # save out ultrametric tree
 write.tree(tree_ultra, here('data/sequencing_rpoB/raxml/trees/myxo_asv/myxo_asv_chronopl10.tre'))
 
@@ -63,11 +66,6 @@ alignment <- read.FASTA(here('data/sequencing_rpoB/raxml/alignment/alignment_91p
 # use hamming distance but this could be changes
 dist_matrix <- dist.hamming(alignment)
 
-# alter tip labels to remove family as they will not link to the distance matrix
-# write function to remove family labels
-strsplit_mod <- function(x)(strsplit(x, split = '_') %>% unlist() %>% .[1:2] %>% paste0(., collapse = '_'))
-tree2 <- tree
-tree2$tip.label <- purrr::map_chr(tree2$tip.label, strsplit_mod)
 
 # make tree ultrametric
 tree_ultra <- nnls.phylo(tree2, dist_matrix, method = 'ultrametric')
@@ -88,8 +86,6 @@ write.tree(fit2$tree, here('data/sequencing_rpoB/raxml/trees/myxo_91percent/myxo
 #------------------------------#
 # old code do not run this! ####
 #------------------------------#
-
-
 
 # look at distribution of branch lengths to see if there is a difference between the old tree and the new tree
 hist(tree$edge.length)

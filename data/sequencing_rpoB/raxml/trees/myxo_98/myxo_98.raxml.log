@@ -1,0 +1,46 @@
+
+RAxML-NG v. 1.1 released on 29.11.2021 by The Exelixis Lab.
+Developed by: Alexey M. Kozlov and Alexandros Stamatakis.
+Contributors: Diego Darriba, Tomas Flouri, Benoit Morel, Sarah Lutteropp, Ben Bettisworth.
+Latest version: https://github.com/amkozlov/raxml-ng
+Questions/problems/suggestions? Please visit: https://groups.google.com/forum/#!forum/raxml
+
+System: Intel(R) Xeon(R) Gold 6230 CPU @ 2.10GHz, 40 cores, 376 GB RAM
+
+RAxML-NG was called at 31-Jan-2023 10:46:41 as follows:
+
+raxml-ng --check --msa alignment/alignment_98percent.fasta --model GTR+G --prefix trees/myxo_98/myxo_98 --threads 10 --seed 2 --tree-constraint constraint_trees/constraint_tree_98percent.tre
+
+Analysis options:
+  run mode: Alignment validation
+  start tree(s): 
+  topological constraint: constraint_trees/constraint_tree_98percent.tre (algorithm: NEW)
+  random seed: 2
+  SIMD kernels: AVX2
+  parallelization: coarse-grained (auto), PTHREADS (10 threads), thread pinning: OFF
+
+[00:00:00] Reading alignment from file: alignment/alignment_98percent.fasta
+[00:00:00] Loaded alignment with 1792 taxa and 246 sites
+
+Alignment comprises 1 partitions and 246 sites
+
+Partition 0: noname
+Model: GTR+FO+G4m
+Alignment sites: 246
+Gaps: 8.90 %
+Invariant sites: 37.80 %
+
+
+[00:00:00] Loading constraint tree from: constraint_trees/constraint_tree_98percent.tre
+[00:00:00] Loaded non-comprehensive constraint tree with 1258 taxa
+
+
+Alignment can be successfully read by RAxML-NG.
+
+
+Execution log saved to: /home2/ISAD/dp415/raxml_new/trees/myxo_98/myxo_98.raxml.log
+
+Analysis started: 31-Jan-2023 10:46:41 / finished: 31-Jan-2023 10:46:41
+
+Elapsed time: 0.102 seconds
+

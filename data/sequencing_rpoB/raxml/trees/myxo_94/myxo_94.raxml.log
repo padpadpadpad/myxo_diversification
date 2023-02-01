@@ -1,0 +1,435 @@
+
+RAxML-NG v. 1.1 released on 29.11.2021 by The Exelixis Lab.
+Developed by: Alexey M. Kozlov and Alexandros Stamatakis.
+Contributors: Diego Darriba, Tomas Flouri, Benoit Morel, Sarah Lutteropp, Ben Bettisworth.
+Latest version: https://github.com/amkozlov/raxml-ng
+Questions/problems/suggestions? Please visit: https://groups.google.com/forum/#!forum/raxml
+
+System: Intel(R) Xeon(R) Gold 6230 CPU @ 2.10GHz, 40 cores, 376 GB RAM
+
+RAxML-NG was called at 31-Jan-2023 11:59:47 as follows:
+
+raxml-ng --msa alignment/alignment_94percent.fasta --model GTR+G --prefix trees/myxo_94/myxo_94 --threads 8 --seed 2 --tree-constraint constraint_trees/constraint_tree_94percent.tre
+
+Analysis options:
+  run mode: ML tree search
+  start tree(s): random (10) + parsimony (10)
+  topological constraint: constraint_trees/constraint_tree_94percent.tre (algorithm: NEW)
+  random seed: 2
+  tip-inner: OFF
+  pattern compression: ON
+  per-rate scalers: OFF
+  site repeats: ON
+  fast spr radius: AUTO
+  spr subtree cutoff: 1.000000
+  branch lengths: proportional (ML estimate, algorithm: NR-FAST)
+  SIMD kernels: AVX2
+  parallelization: coarse-grained (auto), PTHREADS (8 threads), thread pinning: OFF
+
+[00:00:00] Reading alignment from file: alignment/alignment_94percent.fasta
+[00:00:00] Loaded alignment with 808 taxa and 246 sites
+
+Alignment comprises 1 partitions and 155 patterns
+
+Partition 0: noname
+Model: GTR+FO+G4m
+Alignment sites / patterns: 246 / 155
+Gaps: 8.88 %
+Invariant sites: 37.80 %
+
+
+NOTE: Binary MSA file created: trees/myxo_94/myxo_94.raxml.rba
+
+[00:00:00] Loading constraint tree from: constraint_trees/constraint_tree_94percent.tre
+[00:00:00] Loaded non-comprehensive constraint tree with 438 taxa
+
+Parallelization scheme autoconfig: 8 worker(s) x 1 thread(s)
+
+Parallel reduction/worker buffer size: 1 KB  / 0 KB
+
+[00:00:00] Generating 10 random starting tree(s) with 808 taxa
+[00:00:00] Generating 10 parsimony starting tree(s) with 808 taxa
+[00:00:08] Data distribution: max. partitions/sites/weight per thread: 1 / 155 / 2480
+[00:00:08] Data distribution: max. searches per worker: 3
+
+Starting ML tree search with 20 distinct starting trees
+
+[00:00:09 -72971.221004] Initial branch length optimization
+[00:00:09 -65861.301801] Model parameter optimization (eps = 10.000000)
+[00:00:14 -60265.415277] AUTODETECT spr round 1 (radius: 5)
+[00:00:23 -53101.288841] AUTODETECT spr round 2 (radius: 10)
+[00:00:33 -48451.713339] AUTODETECT spr round 3 (radius: 15)
+[00:00:45 -45989.290689] AUTODETECT spr round 4 (radius: 20)
+[00:01:00 -44081.564166] AUTODETECT spr round 5 (radius: 25)
+[00:01:14 -43524.142967] SPR radius for FAST iterations: 25 (autodetect)
+[00:01:14 -43524.142967] Model parameter optimization (eps = 3.000000)
+[00:01:31 -43073.435575] FAST spr round 1 (radius: 25)
+[00:01:49 -41380.813093] FAST spr round 2 (radius: 25)
+[00:02:02 -41202.445222] FAST spr round 3 (radius: 25)
+[00:02:13 -41155.590850] FAST spr round 4 (radius: 25)
+[00:02:22 -41136.637150] FAST spr round 5 (radius: 25)
+[00:02:31 -41133.123132] FAST spr round 6 (radius: 25)
+[00:02:40 -41132.376645] FAST spr round 7 (radius: 25)
+[00:02:48 -41132.036816] FAST spr round 8 (radius: 25)
+[00:02:58 -41131.788733] FAST spr round 9 (radius: 25)
+[00:03:09 -41131.597985] FAST spr round 10 (radius: 25)
+[00:03:19 -41131.035671] FAST spr round 11 (radius: 25)
+[00:03:30 -41130.827373] FAST spr round 12 (radius: 25)
+[00:03:39 -41130.234666] FAST spr round 13 (radius: 25)
+[00:03:50 -41130.129165] FAST spr round 14 (radius: 25)
+[00:04:00 -41129.978367] FAST spr round 15 (radius: 25)
+[00:04:10 -41129.807800] FAST spr round 16 (radius: 25)
+[00:04:19 -41129.230532] FAST spr round 17 (radius: 25)
+[00:04:29 -41128.845148] FAST spr round 18 (radius: 25)
+[00:04:39 -41128.845042] Model parameter optimization (eps = 1.000000)
+[00:04:43 -41114.049018] SLOW spr round 1 (radius: 5)
+[00:05:00 -41106.117827] SLOW spr round 2 (radius: 5)
+[00:05:15 -41100.015636] SLOW spr round 3 (radius: 5)
+[00:05:30 -41096.874162] SLOW spr round 4 (radius: 5)
+[00:05:44 -41094.976922] SLOW spr round 5 (radius: 5)
+[00:05:58 -41094.976659] SLOW spr round 6 (radius: 10)
+[00:06:13 -41088.837668] SLOW spr round 7 (radius: 5)
+[00:06:34 -41087.376400] SLOW spr round 8 (radius: 5)
+[00:06:51 -41087.267847] SLOW spr round 9 (radius: 5)
+[00:07:06 -41087.267709] SLOW spr round 10 (radius: 10)
+[00:07:21 -41086.768361] SLOW spr round 11 (radius: 5)
+[00:07:41 -41086.768327] SLOW spr round 12 (radius: 10)
+[00:07:57 -41083.728826] SLOW spr round 13 (radius: 5)
+[00:08:17 -41074.296782] SLOW spr round 14 (radius: 5)
+[00:08:34 -41073.207835] SLOW spr round 15 (radius: 5)
+[00:08:49 -41073.207800] SLOW spr round 16 (radius: 10)
+[00:09:03 -41073.207800] SLOW spr round 17 (radius: 15)
+[00:09:27 -41049.385547] SLOW spr round 18 (radius: 5)
+[00:09:49 -41042.165289] SLOW spr round 19 (radius: 5)
+[00:10:07 -41041.271087] SLOW spr round 20 (radius: 5)
+[00:10:22 -41041.270857] SLOW spr round 21 (radius: 10)
+[00:10:37 -41041.270852] SLOW spr round 22 (radius: 15)
+[00:11:02 -41038.649739] SLOW spr round 23 (radius: 5)
+[00:11:23 -41037.054148] SLOW spr round 24 (radius: 5)
+[00:11:40 -41037.054129] SLOW spr round 25 (radius: 10)
+[00:11:56 -41036.437495] SLOW spr round 26 (radius: 5)
+[00:12:16 -41036.437420] SLOW spr round 27 (radius: 10)
+[00:12:33 -41036.419659] SLOW spr round 28 (radius: 15)
+[00:12:55 -41036.419541] SLOW spr round 29 (radius: 20)
+[00:13:23 -41011.208255] SLOW spr round 30 (radius: 5)
+[00:13:45 -40967.466445] SLOW spr round 31 (radius: 5)
+[00:14:02 -40967.439185] SLOW spr round 32 (radius: 10)
+[00:14:18 -40967.272108] SLOW spr round 33 (radius: 5)
+[00:14:38 -40966.713068] SLOW spr round 34 (radius: 5)
+[00:14:54 -40966.712646] SLOW spr round 35 (radius: 10)
+[00:15:09 -40966.712608] SLOW spr round 36 (radius: 15)
+[00:15:32 -40966.712603] SLOW spr round 37 (radius: 20)
+[00:15:57 -40959.779592] SLOW spr round 38 (radius: 5)
+[00:16:18 -40955.834211] SLOW spr round 39 (radius: 5)
+[00:16:36 -40955.832956] SLOW spr round 40 (radius: 10)
+[00:16:51 -40955.832655] SLOW spr round 41 (radius: 15)
+[00:17:14 -40955.832532] SLOW spr round 42 (radius: 20)
+[00:17:38 -40955.832479] SLOW spr round 43 (radius: 25)
+[00:18:06 -40933.118879] SLOW spr round 44 (radius: 5)
+[00:18:28 -40924.505797] SLOW spr round 45 (radius: 5)
+[00:18:47 -40917.426445] SLOW spr round 46 (radius: 5)
+[00:19:03 -40911.729048] SLOW spr round 47 (radius: 5)
+[00:19:17 -40911.729016] SLOW spr round 48 (radius: 10)
+[00:19:32 -40908.106998] SLOW spr round 49 (radius: 5)
+[00:19:52 -40904.018616] SLOW spr round 50 (radius: 5)
+[00:20:09 -40903.090051] SLOW spr round 51 (radius: 5)
+[00:20:24 -40903.089939] SLOW spr round 52 (radius: 10)
+[00:20:39 -40903.089932] SLOW spr round 53 (radius: 15)
+[00:21:03 -40903.089929] SLOW spr round 54 (radius: 20)
+[00:21:27 -40901.459548] SLOW spr round 55 (radius: 5)
+[00:21:48 -40901.457850] SLOW spr round 56 (radius: 10)
+[00:22:06 -40901.457731] SLOW spr round 57 (radius: 15)
+[00:22:27 -40901.457707] SLOW spr round 58 (radius: 20)
+[00:22:52 -40901.376048] SLOW spr round 59 (radius: 25)
+[00:23:20 -40898.467680] SLOW spr round 60 (radius: 5)
+[00:23:41 -40895.841434] SLOW spr round 61 (radius: 5)
+[00:23:59 -40894.815693] SLOW spr round 62 (radius: 5)
+[00:24:14 -40894.815476] SLOW spr round 63 (radius: 10)
+[00:24:30 -40894.815458] SLOW spr round 64 (radius: 15)
+[00:24:52 -40894.815455] SLOW spr round 65 (radius: 20)
+[00:25:16 -40894.815454] SLOW spr round 66 (radius: 25)
+[00:25:43 -40892.969919] SLOW spr round 67 (radius: 5)
+[00:26:03 -40892.909587] SLOW spr round 68 (radius: 10)
+[00:26:21 -40892.908912] SLOW spr round 69 (radius: 15)
+[00:26:42 -40892.908743] SLOW spr round 70 (radius: 20)
+[00:27:06 -40892.908681] SLOW spr round 71 (radius: 25)
+[00:27:33 -40892.031071] SLOW spr round 72 (radius: 5)
+[00:27:53 -40891.490579] SLOW spr round 73 (radius: 5)
+[00:28:11 -40891.489582] SLOW spr round 74 (radius: 10)
+[00:28:26 -40891.489404] SLOW spr round 75 (radius: 15)
+[00:28:47 -40891.489342] SLOW spr round 76 (radius: 20)
+[00:29:11 -40891.489317] SLOW spr round 77 (radius: 25)
+[00:29:38 -40891.031906] SLOW spr round 78 (radius: 5)
+[00:29:58 -40890.658930] SLOW spr round 79 (radius: 5)
+[00:30:15 -40890.658720] SLOW spr round 80 (radius: 10)
+[00:30:30 -40890.658713] SLOW spr round 81 (radius: 15)
+[00:30:52 -40890.658713] SLOW spr round 82 (radius: 20)
+[00:31:16 -40890.658713] SLOW spr round 83 (radius: 25)
+[00:31:43 -40890.197590] SLOW spr round 84 (radius: 5)
+[00:32:03 -40890.030437] SLOW spr round 85 (radius: 5)
+[00:32:20 -40890.030177] SLOW spr round 86 (radius: 10)
+[00:32:35 -40890.030173] SLOW spr round 87 (radius: 15)
+[00:32:57 -40890.030173] SLOW spr round 88 (radius: 20)
+[00:33:21 -40890.030173] SLOW spr round 89 (radius: 25)
+[00:33:47 -40890.030173] Model parameter optimization (eps = 0.100000)
+
+[00:33:51] [worker #0] ML tree search #1, logLikelihood: -40887.645346
+
+[00:33:51 -73001.865428] Initial branch length optimization
+[00:33:51 -65904.890477] Model parameter optimization (eps = 10.000000)
+[00:33:58 -60243.815212] AUTODETECT spr round 1 (radius: 5)
+[00:34:08 -53618.679579] AUTODETECT spr round 2 (radius: 10)
+[00:34:19 -48274.314141] AUTODETECT spr round 3 (radius: 15)
+[00:34:29] [worker #1] ML tree search #2, logLikelihood: -41286.265336
+[00:34:34 -45308.751712] AUTODETECT spr round 4 (radius: 20)
+[00:34:52 -44196.085406] AUTODETECT spr round 5 (radius: 25)
+[00:35:10 -43603.675410] SPR radius for FAST iterations: 25 (autodetect)
+[00:35:10 -43603.675410] Model parameter optimization (eps = 3.000000)
+[00:35:24 -43221.930145] FAST spr round 1 (radius: 25)
+[00:35:45 -41551.038586] FAST spr round 2 (radius: 25)
+[00:36:00 -41372.898665] FAST spr round 3 (radius: 25)
+[00:36:12 -41330.803248] FAST spr round 4 (radius: 25)
+[00:36:23 -41322.772941] FAST spr round 5 (radius: 25)
+[00:36:32 -41318.960269] FAST spr round 6 (radius: 25)
+[00:36:42 -41314.129858] FAST spr round 7 (radius: 25)
+[00:36:51 -41313.182501] FAST spr round 8 (radius: 25)
+[00:37:00 -41312.258723] FAST spr round 9 (radius: 25)
+[00:37:08 -41311.841002] FAST spr round 10 (radius: 25)
+[00:37:17 -41309.585159] FAST spr round 11 (radius: 25)
+[00:37:26 -41309.010700] FAST spr round 12 (radius: 25)
+[00:37:35 -41308.750991] FAST spr round 13 (radius: 25)
+[00:37:43 -41307.486522] FAST spr round 14 (radius: 25)
+[00:37:52 -41307.456712] Model parameter optimization (eps = 1.000000)
+[00:37:55 -41292.516042] SLOW spr round 1 (radius: 5)
+[00:38:11 -41278.410036] SLOW spr round 2 (radius: 5)
+[00:38:25 -41273.661970] SLOW spr round 3 (radius: 5)
+[00:38:39 -41271.351653] SLOW spr round 4 (radius: 5)
+[00:38:52 -41270.880832] SLOW spr round 5 (radius: 5)
+[00:39:05 -41270.868202] SLOW spr round 6 (radius: 10)
+[00:39:19 -41257.502051] SLOW spr round 7 (radius: 5)
+[00:39:37 -41254.653467] SLOW spr round 8 (radius: 5)
+[00:39:52 -41254.653415] SLOW spr round 9 (radius: 10)
+[00:40:06 -41254.169313] SLOW spr round 10 (radius: 5)
+[00:40:24 -41248.470595] SLOW spr round 11 (radius: 5)
+[00:40:39 -41247.050721] SLOW spr round 12 (radius: 5)
+[00:40:53 -41246.617434] SLOW spr round 13 (radius: 5)
+[00:41:06 -41246.617371] SLOW spr round 14 (radius: 10)
+[00:41:18] [worker #5] ML tree search #6, logLikelihood: -40866.411866
+[00:41:20 -41245.905355] SLOW spr round 15 (radius: 5)
+[00:41:38 -41245.392022] SLOW spr round 16 (radius: 5)
+[00:41:53 -41245.391458] SLOW spr round 17 (radius: 10)
+[00:42:07 -41245.197314] SLOW spr round 18 (radius: 5)
+[00:42:13] [worker #4] ML tree search #5, logLikelihood: -40820.285321
+[00:42:25 -41242.250339] SLOW spr round 19 (radius: 5)
+[00:42:41 -41242.250339] SLOW spr round 20 (radius: 10)
+[00:42:55 -41242.250339] SLOW spr round 21 (radius: 15)
+[00:43:17 -41213.495734] SLOW spr round 22 (radius: 5)
+[00:43:36 -41210.040703] SLOW spr round 23 (radius: 5)
+[00:43:52 -41208.278734] SLOW spr round 24 (radius: 5)
+[00:44:06 -41208.278199] SLOW spr round 25 (radius: 10)
+[00:44:14] [worker #7] ML tree search #8, logLikelihood: -40843.329204
+[00:44:20 -41196.596397] SLOW spr round 26 (radius: 5)
+[00:44:38 -41195.261682] SLOW spr round 27 (radius: 5)
+[00:44:54 -41194.997730] SLOW spr round 28 (radius: 5)
+[00:45:08 -41194.994097] SLOW spr round 29 (radius: 10)
+[00:45:21 -41194.828192] SLOW spr round 30 (radius: 5)
+[00:45:39 -41194.824765] SLOW spr round 31 (radius: 10)
+[00:45:54 -41194.724143] SLOW spr round 32 (radius: 5)
+[00:46:12 -41193.583268] SLOW spr round 33 (radius: 5)
+[00:46:27 -41193.576690] SLOW spr round 34 (radius: 10)
+[00:46:41 -41193.576450] SLOW spr round 35 (radius: 15)
+[00:47:03 -41192.490056] SLOW spr round 36 (radius: 5)
+[00:47:23 -41192.142766] SLOW spr round 37 (radius: 5)
+[00:47:40 -41192.142365] SLOW spr round 38 (radius: 10)
+[00:47:54 -41192.142362] SLOW spr round 39 (radius: 15)
+[00:48:16 -41191.903286] SLOW spr round 40 (radius: 5)
+[00:48:36 -41191.561698] SLOW spr round 41 (radius: 5)
+[00:48:54 -41191.561376] SLOW spr round 42 (radius: 10)
+[00:49:09 -41191.550372] SLOW spr round 43 (radius: 15)
+[00:49:32 -41191.550296] SLOW spr round 44 (radius: 20)
+[00:49:59] [worker #6] ML tree search #7, logLikelihood: -40639.653261
+[00:49:59 -41166.061841] SLOW spr round 45 (radius: 5)
+[00:50:21 -41142.626831] SLOW spr round 46 (radius: 5)
+[00:50:39 -41140.562209] SLOW spr round 47 (radius: 5)
+[00:50:55 -41139.757461] SLOW spr round 48 (radius: 5)
+[00:51:13 -41139.757376] SLOW spr round 49 (radius: 10)
+[00:51:36 -41137.956593] SLOW spr round 50 (radius: 5)
+[00:52:08 -41137.956013] SLOW spr round 51 (radius: 10)
+[00:52:29 -41137.734726] SLOW spr round 52 (radius: 5)
+[00:52:49 -41137.415400] SLOW spr round 53 (radius: 5)
+[00:53:06 -41137.415241] SLOW spr round 54 (radius: 10)
+[00:53:22 -41137.269628] SLOW spr round 55 (radius: 5)
+[00:53:41 -41137.269579] SLOW spr round 56 (radius: 10)
+[00:53:59 -41137.269579] SLOW spr round 57 (radius: 15)
+[00:54:22 -41136.706103] SLOW spr round 58 (radius: 5)
+[00:54:44 -41134.059563] SLOW spr round 59 (radius: 5)
+[00:55:02 -41134.059282] SLOW spr round 60 (radius: 10)
+[00:55:17 -41134.059277] SLOW spr round 61 (radius: 15)
+[00:55:40 -41134.059277] SLOW spr round 62 (radius: 20)
+[00:56:05 -41134.059277] SLOW spr round 63 (radius: 25)
+[00:56:39 -41120.026432] SLOW spr round 64 (radius: 5)
+[00:57:01 -41106.866381] SLOW spr round 65 (radius: 5)
+[00:57:19 -41106.262602] SLOW spr round 66 (radius: 5)
+[00:57:35 -41106.247412] SLOW spr round 67 (radius: 10)
+[00:57:51 -41105.948404] SLOW spr round 68 (radius: 5)
+[00:58:12 -41105.734630] SLOW spr round 69 (radius: 5)
+[00:58:17] [worker #3] ML tree search #4, logLikelihood: -40774.146305
+[00:58:29 -41105.734549] SLOW spr round 70 (radius: 10)
+[00:58:45 -41105.734549] SLOW spr round 71 (radius: 15)
+[00:59:08 -41104.492827] SLOW spr round 72 (radius: 5)
+[00:59:29 -41104.492571] SLOW spr round 73 (radius: 10)
+[00:59:47 -41104.492564] SLOW spr round 74 (radius: 15)
+[01:00:11 -41102.699800] SLOW spr round 75 (radius: 5)
+[01:00:33 -41102.698110] SLOW spr round 76 (radius: 10)
+[01:00:50 -41102.698043] SLOW spr round 77 (radius: 15)
+[01:01:13 -41100.339344] SLOW spr round 78 (radius: 5)
+[01:01:35 -41100.339010] SLOW spr round 79 (radius: 10)
+[01:01:52 -41100.338983] SLOW spr round 80 (radius: 15)
+[01:02:15 -41100.338973] SLOW spr round 81 (radius: 20)
+[01:02:42 -41100.338968] SLOW spr round 82 (radius: 25)
+[01:03:15 -41097.309153] SLOW spr round 83 (radius: 5)
+[01:03:37 -41097.309064] SLOW spr round 84 (radius: 10)
+[01:03:39] [worker #2] ML tree search #3, logLikelihood: -40647.984528
+[01:03:55 -41097.309059] SLOW spr round 85 (radius: 15)
+[01:04:18 -41097.309056] SLOW spr round 86 (radius: 20)
+[01:04:46 -41097.309055] SLOW spr round 87 (radius: 25)
+[01:05:19 -41097.309054] Model parameter optimization (eps = 0.100000)
+
+[01:05:28] [worker #0] ML tree search #9, logLikelihood: -41092.607169
+
+[01:05:28 -48457.979449] Initial branch length optimization
+[01:05:29 -45070.763018] Model parameter optimization (eps = 10.000000)
+[01:05:38 -42146.820419] AUTODETECT spr round 1 (radius: 5)
+[01:05:48 -41612.562581] AUTODETECT spr round 2 (radius: 10)
+[01:06:00 -41389.402103] AUTODETECT spr round 3 (radius: 15)
+[01:06:14 -41324.105731] AUTODETECT spr round 4 (radius: 20)
+[01:06:28 -41252.613791] AUTODETECT spr round 5 (radius: 25)
+[01:06:45 -41193.058051] SPR radius for FAST iterations: 25 (autodetect)
+[01:06:45 -41193.058051] Model parameter optimization (eps = 3.000000)
+[01:06:50 -41148.870838] FAST spr round 1 (radius: 25)
+[01:07:08 -40929.967936] FAST spr round 2 (radius: 25)
+[01:07:23 -40870.147399] FAST spr round 3 (radius: 25)
+[01:07:36 -40837.302127] FAST spr round 4 (radius: 25)
+[01:07:48 -40828.621387] FAST spr round 5 (radius: 25)
+[01:07:59 -40825.349897] FAST spr round 6 (radius: 25)
+[01:08:10 -40824.739995] FAST spr round 7 (radius: 25)
+[01:08:19 -40824.359106] FAST spr round 8 (radius: 25)
+[01:08:29 -40824.150177] FAST spr round 9 (radius: 25)
+[01:08:40 -40824.052210] Model parameter optimization (eps = 1.000000)
+[01:08:45 -40813.836753] SLOW spr round 1 (radius: 5)
+[01:09:03 -40788.160987] SLOW spr round 2 (radius: 5)
+[01:09:19 -40782.154354] SLOW spr round 3 (radius: 5)
+[01:09:27] [worker #5] ML tree search #14, logLikelihood: -40647.332949
+[01:09:35 -40779.234033] SLOW spr round 4 (radius: 5)
+[01:09:50 -40778.422305] SLOW spr round 5 (radius: 5)
+[01:10:08 -40778.323793] SLOW spr round 6 (radius: 10)
+[01:10:29 -40771.955830] SLOW spr round 7 (radius: 5)
+[01:10:49 -40770.586325] SLOW spr round 8 (radius: 5)
+[01:11:07 -40765.842055] SLOW spr round 9 (radius: 5)
+[01:11:23 -40764.602996] SLOW spr round 10 (radius: 5)
+[01:11:37 -40764.601498] SLOW spr round 11 (radius: 10)
+[01:11:53 -40755.705875] SLOW spr round 12 (radius: 5)
+[01:12:13 -40749.637056] SLOW spr round 13 (radius: 5)
+[01:12:30 -40749.281139] SLOW spr round 14 (radius: 5)
+[01:12:45 -40748.996755] SLOW spr round 15 (radius: 5)
+[01:12:59 -40748.996207] SLOW spr round 16 (radius: 10)
+[01:13:14 -40745.950929] SLOW spr round 17 (radius: 5)
+[01:13:34 -40742.351966] SLOW spr round 18 (radius: 5)
+[01:13:51 -40742.349714] SLOW spr round 19 (radius: 10)
+[01:14:06 -40741.759600] SLOW spr round 20 (radius: 5)
+[01:14:26 -40740.872591] SLOW spr round 21 (radius: 5)
+[01:14:43 -40740.872251] SLOW spr round 22 (radius: 10)
+[01:14:58 -40740.183355] SLOW spr round 23 (radius: 5)
+[01:15:18 -40738.125735] SLOW spr round 24 (radius: 5)
+[01:15:34 -40738.063314] SLOW spr round 25 (radius: 10)
+[01:15:50 -40737.207335] SLOW spr round 26 (radius: 5)
+[01:16:09 -40735.859342] SLOW spr round 27 (radius: 5)
+[01:16:25 -40735.859163] SLOW spr round 28 (radius: 10)
+[01:16:39 -40730.608582] SLOW spr round 29 (radius: 5)
+[01:16:58 -40730.356171] SLOW spr round 30 (radius: 5)
+[01:17:14 -40730.355850] SLOW spr round 31 (radius: 10)
+[01:17:29 -40728.674716] SLOW spr round 32 (radius: 5)
+[01:17:48 -40728.674619] SLOW spr round 33 (radius: 10)
+[01:18:04 -40728.674619] SLOW spr round 34 (radius: 15)
+[01:18:24] [worker #7] ML tree search #16, logLikelihood: -40710.540830
+[01:18:25 -40718.743633] SLOW spr round 35 (radius: 5)
+[01:18:45 -40717.714110] SLOW spr round 36 (radius: 5)
+[01:19:01 -40717.293848] SLOW spr round 37 (radius: 5)
+[01:19:16 -40717.293843] SLOW spr round 38 (radius: 10)
+[01:19:30 -40716.728511] SLOW spr round 39 (radius: 5)
+[01:19:49 -40716.728440] SLOW spr round 40 (radius: 10)
+[01:20:04 -40716.728439] SLOW spr round 41 (radius: 15)
+[01:20:24 -40715.610795] SLOW spr round 42 (radius: 5)
+[01:20:44 -40714.183059] SLOW spr round 43 (radius: 5)
+[01:21:00 -40714.182999] SLOW spr round 44 (radius: 10)
+[01:21:14 -40714.182999] SLOW spr round 45 (radius: 15)
+[01:21:35 -40711.473843] SLOW spr round 46 (radius: 5)
+[01:21:54 -40709.767555] SLOW spr round 47 (radius: 5)
+[01:22:10 -40709.767310] SLOW spr round 48 (radius: 10)
+[01:22:24 -40709.767305] SLOW spr round 49 (radius: 15)
+[01:22:45 -40709.150349] SLOW spr round 50 (radius: 5)
+[01:23:04 -40708.853399] SLOW spr round 51 (radius: 5)
+[01:23:20 -40708.666934] SLOW spr round 52 (radius: 5)
+[01:23:35 -40708.666914] SLOW spr round 53 (radius: 10)
+[01:23:49 -40708.666914] SLOW spr round 54 (radius: 15)
+[01:24:10 -40708.586170] SLOW spr round 55 (radius: 20)
+[01:24:33 -40706.391938] SLOW spr round 56 (radius: 5)
+[01:24:53 -40703.849646] SLOW spr round 57 (radius: 5)
+[01:25:10 -40703.619782] SLOW spr round 58 (radius: 5)
+[01:25:24 -40703.619745] SLOW spr round 59 (radius: 10)
+[01:25:38 -40703.619744] SLOW spr round 60 (radius: 15)
+[01:25:58 -40701.494683] SLOW spr round 61 (radius: 5)
+[01:26:18 -40701.054924] SLOW spr round 62 (radius: 5)
+[01:26:34 -40701.054760] SLOW spr round 63 (radius: 10)
+[01:26:48 -40701.054759] SLOW spr round 64 (radius: 15)
+[01:27:08 -40701.054759] SLOW spr round 65 (radius: 20)
+[01:27:30 -40701.054759] SLOW spr round 66 (radius: 25)
+[01:27:53] [worker #2] ML tree search #11, logLikelihood: -40554.610895
+[01:27:55 -40684.320915] SLOW spr round 67 (radius: 5)
+[01:28:15 -40683.652142] SLOW spr round 68 (radius: 5)
+[01:28:31 -40683.651805] SLOW spr round 69 (radius: 10)
+[01:28:45 -40683.554808] SLOW spr round 70 (radius: 15)
+[01:29:04 -40683.553343] SLOW spr round 71 (radius: 20)
+[01:29:26 -40683.553288] SLOW spr round 72 (radius: 25)
+[01:29:51 -40683.553286] Model parameter optimization (eps = 0.100000)
+
+[01:29:56] [worker #0] ML tree search #17, logLikelihood: -40679.262098
+
+[01:33:05] [worker #4] ML tree search #13, logLikelihood: -40614.331638
+[01:34:59] [worker #6] ML tree search #15, logLikelihood: -40653.426488
+[01:49:05] [worker #3] ML tree search #12, logLikelihood: -40623.890575
+[01:49:45] [worker #1] ML tree search #10, logLikelihood: -40793.233920
+[01:51:21] [worker #2] ML tree search #19, logLikelihood: -40696.357725
+[02:19:26] [worker #1] ML tree search #18, logLikelihood: -40624.027579
+[02:19:38] [worker #3] ML tree search #20, logLikelihood: -40667.551800
+
+Optimized model parameters:
+
+   Partition 0: noname
+   Rate heterogeneity: GAMMA (4 cats, mean),  alpha: 0.333723 (ML),  weights&rates: (0.250000,0.008425) (0.250000,0.130857) (0.250000,0.648324) (0.250000,3.212393) 
+   Base frequencies (ML): 0.087960 0.420825 0.346824 0.144392 
+   Substitution rates (ML): 0.908312 5.373141 6.713253 3.419627 6.453753 1.000000 
+
+
+Final LogLikelihood: -40554.610895
+
+AIC score: 84353.221789 / AICc score: 5349365.221789 / BIC score: 90038.869541
+Free parameters (model + branch lengths): 1622
+
+WARNING: Number of free parameters (K=1622) is larger than alignment size (n=246).
+         This might lead to overfitting and compromise tree inference results!
+
+
+WARNING: Best ML tree contains 58 near-zero branches!
+
+Best ML tree with collapsed near-zero branches saved to: /home2/ISAD/dp415/raxml_new/trees/myxo_94/myxo_94.raxml.bestTreeCollapsed
+Best ML tree saved to: /home2/ISAD/dp415/raxml_new/trees/myxo_94/myxo_94.raxml.bestTree
+All ML trees saved to: /home2/ISAD/dp415/raxml_new/trees/myxo_94/myxo_94.raxml.mlTrees
+Optimized model saved to: /home2/ISAD/dp415/raxml_new/trees/myxo_94/myxo_94.raxml.bestModel
+
+Execution log saved to: /home2/ISAD/dp415/raxml_new/trees/myxo_94/myxo_94.raxml.log
+
+Analysis started: 31-Jan-2023 11:59:47 / finished: 31-Jan-2023 14:19:25
+
+Elapsed time: 8378.784 seconds
+
