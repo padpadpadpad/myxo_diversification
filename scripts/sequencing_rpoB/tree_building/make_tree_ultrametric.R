@@ -7,13 +7,12 @@
 # for each rerooted tree data/sequencing_rpoB/phyloseq/myxococcus/clustered
 # 1. reads in tree
 # 2. checks it is rooted
-# 3. makes the tree ultrametric by re-estimating the tree using the topology of the original raxml tree and the sequence alignment
+# 3. makes the tree ultrametric by using chronopl()
 # 4. checks the tree is ultrametric
-# 5. saves out the ultrametric tree twice - one with family names in the tip labels and one without
+# 5. saves out the ultrametric tree after removing family names
 
 # load in packages
 library(phytools)
-library(phangorn)
 library(tidyverse)
 library(ggtree)
 library(here)
@@ -21,38 +20,44 @@ library(here)
 here::i_am('scripts/sequencing_rpoB/tree_building/make_tree_ultrametric.R')
 
 # set percent similarity - those used in asvs_to_otus.R
-percent_similarity <- c(99:90, 97.7, 85, 80, 'asv')
+percent_similarity <- c(99:91, 97.7, 'asv')
 
-# read in tree
-# use either just rooted or after adding tiny tips to the branches
-tree <- read.nexus(here('data/sequencing_rpoB/raxml/trees/myxo_asv/myxo_asv.raxml_rooted.tre'))
+# run for loop to align sequences
+for(i in 1:length(percent_similarity)){
+  
+  # read in tree
+  # use either just rooted or after adding tiny tips to the branches
+  tree <- read.nexus(here(paste('data/sequencing_rpoB/raxml/trees/myxo_', percent_similarity[i], '/myxo_', percent_similarity[i], '.raxml_rooted.tre', sep = '')))
+  
+  ggtree(tree) + geom_tiplab()
+  
+  # check if tree is rooted
+  is.rooted(tree)
+  is.ultrametric(tree)
+  
+  # try using chronos
+  #tree_ultra <- chronos(tree, lambda = 10)
+  tree_ultra <- chronopl(tree, lambda = 10)
+  
+  ggtree(tree_ultra) + geom_tiplab()
+  
+  # look at edge lengths
+  hist(tree$edge.length)
+  hist(tree_ultra$edge.length)
+  
+  is.ultrametric(tree_ultra)
+  
+  # alter tip labels to remove family as they will not link to the distance matrix
+  # write function to remove family labels
+  strsplit_mod <- function(x)(strsplit(x, split = '_') %>% unlist() %>% .[1:2] %>% paste0(., collapse = '_'))
+  
+  tree_ultra$tip.label <- purrr::map_chr(tree_ultra$tip.label, strsplit_mod)
+  
+  # save out ultrametric tree
+  write.tree(tree_ultra, here(paste('data/sequencing_rpoB/raxml/trees/myxo_', percent_similarity[i], '/myxo_', percent_similarity[i], '_chronopl10.tre', sep = '')))
+  
+}
 
-ggtree(tree) + geom_tiplab()
-
-# check if tree is rooted
-is.rooted(tree)
-is.ultrametric(tree)
-
-# try using chronos
-#tree_ultra <- chronos(tree, lambda = 10)
-tree_ultra <- chronopl(tree, lambda = 10)
-
-ggtree(tree_ultra) + geom_tiplab()
-
-# look at edge lengths
-hist(tree$edge.length)
-hist(tree_ultra$edge.length)
-
-is.ultrametric(tree_ultra)
-
-# alter tip labels to remove family as they will not link to the distance matrix
-# write function to remove family labels
-strsplit_mod <- function(x)(strsplit(x, split = '_') %>% unlist() %>% .[1:2] %>% paste0(., collapse = '_'))
-
-tree_ultra$tip.label <- purrr::map_chr(tree_ultra$tip.label, strsplit_mod)
-
-# save out ultrametric tree
-write.tree(tree_ultra, here('data/sequencing_rpoB/raxml/trees/myxo_asv/myxo_asv_chronopl10.tre'))
 
 
 # re-estimate ultrametric phylogenetic tree from the topology of the original tree and the sequencing alignment
