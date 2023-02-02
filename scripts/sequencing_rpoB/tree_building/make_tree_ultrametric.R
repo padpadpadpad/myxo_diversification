@@ -31,10 +31,6 @@ for(i in 1:length(percent_similarity)){
   
   ggtree(tree) + geom_tiplab()
   
-  tree2 <- di2multi(tree)
-  
-  ggtree(tree2) + geom_tiplab()
-  
   # check if tree is rooted
   is.rooted(tree)
   is.ultrametric(tree)

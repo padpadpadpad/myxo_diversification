@@ -26,7 +26,7 @@ library(ape)
 library(here)
 
 # set variable for ASV or otu similarity
-otu_similarity <- c(99:90, 97.7, 'asv')
+otu_similarity <- c(99:91, 97.7)
 
 # set number of iterations or permutations
 n_iter = 50 # number of iterations for calculating Pagel's lambda
@@ -40,7 +40,8 @@ n_cores = 4
 options(mc.cores=4)
 
 # set number of tips to subsample
-n_tips = 500
+# the 91% tree is 353 tips
+n_tips = 350
 
 # run for loop for each otu similarity
 for(i in 1:length(otu_similarity)){
@@ -122,9 +123,9 @@ for(i in 1:length(otu_similarity)){
   
   names(freshwater_vec) <- names(terrestrial_vec) <- names(marine_mud_vec) <- d_pref2$otu
   
-  # first fit for all traits - use SYM as ARD takes SO LONG
+  # first fit for all traits - use ER as SYM and ARD takes SO LONG
   # run it for less iterations
-  mod_all <- fitDiscrete(phy = tree, dat = hab_pref_vec, model = 'SYM', transform = 'lambda', ncores = n_cores, control = list(niter = 5))
+  mod_all <- fitDiscrete(phy = tree, dat = hab_pref_vec, model = 'ER', transform = 'lambda', ncores = n_cores, control = list(niter = 10))
   
   # second for all freshwater
   mod_freshwater <- fitDiscrete(phy = tree, dat = freshwater_vec, model = 'ARD', transform = 'lambda', ncores = n_cores, control = list(niter = n_iter))
@@ -147,18 +148,20 @@ for(i in 1:length(otu_similarity)){
   
   temp_lambda <- tibble(habitat_preference = rep(c('all', 'freshwater', 'marine_mud', 'terrestrial'), each = 1),
                         estimated_lambda = c(mod_all$opt$lambda, mod_freshwater$opt$lambda, mod_mud$opt$lambda, mod_terrestrial$opt$lambda),
-                        model = c('sym', 'er', 'er', 'er'),
+                        model = c('er', 'ard', 'ard', 'ard'),
                         similarity = temp_otu_similarity)
   
   # save out output
-  write.csv(temp_d_statistics, paste('sequencing_rpoB/data/phylogenetic_signal/d_statistic_', temp_otu_similarity, '.csv', sep = ''))
-  write.csv(temp_lambda, paste('sequencing_rpoB/data/phylogenetic_signal/lambda_', temp_otu_similarity, '.csv', sep = ''))
+  write.csv(temp_d_statistics, here(paste('data/sequencing_rpoB/processed/phylogenetic_signal/d_statistic_', temp_otu_similarity, '.csv', sep = '')))
+  write.csv(temp_lambda, here(paste('data/sequencing_rpoB/processed/phylogenetic_signal/lambda_', temp_otu_similarity, '.csv', sep = '')))
   
   #---------------------------------------------------------------#
   # subsample tree to 1000 tips and calculate the same metrics ####
   #---------------------------------------------------------------#
   
   # set up empty dataframes to populate bootstrapped results
+  
+  # setup empty d statistic dataframe
   temp_boot_d_statistics <- tibble(boot_num = 1:n_boots) %>%
     group_by(boot_num) %>%
     tidyr::expand(habitat_preference = temp_d_statistics$habitat_preference) %>%
@@ -168,14 +171,16 @@ for(i in 1:length(otu_similarity)){
     ungroup() %>%
     mutate(similarity = temp_otu_similarity)
   
+  # set up empty lambda dataframe
   temp_boot_lambda <- tibble(boot_num = 1:n_boots) %>%
     group_by(boot_num) %>%
     tidyr::expand(habitat_preference = rep(c('all', 'freshwater', 'marine_mud', 'terrestrial'), each = 1),
-                  model = rep(c('equal_rates'), times = 4)) %>%
+                  model = c('er', 'ard', 'ard', 'ard')) %>%
     ungroup() %>%
     mutate(similarity = temp_otu_similarity,
            estimated_lambda = NA) 
   
+  # run for loop
   for(j in 1:n_boots){
     
     # calculate rows which have boot in
@@ -183,9 +188,7 @@ for(i in 1:length(otu_similarity)){
     rows_lambda <- which(temp_boot_lambda[,1] == j)
     
     # sample tips to keep
-    keep_tips <- sample(tree$tip.label[tree$tip.label != 'otu_outgroup'], n_tips - 1)
-    keep_tips <- c(keep_tips, 'otu_outgroup')  
-    
+    keep_tips <- sample(tree$tip.label, n_tips)
     tree_sub <- keep.tip(tree, keep_tips)
     
     # calculate D statistic
@@ -201,10 +204,10 @@ for(i in 1:length(otu_similarity)){
     comb_data$phy <- di2multi(comb_data$phy)
     
     # estimate d
-    d_freshwater <- phylo.d(data = comb_data, names.col = otu, binvar = freshwater, 
+    d_freshwater <- phylo.d(data = comb_data, names.col = otu, binvar = freshwater,
                             permut = n_permute)
     
-    d_marine_mud <- phylo.d(data = comb_data, names.col = otu, binvar = marine_mud, 
+    d_marine_mud <- phylo.d(data = comb_data, names.col = otu, binvar = marine_mud,
                            permut = n_permute)
     
     d_terrestrial <- phylo.d(data = comb_data, names.col = otu, binvar = terrestrial, 
@@ -221,31 +224,31 @@ for(i in 1:length(otu_similarity)){
     
     names(freshwater_vec_sub) <- names(terrestrial_vec_sub) <- names(marine_mud_vec_sub) <- d_pref2_sub$otu
     
-    # first fit for all traits
-    mod_all <- fitDiscrete(phy = tree_sub, dat = hab_pref_vec_sub, model = 'SYM', transform = 'lambda', ncores = n_cores, control = list(niter = 10))
+    # first fit for all traits - Use ER because otherwise this step is going take forever - especially for the bootstraps
+    mod_all <- fitDiscrete(phy = tree_sub, dat = hab_pref_vec_sub, model = 'ER', transform = 'lambda', ncores = n_cores, control = list(niter = 10))
     
     # second for all freshwater
-    #mod_freshwater_ARD <- fitDiscrete(phy = tree_sub, dat = freshwater_vec_sub, model = 'ARD', transform = 'lambda', ncores = n_cores, control = list(niter = n_iter))
+    mod_freshwater <- fitDiscrete(phy = tree_sub, dat = freshwater_vec_sub, model = 'ARD', transform = 'lambda', ncores = n_cores, control = list(niter = n_iter))
     
     # mud and shore
-    #mod_mud_ARD <- fitDiscrete(phy = tree_sub, dat = marine_mud_vec_sub, model = 'ARD', transform = 'lambda', ncores = n_cores, control = list(niter = n_iter))
+    mod_mud <- fitDiscrete(phy = tree_sub, dat = marine_mud_vec_sub, model = 'ARD', transform = 'lambda', ncores = n_cores, control = list(niter = n_iter))
     
     # terrestrial
-    #mod_terrestrial_ARD <- fitDiscrete(phy = tree_sub, dat = terrestrial_vec_sub, model = 'ARD', transform = 'lambda', ncores = n_cores, control = list(niter = n_iter))
+    mod_terrestrial <- fitDiscrete(phy = tree_sub, dat = terrestrial_vec_sub, model = 'ARD', transform = 'lambda', ncores = n_cores, control = list(niter = n_iter))
     
     # attach info to precreated dataset
     temp_boot_d_statistics$estimated_d[rows_d_stat] <-c(d_freshwater$DEstimate, d_marine_mud$DEstimate, d_terrestrial$DEstimate)
     temp_boot_d_statistics$prob_random[rows_d_stat] <- c(d_freshwater$Pval1, d_marine_mud$Pval1, d_terrestrial$Pval1)
     temp_boot_d_statistics$prob_brownian[rows_d_stat] <- c(d_freshwater$Pval0, d_marine_mud$Pval0, d_terrestrial$Pval0)
     
-    temp_boot_lambda$estimated_lambda[rows_lambda] <- c(mod_all_ER$opt$lambda, mod_freshwater_ER$opt$lambda,  mod_mud_ER$opt$lambda, mod_terrestrial_ER$opt$lambda)
+    temp_boot_lambda$estimated_lambda[rows_lambda] <- c(mod_all$opt$lambda, mod_freshwater$opt$lambda,  mod_mud$opt$lambda, mod_terrestrial$opt$lambda)
   }
 
 # save out dataset
-write.csv(temp_boot_d_statistics, paste('sequencing_rpoB/data/phylogenetic_signal/d_statistic_boot_', temp_otu_similarity, '.csv', sep = ''))
-write.csv(temp_boot_lambda, paste('sequencing_rpoB/data/phylogenetic_signal/lambda_boot_', temp_otu_similarity, '.csv', sep = ''))
+write.csv(temp_boot_d_statistics, here(paste('data/sequencing_rpoB/processed/phylogenetic_signal/d_statistic_boot_', temp_otu_similarity, '.csv', sep = '')))
+write.csv(temp_boot_lambda, here(paste('data/sequencing_rpoB/processed/phylogenetic_signal/lambda_boot_', temp_otu_similarity, '.csv', sep = '')))
 
 # remove big objects
-rm(list = c('d_terrestrial', 'd_marine_mud', 'd_freshwater', 'comb_data', 'mod_all_ER', 'mod_mud_ER', 'mod_freshwater_ER', 'mod_terrestrial_ER', 'tree_sub', 'd_pref2_sub', 'temp_boot_d_statistics', 'temp_boot_lambda', 'terrestrial_vec_sub', 'hab_pref_vec_sub', 'freshwater_vec_sub', 'marine_mud_vec_sub'))
+rm(list = c('d_terrestrial', 'd_marine_mud', 'd_freshwater', 'comb_data', 'mod_all', 'mod_mud', 'mod_freshwater', 'mod_terrestrial', 'tree_sub', 'd_pref2_sub', 'temp_boot_d_statistics', 'temp_boot_lambda', 'terrestrial_vec_sub', 'hab_pref_vec_sub', 'freshwater_vec_sub', 'marine_mud_vec_sub'))
   
 }
