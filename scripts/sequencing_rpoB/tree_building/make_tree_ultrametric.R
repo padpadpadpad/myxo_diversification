@@ -31,10 +31,19 @@ for(i in 1:length(percent_similarity)){
   
   ggtree(tree) + geom_tiplab()
   
+  tree2 <- di2multi(tree)
+  
+  ggtree(tree2) + geom_tiplab()
+  
   # check if tree is rooted
   is.rooted(tree)
   is.ultrametric(tree)
   
+  # if minimum edge length is 0, add a tiny number onto this
+  if(min(tree$edge.length == 0)){
+    tree$edge.length[tree$edge.length == min(tree$edge.length)] <- min(tree$edge.length) + 1e-05
+  }
+ 
   # try using chronos
   #tree_ultra <- chronos(tree, lambda = 10)
   tree_ultra <- chronopl(tree, lambda = 10)
