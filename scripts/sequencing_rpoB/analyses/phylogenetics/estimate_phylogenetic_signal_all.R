@@ -26,7 +26,7 @@ library(ape)
 library(here)
 
 # set variable for ASV or otu similarity
-otu_similarity <- c(99:91, 97.7)
+otu_similarity <- c(98:91, 97.7)
 
 # set number of iterations or permutations
 n_iter = 50 # number of iterations for calculating Pagel's lambda
