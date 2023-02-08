@@ -16,7 +16,7 @@
 modeltype = speciationextinction        
 # Specify "speciationextinction" or "trait" analysis
                                   
-treefile = myxo_asv_chronopl10.tre
+treefile = rerooted-pruned-chronopl10.tre
 # File name of the phylogenetic tree to be analyzed
 
 runInfoFilename = run_info.txt
@@ -120,7 +120,7 @@ acceptanceResetFreq = 1000
 # Frequency in which to reset the acceptance rate calculation
 # The acceptance rate is output to both the MCMC data file and the screen
 
-outName = bamm_asv
+outName = bamm_2
 # Optional name that will be prefixed on all output files (separated with "_")
 # If commented out, no prefix will be used
 
