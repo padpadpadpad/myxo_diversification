@@ -90,3 +90,5 @@ updateRateEventNumberForBranch    0.0
  useGlobalSamplingProbability    1
    validateEventConfiguration    0
    writeMeanBranchLengthTrees    0
+End time: Fri Feb 10 13:09:22 2023
+

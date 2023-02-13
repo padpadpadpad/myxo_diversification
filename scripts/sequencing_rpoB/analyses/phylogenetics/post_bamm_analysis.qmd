@@ -64,10 +64,20 @@ library(emmeans)
 library(tidyverse)
 
 # set where I am in the project
-here::i_am('scripts/sequencing_rpoB/analyses/post_bamm_analysis.qmd')
+here::i_am('scripts/sequencing_rpoB/analyses/phylogenetics/post_bamm_analysis.qmd')
 
-# read in metadata
-d_meta <- read.csv(here('data/sequencing_rpoB/processed/asv_metadata.csv'))
+# read in habitat preference
+d_habpref <- read.csv(here('data/sequencing_rpoB/phyloseq/myxococcus/habitat_preference/summary/habitat_preference_asv.csv'))
+
+# read in phyloseq object and grab tax table
+d_taxa <- readRDS(here('data/sequencing_rpoB/phyloseq/myxococcus/prevalence_filtered/ps_otu_asv_filt.rds')) %>%
+  phyloseq::tax_table() %>%
+  data.frame() %>%
+  janitor::clean_names() %>%
+  rownames_to_column('otu')
+
+# create d_meta
+d_meta <- left_join(select(d_habpref, otu, habitat_preference, num_present), select(d_taxa, otu:family))
 
 ```
 
@@ -80,7 +90,7 @@ First we will look at a lineage through time plot of our ultrametric phylogeneti
 #| fig.width: 7
 
 # load in tree
-tree <- read.tree(here('data/sequencing_rpoB/bamm/rerooted-pruned-chronopl10.tre'))
+tree <- ape::read.tree(here('data/sequencing_rpoB/raxml/trees/myxo_asv/myxo_asv_chronopl10.tre'))
 
 # check is rooted
 is.rooted(tree)
@@ -99,7 +109,6 @@ ggplot(d_ltt, aes(time2, N)) +
   theme_bw(base_size = 14) +
   labs(x = 'Relative time',
        y = 'Number of lineages')
-
 ```
 
 ## Assess convergence of BAMM run
@@ -108,11 +117,11 @@ First we will assess convergence of our MCMC simulation.
 
 ```{r bamm_check_convergence}
 # read in mcmc output from bamm
-mcmcout <- read.csv(here("data/sequencing_rpoB/bamm/bamm_1_mcmc_out.txt"), header=TRUE)
+mcmcout <- read.csv(here("data/sequencing_rpoB/bamm/bamm_asv_mcmc_out.txt"), header=TRUE)
 max(mcmcout$generation)
 
 # discard some runs as burnin. We will discard the first 10% of samples
-burnstart <- floor(0.4 * nrow(mcmcout))
+burnstart <- floor(0.3 * nrow(mcmcout))
 postburn <- mcmcout[burnstart:nrow(mcmcout), ]
 
 # calculate effective sample size
@@ -120,7 +129,7 @@ effectiveSize(postburn$N_shifts)
 effectiveSize(postburn$logLik)
 ```
 
-In general, we want the effective sample size values to be at least 200 (and 200 is on the low side, but might be reasonable for very large datasets). Both are now close to 200 with a 40% burnin.
+In general, we want the effective sample size values to be at least 200 (and 200 is on the low side, but might be reasonable for very large datasets). Both are now close to 200 with a 30% burnin.
 
 Next we can look at the number of potential rate shifts.
 
@@ -131,7 +140,7 @@ Next we can look at the number of potential rate shifts.
 post_probs <- table(postburn$N_shifts) / nrow(postburn)
 names(post_probs)
 
-edata <- getEventData(tree, eventdata = here('data/sequencing_rpoB/bamm/bamm_1_event_data.txt'), burnin = 0.4)
+edata <- getEventData(tree, eventdata = here('data/sequencing_rpoB/bamm/bamm_asv_event_data.txt'), burnin = 0.3)
 shift_probs <- summary(edata)
 
 # plot these
@@ -149,7 +158,7 @@ n_shifts_ci
 
 ```
 
-The model has converged, and we also now have a narrow(ish) range of potential values for the number of range shifts (between 23 and 34).
+The model has converged, and we also now have a narrow(ish) range of potential values for the number of range shifts (between 9 and 18).
 
 The maintainers or BAMM suggest that (usually) the best overall model from a BAMM analysis is the model with the highest Bayes factor relative to the null model, $M_{0}$, which has zero rate shifts. However, we do not have any samples of zero shifts in our postburn in sample `r min(postburn$N_shifts)`! However, we do have zero shifts in our preburn-in samples as can be seen here `r min(mcmcout$N_shifts)`.
 
@@ -159,7 +168,7 @@ Bayes factors greater than 20 generally imply strong evidence for one model over
 
 ```{r bamm_bayes_factors}
 # list file
-mcmc_file = here("data/sequencing_rpoB/bamm/bamm_1_mcmc_out.txt")
+mcmc_file = here("data/sequencing_rpoB/bamm/bamm_asv_mcmc_out.txt")
 
 # calculate Bayes Factors
 bayes_factors <- computeBayesFactors(mcmc_file, expectedNumberOfShifts=500, burnin=0)
@@ -178,7 +187,7 @@ d_bayes_factors <- arrange(d_bayes_factors, desc(bayes_factor)) %>%
 head(d_bayes_factors)
 ```
 
-We can see the best model with 27 shifts is \>20 away from the next best model, implying strong evidence that the best fit to the data contains 27 shifts.
+We can see the best model with 12 shifts is \>20 away from the next best model, implying strong evidence that the best fit to the data contains 12 shifts.
 
 **BAMMtools** also has a function for visualising the prior and posterior simultaneously. This is useful to see what models are not being sampled in the posterior, and also to evaluate how far from the prior the posterior has moved.
 
@@ -186,7 +195,7 @@ We can see the best model with 27 shifts is \>20 away from the next best model, 
 #| fig.height: 5
 #| fig.width: 7
 # use plotPrior to visualise the prior and posterior simultaneously
-d_prior <- plotPrior(mcmcout, expectedNumberOfShifts=500, burnin = 0.4) %>%
+d_prior <- plotPrior(mcmcout, expectedNumberOfShifts=500, burnin = 0.3) %>%
   data.frame() %>%
   janitor::clean_names() %>%
   pivot_longer(cols = contains('probs'), names_to = 'type', values_to = 'prob', names_pattern = "(.*)_probs")
@@ -233,7 +242,7 @@ plot.credibleshiftset(d_css)
 
 ```
 
-However, as can be seen from the summary, even the single best shift configuration has a really low posterior probability (0.00125). Although the best model supports 27 shifts, not all of these are core shifts. There are only 18-22 core shifts identified in the best model shift configurations here.
+However, as can be seen from the summary, even the single best shift configuration has a really low posterior probability (0.0019). Although the best model supports 12 shifts, not all of these are core shifts. There are only 8-10 core shifts identified in the best model shift configurations here.
 
 For some datasets with large numbers of taxa and rate shifts (e.g., trees with thousands of taxa), all shift configurations may have low probability. There are simply too many parameters in the model to allow a single shift configuration to dominate the credible set. An alternative approach is to extract the shift configuration that maximises the marginal probability of rate shifts along individual branches. This is very similar to the idea of a maximum clade credibility tree in phylogenetic analysis. BAMM has a function `maximumShiftCredibility` for extracting this shift configuration:
 
@@ -250,7 +259,7 @@ plot.bammdata(msc_config, lwd=2)
 addBAMMshifts(msc_config, cex = 2)
 ```
 
-This picks a model with 22 rate shifts over the whole tree.
+This picks a model with 9 rate shifts over the whole tree.
 
 We can try and plot these shifts using ggtree. First we will look at the distribution of speciation rates across the tree. We need to be careful about our colour scale to prevent it being misleading.
 
@@ -272,13 +281,6 @@ shiftnodes <- getShiftNodesFromIndex(edata, index = msc_set$sampleindex)
 
 # get tree
 tree_bamm <- mbt2$phy
-
-# remove family name from the tip label
-d_labels <- data.frame(tip_label = tree_bamm$tip.label) %>%
-  separate(., tip_label, c('part1', 'part2', 'part3'), sep = '_', remove = FALSE) %>%
-  unite('tip_label_new', c(part1, part2), sep = '_')
-
-tree_bamm$tip.label <- d_labels$tip_label_new
 
 # get the edge lengths in a dataframe
 d_tree_bamm <- data.frame(tree_bamm$edge, edge_num=1:nrow(tree_bamm$edge), edge_length = tree_bamm$edge.length)
@@ -310,6 +312,10 @@ Now we can plot the tree. We will try plot the family assignment around the edge
 # constrained families
 constrained_families <- c('Myxococcaceae', 'Vulgatibacteraceae', 'Anaeromyxobacteraceae', 'Polyangiaceae', 'Sandaracinaceae', 'Nannocystaceae', 'Haliangiaceae')
 
+# reorder d_meta so the tip labesl link to the order of the tips in the tree
+d_meta <- tibble(tip_label = tree_bamm$tip.label) %>%
+  left_join(., rename(d_meta, tip_label = otu))
+
 # find the mrca of each of the constrained families
 d_meta2 <- filter(d_meta, family %in% constrained_families) %>%
   dplyr::select(family, tip_label) %>%
@@ -330,14 +336,14 @@ names(cols) <- sort(d_meta2$family2)
 
 # define colours for the different habitats
 cols_hab <- met.brewer('Austria', n = 7)
-names(cols_hab) <- c('mud_and_shore', 'freshwater', 'terrestrial', 'freshwater:terrestrial', 'generalist', 'mud_and_shore:terrestrial', 'freshwater:mud_and_shore')
+names(cols_hab) <- c('marine_mud', 'freshwater', 'terrestrial', 'freshwater:terrestrial', 'generalist', 'marine_mud:terrestrial', 'freshwater:marine_mud')
 hab_labels <- c('marine mud', 'freshwater', 'terrestrial', 'freshwater + terrestrial', 'generalist', 'marine mud + terrestrial', 'freshwater + marine mud')
 
 # remove any tip labels not in our tree from d_meta
 d_meta <- filter(d_meta, tip_label %in% tree_bamm$tip.label)
 
 # make a separate column for the rare states to make their size bigger!
-d_meta <- mutate(d_meta, rare = ifelse(habitat_preference %in% c('generalist', 'mud_and_shore:terrestrial'), 'rare', 'common'))
+d_meta <- mutate(d_meta, rare = ifelse(habitat_preference %in% c('generalist', 'marine_mud:terrestrial'), 'rare', 'common'))
 
 # plot tree using ggtree
 # first colour branches and add rate shifts
@@ -469,10 +475,7 @@ We can also estimate tip-specific evolutionary rates. We can plot these across o
 tip_rates <- data.frame(tip_label = edata$tip.label,
                         speciation = edata$meanTipLambda,
                         extinction = edata$meanTipMu) %>%
-             separate(., tip_label, c('part1', 'part2', 'part3'), sep = '_') %>%
-             unite('tip_label', c(part1, part2), sep = '_') %>%
-             dplyr::select(-part3) %>%
-             left_join(., dplyr::select(d_meta, tip_label, habitat_preference, hab1, hab2)) %>%
+             left_join(., dplyr::select(d_meta, tip_label, habitat_preference)) %>%
              filter(!is.na(habitat_preference)) %>%
              group_by(habitat_preference) %>%
              mutate(n = n()) %>%
@@ -535,7 +538,7 @@ d_tipdr <- data.frame(tip_label = names(d_tipdr),
            separate(., tip_label, c('part1', 'part2', 'part3'), sep = '_') %>%
            unite('tip_label', c(part1, part2), sep = '_') %>%
            dplyr::select(-part3) %>%
-           left_join(., dplyr::select(d_meta, tip_label, habitat_preference, hab1, hab2)) %>%
+           left_join(., dplyr::select(d_meta, tip_label, habitat_preference)) %>%
            filter(!is.na(habitat_preference)) %>%
            group_by(habitat_preference) %>%
            mutate(n = n()) %>%

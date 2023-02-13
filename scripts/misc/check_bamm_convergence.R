@@ -12,7 +12,7 @@ mcmcout <- read.csv(file, header=TRUE)
 max(mcmcout$generation)
 
 # discard some runs as burnin. We will discard the first 10% of samples
-burnstart <- floor(0.5 * nrow(mcmcout))
+burnstart <- floor(0.4 * nrow(mcmcout))
 postburn <- mcmcout[burnstart:nrow(mcmcout), ]
 
 # calculate effective sample size
