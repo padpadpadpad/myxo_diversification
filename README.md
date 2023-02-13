@@ -11,23 +11,22 @@ diversification of Myxobacteria in natural environments.
 
 ## Where we are at
 
-  - [x] Sampled different habitats and sites across Cornwall **(Autumn
-    2020)**
-  - [x] DNA extracted from these samples
-  - [x] Designed primers for amplifying Myxobacteria **(January
-    2021-June 2021)**
-      - [ ] Scripts uploaded
-      - [ ] Bought primers uploaded
-  - [x] Samples 16S sequenced **(May 2021)**
-      - [x] Processed data uploaded
-      - [x] Analysis scripts uploaded
-      - [x] Clustering analysis to look at habitat separation and
-        potential definitions
-      - [ ] Data archived and backed up
-  - [ ] Samples amplicon sequenced to amplify rpoB gene **(October
-    2021)**
-      - [ ] Processed data uploaded
-      - [ ] Exploratory analysis scripts
+- [x] Sampled different habitats and sites across Cornwall **(Autumn
+  2020)**
+- [x] DNA extracted from these samples
+- [x] Designed primers for amplifying Myxobacteria **(January 2021-June
+  2021)**
+  - [ ] Scripts uploaded
+  - [ ] Bought primers uploaded
+- [x] Samples 16S sequenced **(May 2021)**
+  - [x] Processed data uploaded
+  - [x] Analysis scripts uploaded
+  - [x] Clustering analysis to look at habitat separation and potential
+    definitions
+  - [ ] Data archived and backed up
+- [ ] Samples amplicon sequenced to amplify rpoB gene **(October 2021)**
+  - [ ] Processed data uploaded
+  - [ ] Exploratory analysis scripts
 
 ## To use
 
@@ -50,12 +49,10 @@ easy to query.
 **data** includes the processed data from each part of the project.
 `sequencing_16s` contains the data for the 16s sequencing etc.
 
-  - **metadata.csv** - completed metadata for each sample
-  - **sample\_cluster\_assignments.csv** - cluster assignments for each
-    sample based on 16S clustering.
-  - **sequencing 16s** - folder containing data from the 16s sequencing
-
-<!-- end list -->
+- **metadata.csv** - completed metadata for each sample
+- **sample_cluster_assignments.csv** - cluster assignments for each
+  sample based on 16S clustering.
+- **sequencing 16s** - folder containing data from the 16s sequencing
 
 1.  `ps_16s_complete.rds` - the original phyloseq object from the
     processing pipeline
@@ -65,12 +62,7 @@ easy to query.
     samples were too low here**
 4.  `ps_16s_rarefied.rds` - rarefied samples
 
-<!-- end list -->
-
-  - **sequencing\_rpoB** - folder containing data from the rpoB
-    sequencing
-
-<!-- end list -->
+- **sequencing_rpoB** - folder containing data from the rpoB sequencing
 
 1.  `alignments` - folder containing the alignments of myxobacteria
     reads after clustering at different levels of OTU similarity and
@@ -78,7 +70,7 @@ easy to query.
 2.  `raxml` - the trees of each level of OTU similarity. To see the
     meaning of the output files see the [raxml-ng help
     page](https://github.com/amkozlov/raxml-ng/wiki/Output:-files-and-settings).
-    Rooted trees (myxo\_asv.raxml.bestTreeRooted) were made in R using
+    Rooted trees (myxo_asv.raxml.bestTreeRooted) were made in R using
     `ape::root` and has only been done for the asv tree so far.
     `_LogLik.txt` files show the log likelihood of all the trees
     outputted by the raxml command.
@@ -90,9 +82,7 @@ easy to query.
 top of each script there is a summary of what has been done in each
 script. Order of scripts to be run is the same as numbered here.
 
-  - **sequencing\_16s**
-
-<!-- end list -->
+- **sequencing_16s**
 
 1.  `prevalence_filtering.R` - removes low prevalence ASVs
 2.  `rarefy_data.R` - rarefies data and sets root to tree
@@ -101,9 +91,7 @@ script. Order of scripts to be run is the same as numbered here.
 4.  `second_clustering.R` - runs cleaned PCoA and clustering analysis to
     identify habitat clusters in the data.
 
-<!-- end list -->
-
-  - **sequencing\_rpoB**
+- **sequencing_rpoB**
 
 ### plots
 
