@@ -566,13 +566,6 @@ We will first do this using **nlme::lme()** as described in Liam Revell's and Lu
 ```{r pgls_nlme_run}
 #| eval: false
 
-# remove family name from the tip label
-d_labels <- data.frame(tip_label = tree$tip.label) %>%
-  separate(., tip_label, c('part1', 'part2', 'part3'), sep = '_', remove = FALSE) %>%
-  unite('tip_label_new', c(part1, part2), sep = '_')
-
-tree$tip.label <- d_labels$tip_label_new
-
 # set up correlation matrix for the tree
 cor_lambda <- corPagel(value = 1, phy = tree, form = ~tip_label)
 
