@@ -1,65 +1,4 @@
----
-title: "Estimating ancestral states"
-author: "Daniel Padfield"
-date: last-modified
-format:
-  html:
-    toc: true
-    toc-title: 'Contents'
-    code-overflow: wrap
-    code-fold: true
-    code-tools: true
-    self-contained: true
-    self-contained-math: true
-execute:
-  message: false
-  warning: false
-  fig.align: 'center'
-editor: visual
----
 
-# Outline
-
-Using information on the tip states of a phylogenetic tree we can use evolutionary models to estimate the ancestral states of internal nodes and transitions between states.
-
-We fit an $Mk$ model of evolution to our tree and habitat preference data to understand how habitat preference evolved. For example does evolution readily allow transitions between specialist habitat preferences (i.e. from marine mud only to terrestrial only).
-
-We also try and fit an $Mk$ model of evolution when we combine two traits together (habitat preference and whether or not the species has high or low diversification rate as identified by BAMM).
-
-Ancestral state reconstructions can also be estimated from the MuSSE and HiSSE models we are aiming to fit later on. These models would have a lot of free parameters and we are unsure whether they can be fit with the dataset we have. We hope to reduce the number of free parameters in those models by estimating the transition matrix which best fits the data in the $Mk$ model. This would reduce the number of free parameters.
-
-## TL;DR
-
-Go to @sec-best_model for the best $Mk$ model and a discussion of the transition matrix.
-
-## Progress and results
-
--   Used **diversitree** to fit markov models to the data
-
--   Have plotted the transition matrix in multiple ways, see @sec-best-model
-
-# Fitting transition rate models and doing ancestral state reconstructions
-
-We can do ancestral state reconstruction with a couple of different methods in R as well as trying in [BayesTraits](http://www.evolution.reading.ac.uk/BayesTraitsV4.0.0/BayesTraitsV4.0.0.html).
-
-For discrete traits, the most commonly used model for evolution on tree is called the $Mk$ model. $M$ stands for Markov because the modelled process is a continuous-time Markov chain, and $k$ because the model is generalised to include an arbitrary number ($k$) states.
-
-The central attribute of the $Mk$ model is a the transition matrix, $Q$, which gives the instantaneous transition rates between states.
-
-An important distinction in ancestral state reconstruction for discrete characters is joint vs. marginal reconstruction. Joint reconstruction is finding the set of character states at all nodes that maximise the likelihood. Marginal reconstruction is finding the state at the current node that maximises the likelihood integrating over all the other states at all nodes, in proportion to their probability.
-
-We can do both marginal and joint reconstruction using **diversitree** so will use that throughout this walkthrough..
-
-An alternative tactic to the one outlined above is to use an MCMC approach to sample character histories from their posterior probability distribution. This is called stochastic character mapping. The model is the same but in this case we get a sample of unambiguous histories for our discrete character's evolution on the tree - rather than a probability distribution for the character at nodes. This is implemented using **make.simmap()**.
-
-## Load in R packages
-
-First we will load in R packages used and the metadata file used and wrangled in a previous walk-through.
-
-We also load in the final phylogenetic tree, the colours used for habitat preferences, and the position of shift nodes.
-
-```{r load_packages}
-#| results: false
 # load packages
 library(here)
 library(tidyverse)
@@ -103,13 +42,7 @@ tree <- read.tree(here('data/sequencing_rpoB/raxml/trees/myxo_asv/myxo_asv_chron
 # read in shift nodes
 shiftnodes <- readRDS(here('data/sequencing_rpoB/processed/shiftnodes.rds'))
 
-```
-
-## Custom function
-
-We will write a custom function for getting the transition matrix into a format that is easy to plot using **ggplot2**.
-
-```{r custom_function}
+## ----custom_function------------------------------------------------------------------------------------------------------------
 
 # function for getting a data frame from a diversitree object
 get_diversitree_df <- function(div_obj, trait_vec, replace_vec){
@@ -129,13 +62,8 @@ get_diversitree_df <- function(div_obj, trait_vec, replace_vec){
   return(temp)
   
 }
-```
 
-## Create a master dataframe for the trait states
-
-Different methods for estimating ancestral states take different values for the traits. Some only allow for numeric values, whereas others allow characters. Some do not allow colons in the name, and one ([MBASR](https://github.com/stevenheritage/MBASR) which uses Mr Bayes) needs the first trait value to be 0. To allow for us to semi-easily link across different methods, we will make a data frame of our unique tip states and then turn them into a numeric vector. The ordering is all done alphabetically.
-
-```{r tip_state_dataframe}
+## ----tip_state_dataframe--------------------------------------------------------------------------------------------------------
 d_meta <- tibble(tip_label = tree$tip.label) %>%
   left_join(., rename(d_meta, tip_label = otu))
 
@@ -165,64 +93,9 @@ coding <- tibble(hab_pref = unname(hab_pref), hab_pref_num = unname(hab_pref_num
   initials = c('F', 'FM', 'FT', 'G', 'M', 'MT', 'T'))
 
 coding
-```
 
-This results in a dataframe which allows us to easily link between numeric and character values, and also gives us a vector - of the same length of tips in our tree - which we can use for estimating ancestral states.
 
-## Fit model of discrete character evolution using diversitree::fit_mk()
-
-First lets fit the standard models of discrete character evolution using **diversitree::fit_mk()**. These models are the equal rates (ER) model where transition rates between states are all equal, the symmetric model (SYM) where transition rates between any two states are the same, and the al rates different model where transition rates can all be differet. We can compare these models using AIC and likelihood ratio tests to see which model fits the tree best.
-
-**diversitree** is good because it makes us implicitly code the transitions we want to set to 0 or make equivalent, which aids our understanding of the models we are trying to fit. Its downside is that it takes numbers only, so we have to back-transform our model estimates into their biologically meaningful trait values.
-
-```{r diversitree_load}
-#| echo: false
-
-# save out files
-mod_er <- readRDS(here('data/sequencing_rpoB/processed/transition_rates/mod_er_mac.rds'))
-mod_sym <- readRDS(here('data/sequencing_rpoB/processed/transition_rates/mod_sym_mac.rds'))
-mod_ard <- readRDS(here('data/sequencing_rpoB/processed/transition_rates/mod_ard_mac.rds'))
-
-# all of these methods needs a likelihood function, we can build a Mkn model
-lik_ard <- make.mkn(tree, hab_pref_num2, k = max(hab_pref_num2))
-
-argnames(lik_ard)
-
-# make symmetric rates model
-lik_sym <- constrain(lik_ard, 
-                     q12~q21, q13~q31, q14~q41, q15~q51, q16~q61, q17~q71,
-                     q23~q32, q24~q42, q25~q52, q26~q62, q27~q72,
-                     q34~q43, q35~q53, q36~q63, q37~q73,
-                     q45~q54, q46~q64, q47~q74,
-                     q56~q65, q57~q75,
-                     q67~q76
-                     )
-
-argnames(lik_sym)
-
-# make equal rates model
-lik_er <- constrain.i(lik_ard, rep('q12', length(argnames(lik_ard))), i.free = 1)
-
-lik_er <- constrain(lik_ard,
-                    q13~q12, q14~q12, q15~q12, q16~q12, q17~q12,
-                    q21~q12, q23~q12, q24~q12, q25~q12, q26~q12, q27~q12,
-                    q31~q12, q32~q12, q34~q12, q35~q12, q36~q12, q37~q12,
-                    q41~q12, q42~q12, q43~q12, q45~q12, q46~q12, q47~q12,
-                    q51~q12, q52~q12, q53~q12, q54~q12, q56~q12, q57~q12,
-                    q61~q12, q62~q12, q63~q12, q64~q12, q65~q12, q67~q12,
-                    q71~q12, q72~q12, q73~q12, q74~q12, q75~q12, q76~q12)
-
-argnames(lik_er)
-
-# need to pass start values to it - can grab these from the ape::ace, but we will just pass an average rate to the model
-inits_ard <- rep(1, length(argnames(lik_ard)))
-inits_sym <- rep(1, length(argnames(lik_sym)))
-inits_er <- rep(1, length(argnames(lik_er)))
-```
-
-```{r diversitree_setup}
-#| eval: false
-
+## ----diversitree_load-----------------------------------------------------------------------------------------------------------
 # all of these methods needs a likelihood function, we can build a Mkn model
 lik_ard <- make.mkn(tree, hab_pref_num2, k = max(hab_pref_num2))
 
@@ -259,35 +132,16 @@ inits_ard <- rep(1, length(argnames(lik_ard)))
 inits_sym <- rep(1, length(argnames(lik_sym)))
 inits_er <- rep(1, length(argnames(lik_er)))
 
-# find the maximum likelihood estimates of this model
-mod_er <- find.mle(lik_er, inits_er, method = 'subplex', control = list(maxit = 50000))
-mod_sym <- find.mle(lik_sym, inits_sym, method = 'subplex', control = list(maxit = 50000))
-mod_ard <- find.mle(lik_ard, inits_ard, method = 'subplex', control = list(maxit = 50000))
-
-AIC(mod_er)
-AIC(mod_sym)
-AIC(mod_ard)
-```
-
-We can compare model fit using AIC and anovas
-
-```{r diversitree_compare}
+## ----diversitree_compare--------------------------------------------------------------------------------------------------------
 
 AIC(mod_sym, mod_ard, mod_er) %>% arrange(AIC)
 
 anova(mod_ard, mod_sym)
 anova(mod_ard, mod_er)
 
-```
 
-### Model simplificiation of the ARD model
 
-So the ARD model is the best model by a considerable margin using AIC. We can do model simplification of this model to see what parameters can be removed to further improve the model. First we will just plot the distribution of estimated parameters. As most rates are very small we shall do another histogram filtering out the larger rates.
-
-```{r plot_ard}
-#| fig.height: 4
-#| fig.width: 10
-
+## ----plot_ard-------------------------------------------------------------------------------------------------------------------
 # look at paraemters
 mod_ard$par
 
@@ -312,16 +166,6 @@ mod_ard$par %>% sort()
 # get parameters close to 0.
 mod_ard$par[mod_ard$par < 1e-03] %>% names(.)
 
-```
-
-We can immediately see there are many parameters that are extremely close to 0. We shall set these to zero and refit the model. Specifically we will first refit the model with rates <1e-03 to 0.
-
-```{r diversitree_1_load}
-#| echo: false
-
-# read in files
-mod_custom1 <- readRDS(here('data/sequencing_rpoB/processed/transition_rates/mod_custom1_mac.rds'))
-
 # make custom matrix model
 lik_custom1 <- constrain(lik_ard, 
                      q13~0, q15~0, q16~0, q17~0, q26~0, q45~0, q51~0, q53~0, q54~0, q62~0)
@@ -329,36 +173,18 @@ lik_custom1 <- constrain(lik_ard,
 # make start parameters
 inits_custom1 <- rep(1, length(argnames(lik_custom1)))
 
-```
-
-```{r diversitree_1_setup}
-#| eval: false
-
-# make custom matrix model
-lik_custom1 <- constrain(lik_ard, 
-                     q13~0, q15~0, q16~0, q17~0, q26~0, q45~0, q51~0, q53~0, q54~0, q62~0)
-
-# make start parameters
-inits_custom1 <- rep(1, length(argnames(lik_custom1)))
-
-# run model
 mod_custom1 <- find.mle(lik_custom1, inits_custom1, method = 'subplex', control = list(maxit = 50000))
 
-```
 
-We can now do model comparison again.
-
-```{r diversitree_1_compare}
+## ----diversitree_1_compare------------------------------------------------------------------------------------------------------
 # do AIC comparison
 AIC(mod_sym, mod_ard, mod_er, mod_custom1) %>% arrange(AIC)
 
 # anova
 anova(mod_ard, mod_custom1)
-```
 
-This model is loads better again. We can again look at the distribution of rates to see how they look.
 
-```{r plot_custom1}
+## ----plot_custom1---------------------------------------------------------------------------------------------------------------
 # filter for only estimated parameters
 mod_custom1$par.full[names(mod_custom1$par.full) %in% argnames(lik_custom1)] 
 
@@ -382,28 +208,9 @@ mod_custom1$par %>% sort()
 
 # get parameters close to 0.
 mod_custom1$par[mod_custom1$par < 1e-03] %>% names(.)
-```
 
-We will again remove any points which have rates estimated as < 1e-03.
 
-```{r diversitree_2_load}
-#| echo: false
-
-# read in files
-mod_custom2 <- readRDS(here('data/sequencing_rpoB/processed/transition_rates/mod_custom2_mac.rds'))
-
-# make custom matrix model
-lik_custom2 <- constrain(lik_ard, 
-                     q13~0, q15~0, q16~0, q17~0, q26~0, q45~0, q51~0, q53~0, q54~0, q62~0,
-                     q31~0, q35~0, q36~0, q63~0, q72~0, q73~0, q75~0)
-
-# make start parameters
-inits_custom2 <- rep(1, length(argnames(lik_custom2)))
-```
-
-```{r diversitree_2_setup}
-#| eval: false
-
+## ----diversitree_2_load---------------------------------------------------------------------------------------------------------
 # make custom matrix model
 lik_custom2 <- constrain(lik_ard, 
                      q13~0, q15~0, q16~0, q17~0, q26~0, q45~0, q51~0, q53~0, q54~0, q62~0,
@@ -412,13 +219,11 @@ lik_custom2 <- constrain(lik_ard,
 # make start parameters
 inits_custom2 <- rep(1, length(argnames(lik_custom2)))
 
-# run model
+## # run model
 mod_custom2 <- find.mle(lik_custom2, inits_custom2, method = 'subplex', control = list(maxit = 50000))
-```
 
-We can now again do model comparison.
 
-```{r diversitree_2_compare}
+## ----diversitree_2_compare------------------------------------------------------------------------------------------------------
 # do AIC comparison
 AIC(mod_sym, mod_ard, mod_er, mod_custom1, mod_custom2) %>% arrange(AIC)
 
@@ -427,30 +232,9 @@ anova(mod_custom1, mod_custom2)
 
 # sort parameter estimates
 mod_custom2$par %>% sort()
-```
 
-This model is once again better. We will do the same procedure to remove the next parameters that are extremely low. We can see that q57 is extremely low so we shall remove that one first.
 
-```{r diversitree_3_load}
-#| echo: false
-
-# read in files
-mod_custom3 <- readRDS(here('data/sequencing_rpoB/processed/transition_rates/mod_custom3_mac.rds'))
-
-# make custom matrix model
-lik_custom3 <- constrain(lik_ard, 
-                     q13~0, q15~0, q16~0, q17~0, q26~0, q45~0, q51~0, q53~0, q54~0, q62~0,
-                     q31~0, q35~0, q36~0, q63~0, q72~0, q73~0, q75~0,
-                     q57~0)
-
-# make start parameters
-inits_custom3 <- rep(1, length(argnames(lik_custom3)))
-
-```
-
-```{r diversitree_3_setup}
-#| eval: false
-
+## ----diversitree_3_load---------------------------------------------------------------------------------------------------------
 # make custom matrix model
 lik_custom3 <- constrain(lik_ard, 
                      q13~0, q15~0, q16~0, q17~0, q26~0, q45~0, q51~0, q53~0, q54~0, q62~0,
@@ -462,11 +246,8 @@ inits_custom3 <- rep(1, length(argnames(lik_custom3)))
 
 # run model
 mod_custom3 <- find.mle(lik_custom3, inits_custom3, method = 'subplex', control = list(maxit = 50000))
-```
 
-We can now again do model comparison.
-
-```{r diversitree_3_compare}
+## ----diversitree_3_compare------------------------------------------------------------------------------------------------------
 # do AIC comparison
 AIC(mod_sym, mod_ard, mod_er, mod_custom1, mod_custom2, mod_custom3) %>% arrange(AIC)
 
@@ -475,30 +256,9 @@ anova(mod_custom2, mod_custom3)
 
 # sort parameter estimates
 mod_custom3$par %>% sort()
-```
 
-This model is once again better. We will do the same procedure to remove the next parameters that are extremely low. We will now remove q71.
 
-```{r diversitree_4_load}
-#| echo: false
-
-# read in files
-mod_custom4 <- readRDS(here('data/sequencing_rpoB/processed/transition_rates/mod_custom4_mac.rds'))
-
-# make custom matrix model
-lik_custom4 <- constrain(lik_ard, 
-                     q13~0, q15~0, q16~0, q17~0, q26~0, q45~0, q51~0, q53~0, q54~0, q62~0,
-                     q31~0, q35~0, q36~0, q63~0, q72~0, q73~0, q75~0,
-                     q57~0,
-                     q43~0)
-
-# make start parameters
-inits_custom4 <- rep(1, length(argnames(lik_custom4)))
-```
-
-```{r diversitree_4_setup}
-#| eval: false
-
+## ----diversitree_4_load---------------------------------------------------------------------------------------------------------
 # make custom matrix model
 lik_custom4 <- constrain(lik_ard, 
                      q13~0, q15~0, q16~0, q17~0, q26~0, q45~0, q51~0, q53~0, q54~0, q62~0,
@@ -511,11 +271,8 @@ inits_custom4 <- rep(1, length(argnames(lik_custom4)))
 
 # run model
 mod_custom4 <- find.mle(lik_custom4, inits_custom4, method = 'subplex', control = list(maxit = 50000))
-```
 
-We can now again do model comparison.
-
-```{r diversitree_4_compare}
+## ----diversitree_4_compare------------------------------------------------------------------------------------------------------
 # do AIC comparison
 AIC(mod_sym, mod_ard, mod_er, mod_custom1, mod_custom2, mod_custom3, mod_custom4) %>% arrange(AIC)
 
@@ -524,31 +281,9 @@ anova(mod_custom3, mod_custom4)
 
 # sort parameter estimates
 mod_custom4$par %>% sort()
-```
 
-Again the model fits better. We will now remove q56.
 
-```{r diversitree_5_load}
-#| echo: false
-
-# read in files
-mod_custom5 <- readRDS(here('data/sequencing_rpoB/processed/transition_rates/mod_custom5_mac.rds'))
-
-# make custom matrix model
-lik_custom5 <- constrain(lik_ard, 
-                     q13~0, q15~0, q16~0, q17~0, q26~0, q45~0, q51~0, q53~0, q54~0, q62~0,
-                     q31~0, q35~0, q36~0, q63~0, q72~0, q73~0, q75~0,
-                     q57~0,
-                     q43~0,
-                     q56~0)
-
-# make start parameters
-inits_custom5 <- rep(1, length(argnames(lik_custom5)))
-```
-
-```{r diversitree_5_setup}
-#| eval: false
-
+## ----diversitree_5_load---------------------------------------------------------------------------------------------------------
 # make custom matrix model
 lik_custom5 <- constrain(lik_ard, 
                      q13~0, q15~0, q16~0, q17~0, q26~0, q45~0, q51~0, q53~0, q54~0, q62~0,
@@ -562,11 +297,8 @@ inits_custom5 <- rep(1, length(argnames(lik_custom5)))
 
 # run model
 mod_custom5 <- find.mle(lik_custom5, inits_custom5, method = 'subplex', control = list(maxit = 50000))
-```
 
-We can now again do model comparison.
-
-```{r diversitree_5_compare}
+## ----diversitree_5_compare------------------------------------------------------------------------------------------------------
 # do AIC comparison
 AIC(mod_sym, mod_ard, mod_er, mod_custom1, mod_custom2, mod_custom3, mod_custom4, mod_custom5) %>% arrange(AIC)
 
@@ -575,13 +307,9 @@ anova(mod_custom4, mod_custom5)
 
 # sort parameter estimates
 mod_custom5$par %>% sort()
-```
 
-It says this parameter is super important, but also it does not have convergence problems. Lets remove the next smallest one (which is now super small)!
 
-```{r diversitree_6_load}
-#| echo: false
-
+## ----diversitree_6_load---------------------------------------------------------------------------------------------------------
 # read in files
 mod_custom6 <- readRDS(here('data/sequencing_rpoB/processed/transition_rates/mod_custom6_mac.rds'))
 
@@ -596,30 +324,15 @@ lik_custom6 <- constrain(lik_ard,
 
 # make start parameters
 inits_custom6 <- rep(1, length(argnames(lik_custom6)))
-```
 
-```{r diversitree_6_setup}
-#| eval: false
+#-----------------------#
+# STOP AT THIS POINT ####
+#-----------------------#
 
-# make custom matrix model
-lik_custom6 <- constrain(lik_ard, 
-                     q13~0, q15~0, q16~0, q17~0, q26~0, q45~0, q51~0, q53~0, q54~0, q62~0,
-                     q31~0, q35~0, q36~0, q63~0, q72~0, q73~0, q75~0,
-                     q57~0,
-                     q43~0,
-                     q56~0,
-                     q27~0)
-
-# make start parameters
-inits_custom6 <- rep(1, length(argnames(lik_custom6)))
-
-# run model
+# run model - got stuck here
 mod_custom6 <- find.mle(lik_custom6, inits_custom6, method = 'subplex', control = list(maxit = 5))
-```
 
-We can now again do model comparison.
-
-```{r diversitree_6_compare}
+## ----diversitree_6_compare------------------------------------------------------------------------------------------------------
 # do AIC comparison
 AIC(mod_sym, mod_ard, mod_er, mod_custom1, mod_custom2, mod_custom3, mod_custom4, mod_custom5, mod_custom6) %>% arrange(AIC)
 
@@ -628,13 +341,9 @@ anova(mod_custom5, mod_custom6)
 
 # sort parameter estimates
 mod_custom6$par %>% sort()
-```
 
-Weirdly q67 has suddenly become really really small, compared to being 1.83 in the previous model. We can remove it and see how the model does.
 
-```{r diversitree_7_load}
-#| echo: false
-
+## ----diversitree_7_load---------------------------------------------------------------------------------------------------------
 # read in files
 mod_custom7 <- readRDS(here('data/sequencing_rpoB/processed/transition_rates/mod_custom7_mac.rds'))
 
@@ -644,25 +353,21 @@ lik_custom7 <- constrain(lik_ard,
 
 # make start parameters
 inits_custom7 <- rep(1, length(argnames(lik_custom7)))
-```
 
-```{r diversitree_7_setup}
-#| eval: false
 
-# make custom matrix model
-lik_custom7 <- constrain(lik_ard, 
-                     q16~0, q26~0, q27~0, q35~0, q36~0, q42~0, q46~0, q47~0, q53~0, q54~0, q63~0, q64~0, q72~0, q74~0, q17~0, q75~0, q71~0, q51~0, q14~0, q52~0, q67~0)
+## ----diversitree_7_setup--------------------------------------------------------------------------------------------------------
+## # make custom matrix model
+## lik_custom7 <- constrain(lik_ard,
+##                      q16~0, q26~0, q27~0, q35~0, q36~0, q42~0, q46~0, q47~0, q53~0, q54~0, q63~0, q64~0, q72~0, q74~0, q17~0, q75~0, q71~0, q51~0, q14~0, q52~0, q67~0)
+## 
+## # make start parameters
+## inits_custom7 <- rep(1, length(argnames(lik_custom7)))
+## 
+## # run model
+## mod_custom7 <- find.mle(lik_custom7, inits_custom7, method = 'subplex', control = list(maxit = 50000))
 
-# make start parameters
-inits_custom7 <- rep(1, length(argnames(lik_custom7)))
 
-# run model
-mod_custom7 <- find.mle(lik_custom7, inits_custom7, method = 'subplex', control = list(maxit = 50000))
-```
-
-We can now again do model comparison.
-
-```{r diversitree_7_compare}
+## ----diversitree_7_compare------------------------------------------------------------------------------------------------------
 # do AIC comparison
 AIC(mod_sym, mod_ard, mod_er, mod_custom1, mod_custom2, mod_custom3, mod_custom4, mod_custom5, mod_custom6, mod_custom7) %>% arrange(AIC)
 
@@ -671,11 +376,9 @@ anova(mod_custom6, mod_custom7)
 
 # sort parameter estimates
 mod_custom7$par %>% sort()
-```
 
-```{r diversitree_8_load}
-#| echo: false
 
+## ----diversitree_8_load---------------------------------------------------------------------------------------------------------
 # read in files
 mod_custom8 <- readRDS(here('data/sequencing_rpoB/processed/transition_rates/mod_custom8_mac.rds'))
 
@@ -685,25 +388,21 @@ lik_custom8 <- constrain(lik_ard,
 
 # make start parameters
 inits_custom8 <- rep(1, length(argnames(lik_custom8)))
-```
 
-```{r diversitree_8_setup}
-#| eval: false
 
-# make custom matrix model
-lik_custom8 <- constrain(lik_ard, 
-                     q16~0, q26~0, q27~0, q35~0, q36~0, q42~0, q46~0, q47~0, q53~0, q54~0, q63~0, q64~0, q72~0, q74~0, q17~0, q75~0, q71~0, q51~0, q14~0, q52~0, q67~0, q34~0)
+## ----diversitree_8_setup--------------------------------------------------------------------------------------------------------
+## # make custom matrix model
+## lik_custom8 <- constrain(lik_ard,
+##                      q16~0, q26~0, q27~0, q35~0, q36~0, q42~0, q46~0, q47~0, q53~0, q54~0, q63~0, q64~0, q72~0, q74~0, q17~0, q75~0, q71~0, q51~0, q14~0, q52~0, q67~0, q34~0)
+## 
+## # make start parameters
+## inits_custom8 <- rep(1, length(argnames(lik_custom8)))
+## 
+## # run model
+## mod_custom8 <- find.mle(lik_custom8, inits_custom8, method = 'subplex', control = list(maxit = 50000))
 
-# make start parameters
-inits_custom8 <- rep(1, length(argnames(lik_custom8)))
 
-# run model
-mod_custom8 <- find.mle(lik_custom8, inits_custom8, method = 'subplex', control = list(maxit = 50000))
-```
-
-We can now again do model comparison.
-
-```{r diversitree_8_compare}
+## ----diversitree_8_compare------------------------------------------------------------------------------------------------------
 # do AIC comparison
 AIC(mod_sym, mod_ard, mod_er, mod_custom1, mod_custom2, mod_custom3, mod_custom4, mod_custom5, mod_custom6, mod_custom7, mod_custom8) %>% arrange(AIC)
 
@@ -712,18 +411,9 @@ anova(mod_custom7, mod_custom8)
 
 # sort parameter estimates
 mod_custom8$par %>% sort()
-```
 
-This parameter is important in the model. Consequently our best model is **mod_custom7**.
 
-## Plot the best transition matrix
-
-We can plot the transition matrix of the best model.
-
-```{r plot_transition_matrix}
-#| fig.height: 6
-#| fig.width: 8
-
+## ----plot_transition_matrix-----------------------------------------------------------------------------------------------------
 diversitree_df <- get_diversitree_df(mod_custom7, coding$hab_pref_num2, coding$hab_pref)
 
 diversitree_df %>%
@@ -749,51 +439,38 @@ diversitree_df %>%
 
 ggsave(here('plots/sequencing_rpoB/analyses/transition_matrix_diversitree.png'), last_plot(), height = 6, width = 8)
 
-```
 
-## Run MCMC chain for the best Mk model
 
-We can try and run mcmc on this model.
-
-```{r mcmc_load}
-#| echo: false
-
+## ----mcmc_load------------------------------------------------------------------------------------------------------------------
 fit_mcmc3 <- readRDS(here('data/sequencing_rpoB/processed/transition_rates/best_diversitree_mcmc.rds'))
-```
 
-```{r mcmc_try}
-#| eval: false
 
-# set up initial start values
-inits_mcmc <- mod_custom7$par
+## ----mcmc_try-------------------------------------------------------------------------------------------------------------------
+## # set up initial start values
+## inits_mcmc <- mod_custom7$par
+## 
+## # set up upper and lower limits - limit the values to be < 10 times the max value
+## lower_mcmc <- rep(0, length(inits_mcmc))
+## upper_mcmc <- rep(max(inits_mcmc)*10, length(inits_mcmc))
+## 
+## # run first mcmc to tune w
+## fit_mcmc <- mcmc(lik_custom7, inits_mcmc, nsteps = 10, w = 0.1, upper = upper_mcmc, lower = lower_mcmc)
+## 
+## # tune w for each parameter
+## w <- diff(sapply(fit_mcmc[2:(ncol(fit_mcmc)-1)], quantile, c(.05, .95)))
+## 
+## # run second mcmc to tune w
+## fit_mcmc2 <- mcmc(lik_custom7, inits_mcmc, nsteps=100, w=w, upper = upper_mcmc, lower = lower_mcmc)
+## 
+## # tune w for each parameter
+## w <- diff(sapply(fit_mcmc2[2:(ncol(fit_mcmc2)-1)], quantile, c(.05, .95)))
+## 
+## # run third mcmc for 1000 iter
+## fit_mcmc3 <- mcmc(lik_custom7, inits_mcmc, nsteps=1000, w=w, upper = upper_mcmc, lower = lower_mcmc)
+## 
 
-# set up upper and lower limits - limit the values to be < 10 times the max value
-lower_mcmc <- rep(0, length(inits_mcmc))
-upper_mcmc <- rep(max(inits_mcmc)*10, length(inits_mcmc))
 
-# run first mcmc to tune w
-fit_mcmc <- mcmc(lik_custom7, inits_mcmc, nsteps = 10, w = 0.1, upper = upper_mcmc, lower = lower_mcmc)
-
-# tune w for each parameter
-w <- diff(sapply(fit_mcmc[2:(ncol(fit_mcmc)-1)], quantile, c(.05, .95)))
-
-# run second mcmc to tune w
-fit_mcmc2 <- mcmc(lik_custom7, inits_mcmc, nsteps=100, w=w, upper = upper_mcmc, lower = lower_mcmc)
-
-# tune w for each parameter
-w <- diff(sapply(fit_mcmc2[2:(ncol(fit_mcmc2)-1)], quantile, c(.05, .95)))
-
-# run third mcmc for 1000 iter
-fit_mcmc3 <- mcmc(lik_custom7, inits_mcmc, nsteps=1000, w=w, upper = upper_mcmc, lower = lower_mcmc)
-
-```
-
-We can easily plot the distribution of these parameter estimates.
-
-```{r plot_mcmc}
-#| fig.height: 6
-#| fig.width: 5
-
+## ----plot_mcmc------------------------------------------------------------------------------------------------------------------
 # make data long format
 d_mcmc <- pivot_longer(fit_mcmc3, names_to = 'param', values_to = 'transition_rate', cols = starts_with('q')) %>%
   left_join(., select(diversitree_df, param, state_1, state_2)) %>%
@@ -815,16 +492,9 @@ ggplot(d_mcmc, aes(transition_rate, forcats::fct_reorder(parameter, transition_r
        y = 'transition')
 
 
-```
 
-From this it is really clear that the model does not have a very good idea about the value of two transitions: (1) generalist -\> freshwater and (2) generalist -\> freshwater + terrestrial.
 
-We can take 95% CIs and plot these alongside the maximum likelihood estimates.
-
-```{r}
-#| fig.height: 6
-#| fig.width: 6
-
+## -------------------------------------------------------------------------------------------------------------------------------
 # plot 95% CIs
 ggplot(d_mcmc_summary, aes(transition_rate, forcats::fct_reorder(parameter, transition_rate))) +
   geom_linerange(aes(xmin = .lower, xmax = .upper)) +
@@ -836,30 +506,17 @@ ggplot(d_mcmc_summary, aes(transition_rate, forcats::fct_reorder(parameter, tran
        caption = 'red points are ML estimate\nblack points are MCMC average')
 
 
-```
 
-So it is abundantly clear that the maximum likelihood model is struggling with some parameters. These are linked to transitions that are not very common. It generally does a much better job when parameters are smaller.
 
-One thing that could be happening is that when one of those transitions is high, the other is lower, we can look at the correlation between generalist -\> freshwater (q41) and generalist -\> freshwater + terrestrial (q43).
-
-```{r mcmc_cor}
-#| fig.width: 7
-#| fig.height: 5
-
+## ----mcmc_cor-------------------------------------------------------------------------------------------------------------------
 # look at whether the two crazy estimates correlate with each other.
 ggplot(fit_mcmc3, aes(q41, q43)) +
   geom_point() +
   theme_bw()
 
-```
 
-Nope there is no correlation here. The model just does not really have a great idea what the transition rate is for these two.
 
-## Stochastic character mapping with phytools
-
-We can now pass the best matrix onto phytools to do stochastic character mapping.
-
-```{r phytools}
+## ----phytools-------------------------------------------------------------------------------------------------------------------
 
 # create transition matrix
 num_states <- unique(hab_pref) %>% length()
@@ -880,35 +537,29 @@ best_matrix[best_matrix != 0] <- arrange(diversitree_df, state_2, state_1) %>% p
 # make diagonal values make things sum to 0
 diag(best_matrix) <- -rowSums(best_matrix)
 
-```
 
-Run stochastic character mapping
 
-```{r simmap}
-#| eval: false
+## ----simmap---------------------------------------------------------------------------------------------------------------------
+## # do stochastic mapping of character traits using phytools
+## # feed in the best transition matrix previously found using other methods
+## simmap_best <- make.simmap(tree, hab_pref, nsim = 1000, Q = best_matrix)
+## 
+## # need to split this result up so that files are less than 50MB for GitHub
+## 
+## # number of splits
+## n_splits <- 10
+## # find start of each split
+## splits <- seq(from = 1, to = 1000, by = 1000/10)
+## 
+## # save files out
+## for(i in 1:length(splits)){
+##   # save out every 100 sims
+##   saveRDS(simmap_best[splits[i]:(splits[i]+99)], here(paste("data/sequencing_rpoB/processed/transition_rates/simmap/simmap_", i, '.rds', sep = '')))
+## }
+## 
 
-# do stochastic mapping of character traits using phytools
-# feed in the best transition matrix previously found using other methods
-simmap_best <- make.simmap(tree, hab_pref, nsim = 1000, Q = best_matrix)
 
-# need to split this result up so that files are less than 50MB for GitHub
-
-# number of splits
-n_splits <- 10
-# find start of each split
-splits <- seq(from = 1, to = 1000, by = 1000/10)
-
-# save files out
-for(i in 1:length(splits)){
-  # save out every 100 sims
-  saveRDS(simmap_best[splits[i]:(splits[i]+99)], here(paste("data/sequencing_rpoB/processed/transition_rates/simmap/simmap_", i, '.rds', sep = '')))
-}
-
-```
-
-We can then re-load the stochastic character maps in.
-
-```{r load_simmap}
+## ----load_simmap----------------------------------------------------------------------------------------------------------------
 # reload simmap files in
 simmap_files <- list.files(here("data/sequencing_rpoB/processed/transition_rates/simmap"), full.names = TRUE)
 simmap_files <- simmap_files[simmap_files != here('data/sequencing_rpoB/processed/transition_rates/simmap/simmap_summary.rds')]
@@ -919,26 +570,17 @@ simmap_best <- do.call(c, simmap_best)
 
 # load in summary as well!
 simmap_summary <- readRDS(here('data/sequencing_rpoB/processed/transition_rates/simmap/simmap_summary.rds'))
-```
 
-We can then summarise the stochastic character maps.
 
-```{r summarise_phytools}
-#| eval: false
+## ----summarise_phytools---------------------------------------------------------------------------------------------------------
+## # summarise number of switches between states and time spent in each state
+## simmap_summary <- describe.simmap(simmap_best, plot=FALSE)
+## 
+## # remove the tree element - this is the simmap_best
+## simmap_summary$tree <- NULL
 
-# summarise number of switches between states and time spent in each state
-simmap_summary <- describe.simmap(simmap_best, plot=FALSE)
 
-# remove the tree element - this is the simmap_best
-simmap_summary$tree <- NULL
-```
-
-We can now visualise the results. First we can look at the most common transitions.
-
-```{r simmap_summary}
-#| fig-height: 8
-#| fig-width: 10
-
+## ----simmap_summary-------------------------------------------------------------------------------------------------------------
 # coerce transitions into dataframe
 d_transitions <- as.data.frame(simmap_summary$count, col.names = colnames(simmap_summary$count)) %>%
   mutate(iter = 1:n()) %>%
@@ -960,13 +602,9 @@ group_by(d_transitions, transition) %>%
   subtitle = 'Facets are ordered by common transitions',
   x = 'Number of transitions',
   y = 'Count')
-```
 
-We can look at how common transitions are by plotting the averages in a table.
 
-```{r common_transitions}
-#| tbl-cap: common_transitions
-
+## ----common_transitions---------------------------------------------------------------------------------------------------------
 d_transitions_summary <- group_by(d_transitions, iter) %>%
   mutate(prop = n_transitions/sum(n_transitions)) %>%
   group_by(state_1, state_2) %>%
@@ -999,18 +637,9 @@ table_flex <- flextable(table) %>%
 save_as_image(table_flex, here('plots/sequencing_rpoB/analyses/proportion_of_transitions.png'), zoom = 3, webshot = 'webshot2')
 
 table_flex
-```
 
-The take home is that 66% of all transitions occur between terrestrial and freshwater + terrestrial generalists. And 76% of all transitions occur between species that are not good at living in marine mud (terrestrial and freshwater specialists, and freshwater + terrestrial generalists).
 
-## Plot best transition matrix as a network
-
-We can then plot the best model as a network. The output from the stochastic character mapping also contains information as to the time spent in each state in the phylogenetic tree.
-
-```{r plot_best_model}
-#| fig-height: 6
-#| fig-width: 8
-
+## ----plot_best_model------------------------------------------------------------------------------------------------------------
 # coerce time into dataframe
 d_time <- as.data.frame(simmap_summary$times, col.names = colnames(simmap_summary$times)) %>%
   mutate(n = 1:n()) %>%
@@ -1075,19 +704,9 @@ p + geom_label(aes(nudge_x + x, nudge_y+y, label = label), point_data, size = Mi
 # save out model
 ggsave(here('plots/sequencing_rpoB/analyses/transition_plot_diversitree.png'), last_plot(), height = 6, width = 8)
 
-```
 
-Ok so this shows a bunch of cool things. Instead of moving between specialist states directly, transitions between environments are mediated by the evolution of generalism.
 
-Is there a cool way to show this. Given the time spent in each state (the nodes), and the transition rates (the edges), is there a way to look at the most likely paths between habitat preferences. For example, what are the most likely paths to move between freshwater terrestrial specialism?
-
-## Source or sink?
-
-We can look at whether any given habitat preference is a net sink or net source using both the total number of transitions and the instantaneous transition rates. If you are a sink, you have more transitions into you than away from you, or you the combined transition rate into you is greater than going away from you. Likewise if you are a source, you have a tendency to rapidly move away from your state and do not stay in it for very long.
-
-We will first do it with the instantaneous transition rates.
-
-```{r}
+## -------------------------------------------------------------------------------------------------------------------------------
 # first with the transition rates
 d_source_sink_rate <- select(diversitree_df, away = state_1, into = state_2, transition_rate) %>%
   pivot_longer(cols = c(away, into), names_to = 'direction', values_to = 'habitat_preference') %>%
@@ -1116,13 +735,9 @@ table_rate <- select(d_source_sink_rate, habitat_preference, away, into, source_
 save_as_image(table_rate, here('plots/sequencing_rpoB/analyses/source_sink_rate.png'), zoom = 3, webshot = 'webshot2')
 
 table_rate
-```
 
-In this table, a value above one means the rates away from that habitat preference are greater than the rates into that habitat preference. We can see that mud and shore and freshwater specialists are extreme sinks, with marine mud and terrestrial generalists and total generalists being extreme sources. The sources are transient states, being very unstable as soon as they appear.
 
-We can make the same table but for estimated numbers of transitions based on the stochastic character mapping.
-
-```{r}
+## -------------------------------------------------------------------------------------------------------------------------------
 
 # next with simulated counts of transitions on the tree
 d_source_sink_count <- select(d_transitions_summary, away = state_1, into = state_2, ave_num) %>%
@@ -1152,23 +767,9 @@ table_count <- select(d_source_sink_count, habitat_preference, away, into, sourc
 save_as_image(table_count, here('plots/sequencing_rpoB/analyses/source_sink_count.png'), zoom = 3, webshot = 'webshot2')
 
 table_count
-```
 
-This table has much the same information. However we can see that freshwater + terrestrial generalism is no longer a sink, with the number of transitions into and away from it being \~1. Marine mud and terrestrial generalists have 12% more transitions going away from that state than into it, generalists have 17% more, and freshwater + marine mud generalists have 24% more.
 
-In contrast freshwater and marine mud specialists remain sources, having 23% and 35% fewer transitions into that habitat preference than away from it.
-
-## Look at whether some states have more transitions than would be expected
-
-From our BAMM analysis, we have a tip estimate of the diversification rate that we have binned into either being "high" or "slow" diversification. This means each species has been classified as being either "fast" or "slow" in terms of diversification. We want to run a discrete character evolution model to look at whether transitions across environments result in a shift to "high" diversification rate. However, the model would be too big to combine our diversification rate bin and our seven habitat preferences.
-
-Instead we can look for a logical split in the dataset. One way of doing this might be to use the mass action expectation that the number of transitions between two habitat preferences should be equivalent to their prevalence in our tip states. We will do this for all available transitions and see which ones are over- or under-represented.
-
-We calculate an expected rate of transitions by multiplying the proportions of both states together. We then calculate the proportion of transitions they should account for by normalising this over all possible transitions.
-
-```{r mass_action_rate}
-#| tbl-cap: mass_action
-
+## ----mass_action_rate-----------------------------------------------------------------------------------------------------------
 # work out proportion of tips are each habitat preference
 d_hab_pref <- group_by(d_meta, habitat_preference) %>%
   tally() %>%
@@ -1219,27 +820,9 @@ save_as_image(table_expect, here('plots/sequencing_rpoB/analyses/expected_transi
 
 table_expect
 
-```
 
-Firstly, I am not sure this method is very useful. This mass action null model would assume that tips are distributed randomly on the tree.
 
-However, in this method, if you are above 1 then that transition occurs more than would be expected from their abundance in the extant species. If you are below 1 then you occur less than would be expected by the prevalence in the extant species. Unsurprisingly, the two possible transitions (from the best transition matrix) that occur much less than expected are the transitions between specialist states.
-
-What I was hoping for was justification to split generalist states in a specific way to give us a marine - non marine split, or possible a terrestrial - non terrestrial split, but it is much more difficult to interpret than I expected.
-
-Instead I think we will just split it by the obvious marine - non marine split. Anything that is capable of live in the marine mud environment will be grouped together.
-
-## Calculate the time of evolutionary transitions
-
-There does not seem to be any sensible, easy way of doing this using the stochastic character mapping I have done. Will email Liam Revell but will be a while I imagine.
-
-## Does a habitat transition lead to a faster diversification rate?
-
-To look at whether a shift from one state to another leads to a faster diversification rate, we are going to bin our habitat preferences to marine/non marine, and combine them with our diversification rate trait which bins species into either being "fast" or "slow" diversification rate.
-
-First we will load in our diversification rate trait and add it to our metadata.
-
-```{r div_model_prep}
+## ----div_model_prep-------------------------------------------------------------------------------------------------------------
 
 # read in diversification classification
 div <- readRDS(here('data/sequencing_rpoB/processed/div_rate_bins.rds'))
@@ -1276,13 +859,9 @@ coding_new
 # check the renaming has worked!
 sum(names(hab_pref_new2) == tree$tip.label) == length(tree$tip.label)
 
-```
 
-Next we can run an ARD, SYM, and ER model.
 
-```{r saline_diversitree_noshow}
-#| echo: false
-
+## ----saline_diversitree_noshow--------------------------------------------------------------------------------------------------
 # read in models
 mod_er_div <- readRDS(here('data/sequencing_rpoB/processed/transition_rates/mod_er_div.rds'))
 mod_ard_div <- readRDS(here('data/sequencing_rpoB/processed/transition_rates/mod_ard_div.rds'))
@@ -1290,60 +869,51 @@ mod_sym_div <- readRDS(here('data/sequencing_rpoB/processed/transition_rates/mod
 
 # all of these methods needs a likelihood function, we can build a Mkn model
 lik_ard_div <- make.mkn(tree, hab_pref_new2, k = max(hab_pref_new2))
-```
 
-```{r div_diversitree_norun}
-#| eval: false
 
-# all of these methods needs a likelihood function, we can build a Mkn model
-lik_ard_div <- make.mkn(tree, hab_pref_new2, k = max(hab_pref_new2))
+## ----div_diversitree_norun------------------------------------------------------------------------------------------------------
+## # all of these methods needs a likelihood function, we can build a Mkn model
+## lik_ard_div <- make.mkn(tree, hab_pref_new2, k = max(hab_pref_new2))
+## 
+## argnames(lik_ard_div)
+## 
+## # make symmetric rates model
+## lik_sym_div <- constrain(lik_ard_div,
+##                      q12~q21, q13~q31, q14~q41,
+##                      q23~q32, q24~q42,
+##                      q34~q43
+##                      )
+## 
+## argnames(lik_sym_div)
+## 
+## # make equal rates model
+## lik_er_div <- constrain(lik_ard_div,
+##                     q13~q12, q14~q12,
+##                     q21~q12, q23~q12, q24~q12,
+##                     q31~q12, q32~q12, q34~q12,
+##                     q41~q12, q42~q12, q43~q12)
+## 
+## argnames(lik_er_div)
+## 
+## # need to pass start values to it - can grab these from the ape::ace, but we will just pass an average rate to the model
+## inits_ard <- rep(1, length(argnames(lik_ard_div)))
+## inits_sym <- rep(1, length(argnames(lik_sym_div)))
+## inits_er <- rep(1, length(argnames(lik_er_div)))
+## 
+## # find the maximum likelihood estimates of this model
+## mod_er_div <- find.mle(lik_er_div, inits_er, method = 'subplex', control = list(maxit = 50000))
+## mod_sym_div <- find.mle(lik_sym_div, inits_sym, method = 'subplex', control = list(maxit = 50000))
+## mod_ard_div <- find.mle(lik_ard_div, inits_ard, method = 'subplex', control = list(maxit = 50000))
 
-argnames(lik_ard_div)
 
-# make symmetric rates model
-lik_sym_div <- constrain(lik_ard_div, 
-                     q12~q21, q13~q31, q14~q41,
-                     q23~q32, q24~q42,
-                     q34~q43
-                     )
-
-argnames(lik_sym_div)
-
-# make equal rates model
-lik_er_div <- constrain(lik_ard_div,
-                    q13~q12, q14~q12,
-                    q21~q12, q23~q12, q24~q12,
-                    q31~q12, q32~q12, q34~q12,
-                    q41~q12, q42~q12, q43~q12)
-
-argnames(lik_er_div)
-
-# need to pass start values to it - can grab these from the ape::ace, but we will just pass an average rate to the model
-inits_ard <- rep(1, length(argnames(lik_ard_div)))
-inits_sym <- rep(1, length(argnames(lik_sym_div)))
-inits_er <- rep(1, length(argnames(lik_er_div)))
-
-# find the maximum likelihood estimates of this model
-mod_er_div <- find.mle(lik_er_div, inits_er, method = 'subplex', control = list(maxit = 50000))
-mod_sym_div <- find.mle(lik_sym_div, inits_sym, method = 'subplex', control = list(maxit = 50000))
-mod_ard_div <- find.mle(lik_ard_div, inits_ard, method = 'subplex', control = list(maxit = 50000))
-```
-
-We can do model selection to see which model is best.
-
-```{r}
+## -------------------------------------------------------------------------------------------------------------------------------
 # check AIC
 AIC(mod_er_div, mod_sym_div, mod_ard_div) %>% 
   arrange(AIC)
 
-```
 
-The all rates different model is the best. We can plot the transition matrix to see if transitioning across habitats results in increased diversification rates.
 
-```{r plot_div}
-#| fig.height: 6
-#| fig.width: 8
-
+## ----plot_div-------------------------------------------------------------------------------------------------------------------
 get_diversitree_df(mod_ard_div, coding_new$hab_pref_num, coding_new$hab_pref) %>%
   left_join(., select(coding_new, state_1 = hab_pref, state_1_num = hab_pref_num, state_1_label = hab_pref_axis)) %>%
   left_join(., select(coding_new, state_2 = hab_pref, state_2_num = hab_pref_num, state_2_label = hab_pref_axis)) %>%
@@ -1367,19 +937,9 @@ get_diversitree_df(mod_ard_div, coding_new$hab_pref_num, coding_new$hab_pref) %>
 
 ggsave(here('plots/sequencing_rpoB/analyses/transition_matrix_fast_slow.png'), last_plot(), height = 6, width = 8)
 
-```
 
-From this analysis it does not look like movements across the saline boundary result in a faster diversification rate. For example, non-saline low to saline high is not supported, and saline low to saline high does occur but the rate is relatively very low. Instead what happens is movements within states are more likely. Moving across habitats but remaining in the same diversification rate bin, or staying in the same habitat but moving from low to high diversification rate.
 
-So it very much does not look like habitat transitions result in increased diversification rate, but there are other ways this could be tested.
-
-## Do generalists and specialists in different environments have different diversification rates
-
-A different question we can ask for this split is whether marine / non-marine specialists and generalists have different diversification rates. This should allow us to run (a) a MuSSE model using **diversitree** and (b) a MuHiSSE using **hisse**. Collapsing our seven state model to 4 states should (theoretically) make everything more achievable.
-
-First of all we need to set up a new trait and our new coding for it.
-
-```{r setup_new_trait}
+## ----setup_new_trait------------------------------------------------------------------------------------------------------------
 
 # create new habitat preference vector that is just saline/non-saline generalist / non generalist
 d_meta <- mutate(d_meta, saline_or_no = ifelse(str_detect(habitat_preference, 'generalist|mud_and_shore'), 'saline', 'non-saline'),
@@ -1406,15 +966,9 @@ coding_new
 
 # check the renaming has worked!
 sum(names(hab_pref_new2) == tree$tip.label) == length(tree$tip.label)
-```
 
-### Fit standard Mk model
 
-We can now try and fit the MuSSE model. It probably makes sense to constrain transitions based on a model of discrete character evolution BEFORE fitting this model.
-
-```{r premusse_ard_noshow}
-#| echo: false
-
+## ----premusse_ard_noshow--------------------------------------------------------------------------------------------------------
 # read in models
 mod_ard_premusse <- readRDS(here('data/sequencing_rpoB/processed/transition_rates/mod_ard_premusse.rds'))
 mod_sym_premusse <- readRDS(here('data/sequencing_rpoB/processed/transition_rates/mod_sym_premusse.rds'))
@@ -1427,33 +981,29 @@ lik_premusse <- make.mkn(tree, hab_pref_new2, k = max(hab_pref_new2))
 # make custom matrix model
 lik_premusse1 <- constrain(lik_premusse, 
                    q14~0, q23~0, q41~0)
-```
 
-```{r do_ard_selection}
-#| eval: false
 
-# set up likelihood model for diversitree
-lik_premusse <- make.mkn(tree, hab_pref_new2, k = max(hab_pref_new2))
+## ----do_ard_selection-----------------------------------------------------------------------------------------------------------
+## # set up likelihood model for diversitree
+## lik_premusse <- make.mkn(tree, hab_pref_new2, k = max(hab_pref_new2))
+## 
+## lik_sym_premusse <- constrain(lik_premusse,
+##                      q12 ~ q21, q13 ~ q31, q14 ~ q41,
+##                      q23 ~ q32, q24 ~ q42,
+##                      q34 ~ q43)
+## 
+## inits <- rep(1, length(argnames(lik_premusse)))
+## inits_sym <- rep(1, length(argnames(lik_sym_premusse)))
+## 
+## argnames(lik_sym)
+## 
+## # run ARD model
+## mod_ard_premusse <- find.mle(lik, inits_ard, method = 'subplex', control = list(maxit = 50000))
+## mod_sym_premusse <- find.mle(lik_sym, inits_sym, method = 'subplex', control = list(maxit = 50000))
+## 
 
-lik_sym_premusse <- constrain(lik_premusse,
-                     q12 ~ q21, q13 ~ q31, q14 ~ q41,
-                     q23 ~ q32, q24 ~ q42,
-                     q34 ~ q43)
 
-inits <- rep(1, length(argnames(lik_premusse)))
-inits_sym <- rep(1, length(argnames(lik_sym_premusse)))
-
-argnames(lik_sym)
-
-# run ARD model
-mod_ard_premusse <- find.mle(lik, inits_ard, method = 'subplex', control = list(maxit = 50000))
-mod_sym_premusse <- find.mle(lik_sym, inits_sym, method = 'subplex', control = list(maxit = 50000))
-
-```
-
-We can look at the estimates and see a big split between estimates at e-01 and e-06, so we will try removing those and see if the fit improves.
-
-```{r do_ard_selection2}
+## ----do_ard_selection2----------------------------------------------------------------------------------------------------------
 # check AIC
 AIC(mod_ard_premusse, mod_sym_premusse) %>%
   arrange(AIC)
@@ -1467,20 +1017,14 @@ lik_premusse1 <- constrain(lik_premusse,
 
 # make start parameters
 inits_custom1 <- rep(1, length(argnames(lik_premusse1)))
-```
 
-We can then fit the model.
 
-```{r}
-#| eval: false
+## -------------------------------------------------------------------------------------------------------------------------------
+## # run model
+## mod_premusse1 <- find.mle(lik_premusse1, inits_custom1, method = 'subplex', control = list(maxit = 50000))
 
-# run model
-mod_premusse1 <- find.mle(lik_premusse1, inits_custom1, method = 'subplex', control = list(maxit = 50000))
-```
 
-We can check if the model with fewer parameters is better and then remove the next lowest parameter.
-
-```{r}
+## -------------------------------------------------------------------------------------------------------------------------------
 # do model selection
 AIC(mod_ard_premusse, mod_premusse1) %>%
   arrange(AIC)
@@ -1495,21 +1039,15 @@ lik_premusse2 <- constrain(lik_premusse1,
 
 # make start parameters
 inits_custom2 <- rep(1, length(argnames(lik_premusse2)))
-```
 
-We can then fit this new model.
 
-```{r}
-#| eval: false
+## -------------------------------------------------------------------------------------------------------------------------------
+## # run model
+## mod_premusse2 <- find.mle(lik_2, inits_custom2, method = 'subplex', control = list(maxit = 50000))
+## 
 
-# run model
-mod_premusse2 <- find.mle(lik_2, inits_custom2, method = 'subplex', control = list(maxit = 50000))
 
-```
-
-We can then once again do model selection.
-
-```{r}
+## -------------------------------------------------------------------------------------------------------------------------------
 
 # do ANOVAs
 anova(mod_premusse1, mod_premusse2)
@@ -1517,14 +1055,9 @@ anova(mod_premusse1, mod_premusse2)
 # check AIC
 AIC(mod_ard_premusse, mod_premusse1, mod_premusse2) %>%
   arrange(AIC)
-```
 
-So **mod_premusse1** is the best model here. We can plot the transition matrix out to see what it looks like.
 
-```{r plot_matrix_again}
-#| fig.height: 6
-#| fig.width: 8
-
+## ----plot_matrix_again----------------------------------------------------------------------------------------------------------
 # code to plot transition matrix
 get_diversitree_df(mod_premusse1, coding_new$hab_pref_num, coding_new$hab_pref) %>%
   left_join(., select(coding_new, state_1 = hab_pref, state_1_num = hab_pref_num, state_1_label = hab_pref_axis)) %>%
@@ -1549,19 +1082,9 @@ get_diversitree_df(mod_premusse1, coding_new$hab_pref_num, coding_new$hab_pref) 
 
 ggsave(here('plots/sequencing_rpoB/analyses/transition_matrix_premusse.png'), last_plot(), height = 6, width = 8)
 
-```
 
-So there are very low rates between saline specialist and non-saline specialist, with higher rates for all other available transitions. There are no transitions between saline specialists -\> non-saline generalists, non-saline specialists -\> saline generalists and non-saline generalists -\> saline specialists.
 
-This actually all makes perfect sense. Now we can move on to doing a MuSSE. We will pass these estimates of transition rates onto MuSSE.
-
-### Fit MuSSE
-
-We will first set up the MuSSE model and run it.
-
-```{r fit_musse_noshow}
-#| echo: false
-
+## ----fit_musse_noshow-----------------------------------------------------------------------------------------------------------
 # read in models
 fit_musse <- readRDS(here('data/sequencing_rpoB/processed/transition_rates/mod_musse_full.rds'))
 fit_musse_no_se <- readRDS(here('data/sequencing_rpoB/processed/transition_rates/mod_musse_no_se.rds'))
@@ -1570,65 +1093,49 @@ fit_musse_no_se2 <- readRDS(here('data/sequencing_rpoB/processed/transition_rate
 fit_musse_no_sse <- readRDS(here('data/sequencing_rpoB/processed/transition_rates/mod_musse_no_sse.rds'))
 fit_mcmc3 <- readRDS(here('data/sequencing_rpoB/processed/transition_rates/fit_mcmc_musse.rds'))
 
-```
 
-```{r fit_musse}
-#| eval: false
 
-# set up sampling fractions, set them all to 1
-sampling_frac <- setNames(rep(1, times = 4), sort(unique(hab_pref_new2)))
+## ----fit_musse------------------------------------------------------------------------------------------------------------------
+## # set up sampling fractions, set them all to 1
+## sampling_frac <- setNames(rep(1, times = 4), sort(unique(hab_pref_new2)))
+## 
+## # set up likelihood model for diversitree
+## lik_musse <- make.musse(tree, hab_pref_new2, k = max(hab_pref_new2), sampling.f = sampling_frac)
+## 
+## # set constraints for transitions that do not occur
+## lik_musse <- constrain(lik_musse, q14~0, q23~0, q41~0)
+## 
+## # we can estimate starting values using starting.point.musse()
+## start_vals <- starting.point.musse(tree, k = max(hab_pref_new2))
+## 
+## for(i in 1:length(mod_1$par)){
+##     start_vals[names(start_vals) == names(mod_premusse1$par)[i]] <- unname(mod_premusse1$par[i])
+## }
+## 
+## # fit musse model
+## fit_musse <- find.mle(lik_musse, x.init = start_vals[argnames(lik_musse)], method = 'subplex', control = list(maxit = 50000))
+## 
 
-# set up likelihood model for diversitree
-lik_musse <- make.musse(tree, hab_pref_new2, k = max(hab_pref_new2), sampling.f = sampling_frac)
 
-# set constraints for transitions that do not occur
-lik_musse <- constrain(lik_musse, q14~0, q23~0, q41~0)
+## ----run_null_models------------------------------------------------------------------------------------------------------------
+## # remove state dependent speciation and extinction parameters
+## lik_null_no_sse <- constrain(lik_musse, lambda2 ~ lambda1, lambda3 ~ lambda1, lambda4 ~ lambda1,
+##                              mu2 ~ mu1, mu3 ~ mu1, mu4 ~ mu1)
+## 
+## # remove only speciation parameters
+## lik_null_no_ss <- constrain(lik_musse, lambda2 ~ lambda1, lambda3 ~ lambda1, lambda4 ~ lambda1)
+## 
+## # remove only extinction parameters
+## lik_null_no_se <- constrain(lik_musse, mu2 ~ mu1, mu3 ~ mu1, mu4 ~ mu1)
+## 
+## # fit model
+## fit_musse_no_sse <- find.mle(lik_null_no_sse, x.init = start_vals[argnames(lik_null_no_sse)], method = 'subplex', control = list(maxit = 50000))
+## fit_musse_no_ss <- find.mle(lik_null_no_ss, x.init = start_vals[argnames(lik_null_no_ss)],method = 'subplex', control = list(maxit = 50000))
+## fit_musse_no_se <- find.mle(lik_null_no_se, x.init = start_vals[argnames(lik_null_no_se)], method = 'subplex', control = list(maxit = 50000))
+## 
 
-# we can estimate starting values using starting.point.musse()
-start_vals <- starting.point.musse(tree, k = max(hab_pref_new2))
 
-for(i in 1:length(mod_1$par)){
-    start_vals[names(start_vals) == names(mod_premusse1$par)[i]] <- unname(mod_premusse1$par[i])
-}
-
-# fit musse model
-fit_musse <- find.mle(lik_musse, x.init = start_vals[argnames(lik_musse)], method = 'subplex', control = list(maxit = 50000))
-
-```
-
-We want to compare this to a null model where diversification rates do not vary between states. To do this we do another **constrain()** call.
-
-### Run null model MuSSE
-
-We will set up three null models which each have different constraints:
-
--   no state-dependent variation in speciation or extinction
--   no state-dependent variation in speciation only
--   no state-dependent variation in extinction only
-
-```{r run_null_models}
-#| eval: false
-
-# remove state dependent speciation and extinction parameters
-lik_null_no_sse <- constrain(lik_musse, lambda2 ~ lambda1, lambda3 ~ lambda1, lambda4 ~ lambda1,
-                             mu2 ~ mu1, mu3 ~ mu1, mu4 ~ mu1)
-
-# remove only speciation parameters
-lik_null_no_ss <- constrain(lik_musse, lambda2 ~ lambda1, lambda3 ~ lambda1, lambda4 ~ lambda1)
-
-# remove only extinction parameters
-lik_null_no_se <- constrain(lik_musse, mu2 ~ mu1, mu3 ~ mu1, mu4 ~ mu1)
-
-# fit model
-fit_musse_no_sse <- find.mle(lik_null_no_sse, x.init = start_vals[argnames(lik_null_no_sse)], method = 'subplex', control = list(maxit = 50000))
-fit_musse_no_ss <- find.mle(lik_null_no_ss, x.init = start_vals[argnames(lik_null_no_ss)],method = 'subplex', control = list(maxit = 50000))
-fit_musse_no_se <- find.mle(lik_null_no_se, x.init = start_vals[argnames(lik_null_no_se)], method = 'subplex', control = list(maxit = 50000))
-
-```
-
-We can do model simplification on these to see how they perform.
-
-```{r musse_anova}
+## ----musse_anova----------------------------------------------------------------------------------------------------------------
 # run anova
 anova(no_sse = fit_musse_no_sse,
       no_ss = fit_musse_no_ss,
@@ -1641,79 +1148,57 @@ d_musse_aic <- data.frame(model = c('full_sse', 'no_se', 'no_ss', 'no_sse'), aic
     mutate(weights = round(MuMIn::Weights(aic), 3))
 
 d_musse_aic
-```
 
-So the best model is with no state dependent extinction. We can re-run this model with other start values (not passing the values from **diversitree**) to see how it does.
 
-```{r rerun_best}
-#| eval: false
+## ----rerun_best-----------------------------------------------------------------------------------------------------------------
+## # we can estimate starting values using starting.point.musse()
+## start_vals <- starting.point.musse(tree, k = max(hab_pref_new2))
+## 
+## fit_musse_no_se2 <- find.mle(lik_null_no_se, x.init = start_vals[argnames(lik_null_no_se)], method = 'subplex', control = list(maxit = 50000))
 
-# we can estimate starting values using starting.point.musse()
-start_vals <- starting.point.musse(tree, k = max(hab_pref_new2))
 
-fit_musse_no_se2 <- find.mle(lik_null_no_se, x.init = start_vals[argnames(lik_null_no_se)], method = 'subplex', control = list(maxit = 50000))
-```
-
-We can check the difference between the models in terms of AIC score.
-
-```{r compare_sse_models}
+## ----compare_sse_models---------------------------------------------------------------------------------------------------------
 
 AIC(fit_musse_no_se, fit_musse_no_se2)
 
 fit_musse_no_se$lnLik
 fit_musse_no_se2$lnLik
 
-```
 
-We can see that the first model where we passed the estimated transition rates from a non-SSE model to the data has a much, much lower AIC value, and a much much higher log likelihood. Consequently this model should be favoured, however it does hint that our model is perhaps sensitive to the start values. We can try and run MCMC to get a better handle on the variation in the parameter estimates.
 
-However first we can look at the parameters, specifically the diversificiation parameters.
-
-```{r}
+## -------------------------------------------------------------------------------------------------------------------------------
 
 fit_musse_no_se$par %>% round(2)
 
 coding_new
-```
 
-So from this we can see that diversification rate faster in generalist than specialist states, but specifically is super fast in generalists adapted to live in marine mud.
 
-### Run mcmc MuSSE
+## ----musse_mcmc-----------------------------------------------------------------------------------------------------------------
+## # set up initial start values
+## inits_mcmc <- fit_musse_no_se$par
+## 
+## # set up upper and lower limits - limit the values to be < 10 times the max value
+## lower_mcmc <- rep(0, length(inits_mcmc))
+## upper_mcmc <- rep(max(inits_mcmc)*100, length(inits_mcmc))
+## 
+## # run first mcmc to tune w
+## fit_mcmc <- mcmc(lik_null_no_se, inits_mcmc, nsteps = 10, w = 0.1, upper = upper_mcmc, lower = lower_mcmc)
+## 
+## # tune w for each parameter
+## w <- diff(sapply(fit_mcmc[2:(ncol(fit_mcmc)-1)], quantile, c(.05, .95)))
+## 
+## # run second mcmc to tune w
+## fit_mcmc2 <- mcmc(lik_null_no_se, inits_mcmc, nsteps=100, w=w, upper = upper_mcmc, lower = lower_mcmc)
+## 
+## # tune w for each parameter
+## w <- diff(sapply(fit_mcmc2[2:(ncol(fit_mcmc2)-1)], quantile, c(.05, .95)))
+## 
+## # run third mcmc for 1000 iter
+## fit_mcmc3 <- mcmc(lik_null_no_se, inits_mcmc, nsteps=1000, w=w, upper = upper_mcmc, lower = lower_mcmc)
+## 
 
-```{r musse_mcmc}
-#| message: false
-#| eval: false
 
-# set up initial start values
-inits_mcmc <- fit_musse_no_se$par
-
-# set up upper and lower limits - limit the values to be < 10 times the max value
-lower_mcmc <- rep(0, length(inits_mcmc))
-upper_mcmc <- rep(max(inits_mcmc)*100, length(inits_mcmc))
-
-# run first mcmc to tune w
-fit_mcmc <- mcmc(lik_null_no_se, inits_mcmc, nsteps = 10, w = 0.1, upper = upper_mcmc, lower = lower_mcmc)
-
-# tune w for each parameter
-w <- diff(sapply(fit_mcmc[2:(ncol(fit_mcmc)-1)], quantile, c(.05, .95)))
-
-# run second mcmc to tune w
-fit_mcmc2 <- mcmc(lik_null_no_se, inits_mcmc, nsteps=100, w=w, upper = upper_mcmc, lower = lower_mcmc)
-
-# tune w for each parameter
-w <- diff(sapply(fit_mcmc2[2:(ncol(fit_mcmc2)-1)], quantile, c(.05, .95)))
-
-# run third mcmc for 1000 iter
-fit_mcmc3 <- mcmc(lik_null_no_se, inits_mcmc, nsteps=1000, w=w, upper = upper_mcmc, lower = lower_mcmc)
-
-```
-
-We can plot the distribution for speciation rates.
-
-```{r plot_speciation}
-#| fig.height: 5
-#| fig.width: 7
-
+## ----plot_speciation------------------------------------------------------------------------------------------------------------
 # set colours
 cols_hab <- met.brewer('Ingres', n = 4)
 names(cols_hab) <- c('saline_specialist', 'saline_generalist', 'non-saline_generalist', 'non-saline_specialist')
@@ -1749,15 +1234,9 @@ ggplot(d_speciation_summary, aes(hab_pref_axis, speciation_rate, col = hab_pref)
   
 ggsave(here('plots/sequencing_rpoB/analyses/musse_speciation.png'), last_plot(), height = 5, width = 7)
   
-```
 
-Ok this is super cool. So if you are adapted to live in the saline environment, you have a faster speciation rate (and diversification rate) than the non-saline environments, but within environments generalists have higher diversification rates than specialists.
 
-So it is environments and specialism that drive diversification rates, not transitions per se.
-
-We can also plot the estimates of the transition rates in a plot.
-
-```{r plot_musse_transitions}
+## ----plot_musse_transitions-----------------------------------------------------------------------------------------------------
 
 # grab out transition rates
 d_transition_musse <- select(fit_mcmc3, i, starts_with('q')) %>%
@@ -1816,17 +1295,9 @@ p + geom_label(aes(nudge_x + x, nudge_y+y, label = label), point_data, size = Mi
 
 # save out model
 ggsave(here('plots/sequencing_rpoB/analyses/transition_plot_musse.png'), last_plot(), height = 6, width = 8)
-```
 
-### Fit a MuHiSSE model
 
-We will now try and fit a MuHiSSE, allowing for a hidden state within each character combination.
-
-For these models we have to set the extinction fraction (the estimated proportion of extant species).
-
-I think the MuHiSSE implementations need the trait to be in a 00, 01, 10, 11 format so will implement that where non-saline (0) or saline (1) is the first digit, followed by generalist (0) or specialist (1).
-
-```{r setup muhisse}
+## ----setup muhisse--------------------------------------------------------------------------------------------------------------
 # make new coding
 hab_pref_new3 <- case_when(hab_pref_new2 == 1 ~ '00',
                            hab_pref_new2 == 2 ~ '01',
@@ -1858,42 +1329,28 @@ f = c(1,1,1,1)
 muhisse_df <- data.frame(tip_label = names(hab_pref_new3),
                          saline = substr(hab_pref_new3, 1,1),
                          specialist = substr(hab_pref_new3, 2,2))
-```
 
-Now lets try and run the MuHiSSE... The process for setting start parameters does not seem as flexible as in **diversitree**. We currently do not run the MuHiSSE as it has not converged. See `scripts/sequencing_rpoB/analyses/draft/run_muhisse.R` for code to try and fit a MuHiSSE model with this data.
 
-```{r run_MuHiSSE}
-#| eval: false
-muhisse_1 <- MuHiSSE(phy=tree, data=muhisse_df, f=f,
-                     turnover=turnover, 
-                     eps=extinction_fraction, 
-                     hidden.states=TRUE, 
-                     trans.rate=trans_mat)
-```
+## ----run_MuHiSSE----------------------------------------------------------------------------------------------------------------
+## muhisse_1 <- MuHiSSE(phy=tree, data=muhisse_df, f=f,
+##                      turnover=turnover,
+##                      eps=extinction_fraction,
+##                      hidden.states=TRUE,
+##                      trans.rate=trans_mat)
 
-## Useful links used
 
--   [Chapter 13](https://lukejharmon.github.io/pcm/chapter13_chardiv/#ref-Beaulieu2016-ww) of Luke Harmon's book on phylogenetic comparative methods on "Characters and diversification rates".
--   [Tutorial](https://www.zoology.ubc.ca/prog/diversitree/doc/diversitree-tutorial.pdf) on using the R package **diversitree**.
--   [Documentation](https://yulab-smu.top/treedata-book/) of the R package **ggtree** used for plotting phylogenies.
--   [Phylo-wiki](https://www.r-phylo.org/wiki/HowTo/Ancestral_State_Reconstruction) help page on ancestral state reconstruction.
--   [Github Issue](https://github.com/YuLab-SMU/ggtree/issues/419#issuecomment-877563385) on plotting pie charts for ancestral state reconstructions.
+## ----old_code-------------------------------------------------------------------------------------------------------------------
+## # first get the trait matrix into a data frame we can use
+## trans_mat_df <- as_tibble(trans_mat) %>%
+##   mutate(state1_full = row.names(trans_mat)) %>%
+##   pivot_longer(cols = starts_with('('), values_to = 'param_num', names_to = 'state2_full') %>%
+##   mutate(state1 = substr(state1_full, 2,3),
+##          state2 = substr(state2_full, 2,3)) %>%
+##   left_join(., get_diversitree_df(mod_premusse1, trait_vec = coding_new$hab_pref_num, replace_vec = coding_new$muhisse_coding))
+## 
+## premusse_rates <- get_diversitree_df(mod_premusse1, trait_vec = coding_new$hab_pref_num, replace_vec = coding_new$muhisse_coding) %>%
+##   select(state1 = state_1, state2 = state_2, transition_rate)
+## 
+## trans_mat_df <- left_join(trans_mat_df, premusse_rates)
+## 
 
-```{r old_code}
-#| eval: false
-#| echo: false
-
-# first get the trait matrix into a data frame we can use
-trans_mat_df <- as_tibble(trans_mat) %>%
-  mutate(state1_full = row.names(trans_mat)) %>%
-  pivot_longer(cols = starts_with('('), values_to = 'param_num', names_to = 'state2_full') %>%
-  mutate(state1 = substr(state1_full, 2,3),
-         state2 = substr(state2_full, 2,3)) %>%
-  left_join(., get_diversitree_df(mod_premusse1, trait_vec = coding_new$hab_pref_num, replace_vec = coding_new$muhisse_coding))
-
-premusse_rates <- get_diversitree_df(mod_premusse1, trait_vec = coding_new$hab_pref_num, replace_vec = coding_new$muhisse_coding) %>%
-  select(state1 = state_1, state2 = state_2, transition_rate)
-
-trans_mat_df <- left_join(trans_mat_df, premusse_rates)
-
-```
