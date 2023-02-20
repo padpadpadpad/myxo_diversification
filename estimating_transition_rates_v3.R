@@ -20,8 +20,6 @@ library(flextable)
 library(ggridges)
 library(hisse)
 
-# set where I am in the project
-here::i_am('scripts/sequencing_rpoB/analyses/phylogenetics/estimating_transition_rates_v3.qmd')
 
 # read in habitat preference
 d_habpref <- read.csv(here('data/sequencing_rpoB/phyloseq/myxococcus/habitat_preference/summary/habitat_preference_asv.csv'))
@@ -131,6 +129,10 @@ argnames(lik_er)
 inits_ard <- rep(1, length(argnames(lik_ard)))
 inits_sym <- rep(1, length(argnames(lik_sym)))
 inits_er <- rep(1, length(argnames(lik_er)))
+
+mod_sym <- find.mle(lik_sym, inits_sym, method = 'subplex', control = list(maxit = 50000))
+mod_er <- find.mle(lik_er, inits_er, method = 'subplex', control = list(maxit = 50000))
+mod_ard <- find.mle(lik_ard, inits_ard, method = 'subplex', control = list(maxit = 50000))
 
 ## ----diversitree_compare--------------------------------------------------------------------------------------------------------
 
@@ -311,7 +313,6 @@ mod_custom5$par %>% sort()
 
 ## ----diversitree_6_load---------------------------------------------------------------------------------------------------------
 # read in files
-mod_custom6 <- readRDS(here('data/sequencing_rpoB/processed/transition_rates/mod_custom6_mac.rds'))
 
 # make custom matrix model
 lik_custom6 <- constrain(lik_ard, 
@@ -320,14 +321,10 @@ lik_custom6 <- constrain(lik_ard,
                      q57~0,
                      q43~0,
                      q56~0,
-                     q27~0)
+                     q76~0)
 
 # make start parameters
 inits_custom6 <- rep(1, length(argnames(lik_custom6)))
-
-#-----------------------#
-# STOP AT THIS POINT ####
-#-----------------------#
 
 # run model - got stuck here
 mod_custom6 <- find.mle(lik_custom6, inits_custom6, method = 'subplex', control = list(maxit = 5))
@@ -343,28 +340,36 @@ anova(mod_custom5, mod_custom6)
 mod_custom6$par %>% sort()
 
 
+# save out models so far
+saveRDS(mod_ard, 'data/sequencing_rpoB/processed/transition_rates/asv_mod_ard.rds')
+saveRDS(mod_sym, 'data/sequencing_rpoB/processed/transition_rates/asv_mod_sym.rds')
+saveRDS(mod_er, 'data/sequencing_rpoB/processed/transition_rates/asv_mod_er.rds')
+saveRDS(mod_custom1, 'data/sequencing_rpoB/processed/transition_rates/asv_mod_custom1.rds')
+saveRDS(mod_custom2, 'data/sequencing_rpoB/processed/transition_rates/asv_mod_custom2.rds')
+saveRDS(mod_custom3, 'data/sequencing_rpoB/processed/transition_rates/asv_mod_custom3.rds')
+saveRDS(mod_custom4, 'data/sequencing_rpoB/processed/transition_rates/asv_mod_custom4.rds')
+saveRDS(mod_custom5, 'data/sequencing_rpoB/processed/transition_rates/asv_mod_custom5.rds')
+saveRDS(mod_custom6, 'data/sequencing_rpoB/processed/transition_rates/asv_mod_custom6.rds')
+
+
 ## ----diversitree_7_load---------------------------------------------------------------------------------------------------------
 # read in files
-mod_custom7 <- readRDS(here('data/sequencing_rpoB/processed/transition_rates/mod_custom7_mac.rds'))
 
 # make custom matrix model
 lik_custom7 <- constrain(lik_ard, 
-                     q16~0, q26~0, q27~0, q35~0, q36~0, q42~0, q46~0, q47~0, q53~0, q54~0, q63~0, q64~0, q72~0, q74~0, q17~0, q75~0, q71~0, q51~0, q14~0, q52~0, q67~0)
+                         q13~0, q15~0, q16~0, q17~0, q26~0, q45~0, q51~0, q53~0, q54~0, q62~0,
+                         q31~0, q35~0, q36~0, q63~0, q72~0, q73~0, q75~0,
+                         q57~0,
+                         q43~0,
+                         q56~0,
+                         q76~0,
+                         q64~0)
 
 # make start parameters
 inits_custom7 <- rep(1, length(argnames(lik_custom7)))
 
-
-## ----diversitree_7_setup--------------------------------------------------------------------------------------------------------
-## # make custom matrix model
-## lik_custom7 <- constrain(lik_ard,
-##                      q16~0, q26~0, q27~0, q35~0, q36~0, q42~0, q46~0, q47~0, q53~0, q54~0, q63~0, q64~0, q72~0, q74~0, q17~0, q75~0, q71~0, q51~0, q14~0, q52~0, q67~0)
-## 
-## # make start parameters
-## inits_custom7 <- rep(1, length(argnames(lik_custom7)))
-## 
 ## # run model
-## mod_custom7 <- find.mle(lik_custom7, inits_custom7, method = 'subplex', control = list(maxit = 50000))
+mod_custom7 <- find.mle(lik_custom7, inits_custom7, method = 'subplex', control = list(maxit = 50000))
 
 
 ## ----diversitree_7_compare------------------------------------------------------------------------------------------------------
@@ -377,29 +382,24 @@ anova(mod_custom6, mod_custom7)
 # sort parameter estimates
 mod_custom7$par %>% sort()
 
-
-## ----diversitree_8_load---------------------------------------------------------------------------------------------------------
-# read in files
-mod_custom8 <- readRDS(here('data/sequencing_rpoB/processed/transition_rates/mod_custom8_mac.rds'))
+## ----diversitree_8_load--------------------------------------------------------------------------------------
 
 # make custom matrix model
 lik_custom8 <- constrain(lik_ard, 
-                     q16~0, q26~0, q27~0, q35~0, q36~0, q42~0, q46~0, q47~0, q53~0, q54~0, q63~0, q64~0, q72~0, q74~0, q17~0, q75~0, q71~0, q51~0, q14~0, q52~0, q67~0, q34~0)
+                        q13~0, q15~0, q16~0, q17~0, q26~0, q45~0, q51~0, q53~0, q54~0, q62~0,
+                        q31~0, q35~0, q36~0, q63~0, q72~0, q73~0, q75~0,
+                        q57~0,
+                        q43~0,
+                        q56~0,
+                        q76~0,
+                        q64~0,
+                        q65~0)
 
 # make start parameters
 inits_custom8 <- rep(1, length(argnames(lik_custom8)))
 
-
-## ----diversitree_8_setup--------------------------------------------------------------------------------------------------------
-## # make custom matrix model
-## lik_custom8 <- constrain(lik_ard,
-##                      q16~0, q26~0, q27~0, q35~0, q36~0, q42~0, q46~0, q47~0, q53~0, q54~0, q63~0, q64~0, q72~0, q74~0, q17~0, q75~0, q71~0, q51~0, q14~0, q52~0, q67~0, q34~0)
-## 
-## # make start parameters
-## inits_custom8 <- rep(1, length(argnames(lik_custom8)))
-## 
-## # run model
-## mod_custom8 <- find.mle(lik_custom8, inits_custom8, method = 'subplex', control = list(maxit = 50000))
+# run model
+mod_custom8 <- find.mle(lik_custom8, inits_custom8, method = 'subplex', control = list(maxit = 50000))
 
 
 ## ----diversitree_8_compare------------------------------------------------------------------------------------------------------
@@ -412,9 +412,41 @@ anova(mod_custom7, mod_custom8)
 # sort parameter estimates
 mod_custom8$par %>% sort()
 
+# make custom matrix model
+lik_custom9 <- constrain(lik_ard, 
+                         q13~0, q15~0, q16~0, q17~0, q26~0, q45~0, q51~0, q53~0, q54~0, q62~0,
+                         q31~0, q35~0, q36~0, q63~0, q72~0, q73~0, q75~0,
+                         q57~0,
+                         q43~0,
+                         q56~0,
+                         q76~0,
+                         q64~0,
+                         q65~0,
+                         q46~0)
+
+# make start parameters
+inits_custom9 <- rep(1, length(argnames(lik_custom9)))
+
+# run model
+mod_custom9 <- find.mle(lik_custom9, inits_custom9, method = 'subplex', control = list(maxit = 50000))
+
+
+## ----diversitree_9_compare------------------------------------------------------------------------------------------------------
+# do AIC comparison
+AIC(mod_sym, mod_ard, mod_er, mod_custom1, mod_custom2, mod_custom3, mod_custom4, mod_custom5, mod_custom6, mod_custom7, mod_custom8, mod_custom9) %>% arrange(AIC)
+
+# anova
+anova(mod_custom8, mod_custom9)
+
+# sort parameter estimates
+mod_custom9$par %>% sort()
+
+# mod custom 4 is the best.
+# run it for more iterations
+mod_custom4 <- find.mle(lik_custom4, inits_custom4, method = 'subplex', control = list(maxit = 100000))
 
 ## ----plot_transition_matrix-----------------------------------------------------------------------------------------------------
-diversitree_df <- get_diversitree_df(mod_custom7, coding$hab_pref_num2, coding$hab_pref)
+diversitree_df <- get_diversitree_df(mod_custom4, coding$hab_pref_num2, coding$hab_pref)
 
 diversitree_df %>%
   left_join(., select(coding, state_1 = hab_pref, state_1_num = hab_pref_num2, state_1_label = hab_pref_axis)) %>%
@@ -433,7 +465,7 @@ diversitree_df %>%
   scale_y_discrete(position = 'left', labels = scales::label_wrap(13)) +
   labs(y = 'state 1',
   x = 'state 2',
-  title = paste('all rates different with', length(mod_custom7$par), 'free parameters', sep = ' ')) +
+  title = paste('all rates different with', length(mod_custom4$par), 'free parameters', sep = ' ')) +
   coord_fixed() +
   scale_color_manual(values = c('red', 'black'))
 
@@ -447,27 +479,27 @@ fit_mcmc3 <- readRDS(here('data/sequencing_rpoB/processed/transition_rates/best_
 
 ## ----mcmc_try-------------------------------------------------------------------------------------------------------------------
 ## # set up initial start values
-## inits_mcmc <- mod_custom7$par
-## 
+inits_mcmc <- mod_custom4$par
+
 ## # set up upper and lower limits - limit the values to be < 10 times the max value
-## lower_mcmc <- rep(0, length(inits_mcmc))
-## upper_mcmc <- rep(max(inits_mcmc)*10, length(inits_mcmc))
+lower_mcmc <- rep(0, length(inits_mcmc))
+upper_mcmc <- rep(max(inits_mcmc)*5, length(inits_mcmc))
 ## 
 ## # run first mcmc to tune w
-## fit_mcmc <- mcmc(lik_custom7, inits_mcmc, nsteps = 10, w = 0.1, upper = upper_mcmc, lower = lower_mcmc)
-## 
+fit_mcmc <- mcmc(lik_custom4, inits_mcmc, nsteps = 10, w = 0.1, upper = upper_mcmc, lower = lower_mcmc)
+
 ## # tune w for each parameter
-## w <- diff(sapply(fit_mcmc[2:(ncol(fit_mcmc)-1)], quantile, c(.05, .95)))
-## 
-## # run second mcmc to tune w
-## fit_mcmc2 <- mcmc(lik_custom7, inits_mcmc, nsteps=100, w=w, upper = upper_mcmc, lower = lower_mcmc)
-## 
+w <- diff(sapply(fit_mcmc[2:(ncol(fit_mcmc)-1)], quantile, c(.05, .95)))
+
+# run second mcmc to tune w
+fit_mcmc2 <- mcmc(lik_custom4, inits_mcmc, nsteps=100, w=w, upper = upper_mcmc, lower = lower_mcmc)
+
 ## # tune w for each parameter
-## w <- diff(sapply(fit_mcmc2[2:(ncol(fit_mcmc2)-1)], quantile, c(.05, .95)))
-## 
-## # run third mcmc for 1000 iter
-## fit_mcmc3 <- mcmc(lik_custom7, inits_mcmc, nsteps=1000, w=w, upper = upper_mcmc, lower = lower_mcmc)
-## 
+w <- diff(sapply(fit_mcmc2[2:(ncol(fit_mcmc2)-1)], quantile, c(.05, .95)))
+
+# run third mcmc for 1000 iter
+fit_mcmc3 <- mcmc(lik_custom4, inits_mcmc, nsteps=1000, w=w, upper = upper_mcmc, lower = lower_mcmc)
+
 
 
 ## ----plot_mcmc------------------------------------------------------------------------------------------------------------------
