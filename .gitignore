@@ -15,3 +15,4 @@ Icon?
 *.Rproj
 .DS_Store
 data/sequencing_rpoB/phyloseq/myxococcus/dist_matrix.rds
+data/sequencing_rpoB/processed/transition_rates/previous/*
