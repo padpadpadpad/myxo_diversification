@@ -1,28 +1,12 @@
+# script to run models of discrete character evolution ####
 
-# load packages
-library(here)
-library(tidyverse)
-library(ggtree)
-library(ggnewscale)
-library(RColorBrewer)
-library(patchwork)
-library(phytools)
-library(MetBrewer)
-library(ggpp)
-library(castor)
-library(diversitree)
-library(tidygraph)
-library(igraph)
-library(ggraph)
-library(GGally)
-library(ggrepel)
-library(flextable)
-library(ggridges)
-library(hisse)
+# load packages ####
+librarian::shelf(here, tidyverse, ggtree, ggnewscale, RColorBrewer, patchwork, phytools, ggpp, castor, diversitree, tidygraph, igraph, ggraph, GGally, ggrepel, flextable, ggridges, hisse, padpadpadpad/MicrobioUoE)
 
+# read in datasets ####
 
 # read in habitat preference
-d_habpref <- read.csv(here('data/sequencing_rpoB/phyloseq/myxococcus/habitat_preference/summary/habitat_preference_asv.csv'))
+d_habpref <- read.csv(here('data/sequencing_rpoB/phyloseq/myxococcus/habitat_preference/summary/habitat_preference_asv_new.csv'))
 
 # read in phyloseq object and grab tax table
 d_taxa <- readRDS(here('data/sequencing_rpoB/phyloseq/myxococcus/prevalence_filtered/ps_otu_asv_filt.rds')) %>%
@@ -32,7 +16,8 @@ d_taxa <- readRDS(here('data/sequencing_rpoB/phyloseq/myxococcus/prevalence_filt
   rownames_to_column('otu')
 
 # create d_meta
-d_meta <- left_join(select(d_habpref, otu, habitat_preference, num_present), select(d_taxa, otu:family))
+# use habitat_preference3 which collapses into marine mud generalists
+d_meta <- left_join(select(d_habpref, otu, habitat_preference = habitat_preference3, num_present), select(d_taxa, otu:family))
 
 # read in tree
 tree <- read.tree(here('data/sequencing_rpoB/raxml/trees/myxo_asv/myxo_asv_chronopl10.tre'))
@@ -40,7 +25,10 @@ tree <- read.tree(here('data/sequencing_rpoB/raxml/trees/myxo_asv/myxo_asv_chron
 # read in shift nodes
 shiftnodes <- readRDS(here('data/sequencing_rpoB/processed/shiftnodes.rds'))
 
-## ----custom_function------------------------------------------------------------------------------------------------------------
+# read in colours for states
+cols_hab <- readRDS(here('data/sequencing_rpoB/phyloseq/myxococcus/habitat_preference/summary/habitat_colours.rds'))
+
+#custom_function ####
 
 # function for getting a data frame from a diversitree object
 get_diversitree_df <- function(div_obj, trait_vec, replace_vec){
@@ -61,7 +49,9 @@ get_diversitree_df <- function(div_obj, trait_vec, replace_vec){
   
 }
 
-## ----tip_state_dataframe--------------------------------------------------------------------------------------------------------
+# setup for analyses ####
+
+# reorder metadata to match tip labels of tree
 d_meta <- tibble(tip_label = tree$tip.label) %>%
   left_join(., rename(d_meta, tip_label = otu))
 
@@ -69,27 +59,28 @@ d_meta <- tibble(tip_label = tree$tip.label) %>%
 sum(d_meta$tip_label == tree$tip.label) == length(tree$tip.label)
 # SUCCESS if TRUE
 
-# create new coding where we collapse all marine generalists together
-d_meta <- mutate(d_meta, habitat_preference2 = ifelse(habitat_preference %in% c('marine_mud:terrestrial', 'freshwater:marine_mud:terrestrial', 'freshwater:marine_mud'), 'marine_mud:generalist', habitat_preference))
+# use habitat preference 3 - which collapses marine mud generalists into a single state
+unique(d_meta$habitat_preference)
 
-hab_pref <- setNames(d_meta$habitat_preference2, d_meta$tip_label)
+hab_pref <- setNames(d_meta$habitat_preference, d_meta$tip_label)
 hab_pref_num <- as.numeric(as.factor(hab_pref))
 hab_pref_num <- setNames(hab_pref_num, d_meta$tip_label)
-
 
 # coding from numeric to character
 coding <- tibble(hab_pref = unname(hab_pref), hab_pref_num = unname(hab_pref_num)) %>%
   distinct() %>%
-  mutate(hab_pref2 = gsub(':', '.', hab_pref)) %>%
   arrange(hab_pref) %>%
   mutate(hab_pref_axis = gsub(':', '/ ', hab_pref),
   hab_pref_axis = gsub('_', ' ', hab_pref_axis),
   # rename the columns for easy naming
-  initials = c('F', 'FT', 'M', 'MG', 'T'))
+  initials = c('FG', 'FS', 'MG', 'MS', 'TS'))
 
 coding
 
-## ----diversitree_load-----------------------------------------------------------------------------------------------------------
+#-------------------------------------------------------------#
+# run diversitree analysis of discrete character evolution ####
+#-------------------------------------------------------------#
+
 # all of these methods needs a likelihood function, we can build a Mkn model
 lik_ard <- make.mkn(tree, hab_pref_num, k = max(hab_pref_num))
 
@@ -119,36 +110,16 @@ inits_ard <- rep(1, length(argnames(lik_ard)))
 inits_sym <- rep(1, length(argnames(lik_sym)))
 inits_er <- rep(1, length(argnames(lik_er)))
 
+# run first three models
 mod_sym <- find.mle(lik_sym, inits_sym, method = 'subplex', control = list(maxit = 50000))
 mod_er <- find.mle(lik_er, inits_er, method = 'subplex', control = list(maxit = 50000))
 mod_ard <- find.mle(lik_ard, inits_ard, method = 'subplex', control = list(maxit = 50000))
 
-## ----diversitree_compare--------------------------------------------------------------------------------------------------------
-
+# compare models
 AIC(mod_sym, mod_ard, mod_er) %>% arrange(AIC)
 
 anova(mod_ard, mod_sym)
 anova(mod_ard, mod_er)
-
-
-## ----plot_ard-------------------------------------------------------------------------------------------------------------------
-# look at paraemters
-mod_ard$par
-
-# plot of all parameters
-p1 <- tibble(rate = mod_ard$par) %>%
-  ggplot(., aes(rate)) +
-  geom_histogram(fill = 'white', col = 'black') +
-  theme_bw()
-
-# plot of constrained x axis (rates <1)
-p2 <- tibble(rate = mod_ard$par) %>%
-  filter(rate < 1) %>%
-  ggplot(., aes(rate)) +
-  geom_histogram(fill = 'white', col = 'black') +
-  theme_bw()
-
-p1+p2
 
 # sort parameter estimates
 mod_ard$par %>% sort()
@@ -158,52 +129,32 @@ mod_ard$par[mod_ard$par < 1e-03] %>% names(.)
 
 # make custom matrix model
 lik_custom1 <- constrain(lik_ard, 
-                     q13~0, q15~0, q23~0, q31~0, q32~0, q54~0)
+                     q14~0, q24~0, q25~0, q41~0, q42~0, q53~0)
 
 # make start parameters
 inits_custom1 <- rep(1, length(argnames(lik_custom1)))
 
+# refit model
 mod_custom1 <- find.mle(lik_custom1, inits_custom1, method = 'subplex', control = list(maxit = 50000))
 
-
-## ----diversitree_1_compare------------------------------------------------------------------------------------------------------
 # do AIC comparison
 AIC(mod_sym, mod_ard, mod_er, mod_custom1) %>% arrange(AIC)
 
 # anova
 anova(mod_ard, mod_custom1)
 
+# no change in the log likelihood - this is doing exactly the same
 
-## ----plot_custom1---------------------------------------------------------------------------------------------------------------
 # filter for only estimated parameters
 mod_custom1$par.full[names(mod_custom1$par.full) %in% argnames(lik_custom1)] 
-
-# plot of all parameters
-p1 <- tibble(rate = mod_custom1$par.full[names(mod_custom1$par.full) %in% argnames(lik_custom1)]) %>%
-  ggplot(., aes(rate)) +
-  geom_histogram(fill = 'white', col = 'black') +
-  theme_bw()
-
-# plot of constrained x axis (rates <1)
-p2 <- tibble(rate = mod_custom1$par.full[names(mod_custom1$par.full) %in% argnames(lik_custom1)]) %>%
-  filter(rate < 1) %>%
-  ggplot(., aes(rate)) +
-  geom_histogram(fill = 'white', col = 'black') +
-  theme_bw()
-
-p1+p2
 
 # sort parameter estimates
 mod_custom1$par %>% sort()
 
-# get parameters close to 0.
-mod_custom1$par[mod_custom1$par < 1e-03] %>% names(.)
-
-## ----diversitree_2_load---------------------------------------------------------------------------------------------------------
-# make custom matrix model
+# make custom matrix model again
 lik_custom2 <- constrain(lik_ard, 
-                         q13~0, q15~0, q23~0, q31~0, q32~0, q54~0,
-                         q35~0)
+                         q14~0, q24~0, q25~0, q41~0, q42~0, q53~0,
+                         q45~0)
 
 # make start parameters
 inits_custom2 <- rep(1, length(argnames(lik_custom2)))
@@ -211,24 +162,21 @@ inits_custom2 <- rep(1, length(argnames(lik_custom2)))
 ## # run model
 mod_custom2 <- find.mle(lik_custom2, inits_custom2, method = 'subplex', control = list(maxit = 50000))
 
-
-## ----diversitree_2_compare------------------------------------------------------------------------------------------------------
 # do AIC comparison
 AIC(mod_sym, mod_ard, mod_er, mod_custom1, mod_custom2) %>% arrange(AIC)
 
 # anova
 anova(mod_custom1, mod_custom2)
+# parameter not significant
 
 # sort parameter estimates
 mod_custom2$par %>% sort()
 
-
-## ----diversitree_3_load---------------------------------------------------------------------------------------------------------
 # make custom matrix model
 lik_custom3 <- constrain(lik_ard, 
-                         q13~0, q15~0, q23~0, q31~0, q32~0, q54~0,
-                         q35~0,
-                         q53~0)
+                         q14~0, q24~0, q25~0, q41~0, q42~0, q53~0,
+                         q45~0,
+                         q54~0)
 
 # make start parameters
 inits_custom3 <- rep(1, length(argnames(lik_custom3)))
@@ -236,24 +184,22 @@ inits_custom3 <- rep(1, length(argnames(lik_custom3)))
 # run model
 mod_custom3 <- find.mle(lik_custom3, inits_custom3, method = 'subplex', control = list(maxit = 50000))
 
-## ----diversitree_3_compare------------------------------------------------------------------------------------------------------
 # do AIC comparison
 AIC(mod_sym, mod_ard, mod_er, mod_custom1, mod_custom2, mod_custom3) %>% arrange(AIC)
 
 # anova
 anova(mod_custom2, mod_custom3)
+# parameter is just not significant.
 
 # sort parameter estimates
 mod_custom3$par %>% sort()
 
-
-## ----diversitree_4_load---------------------------------------------------------------------------------------------------------
 # make custom matrix model
 lik_custom4 <- constrain(lik_ard, 
-                         q13~0, q15~0, q23~0, q31~0, q32~0, q54~0,
-                         q35~0,
-                         q53~0,
-                         q34~0)
+                         q14~0, q24~0, q25~0, q41~0, q42~0, q53~0,
+                         q45~0,
+                         q54~0,
+                         q43~0)
 
 # make start parameters
 inits_custom4 <- rep(1, length(argnames(lik_custom4)))
@@ -261,13 +207,12 @@ inits_custom4 <- rep(1, length(argnames(lik_custom4)))
 # run model
 mod_custom4 <- find.mle(lik_custom4, inits_custom4, method = 'subplex', control = list(maxit = 50000))
 
-## ----diversitree_4_compare------------------------------------------------------------------------------------------------------
 # do AIC comparison
 AIC(mod_sym, mod_ard, mod_er, mod_custom1, mod_custom2, mod_custom3, mod_custom4) %>% arrange(AIC)
 
 # anova
 anova(mod_custom3, mod_custom4)
-
+# super significant
 
 # save out models so far
 saveRDS(mod_ard, 'data/sequencing_rpoB/processed/transition_rates/asv_mod_ard_v2.rds')
@@ -278,7 +223,7 @@ saveRDS(mod_custom2, 'data/sequencing_rpoB/processed/transition_rates/asv_mod_cu
 saveRDS(mod_custom3, 'data/sequencing_rpoB/processed/transition_rates/asv_mod_custom3_v2.rds')
 saveRDS(mod_custom4, 'data/sequencing_rpoB/processed/transition_rates/asv_mod_custom4_v2.rds')
 
-## ----plot_transition_matrix-----------------------------------------------------------------------------------------------------
+# plot_transition_matrix
 diversitree_df <- get_diversitree_df(mod_custom3, coding$hab_pref_num, coding$hab_pref)
 
 diversitree_df %>%
@@ -296,25 +241,30 @@ diversitree_df %>%
   geom_text(aes(label = transition_rate), size = MicrobioUoE::pts(10)) +
   scale_x_discrete(position = 'top', labels = scales::label_wrap(13)) +
   scale_y_discrete(position = 'left', labels = scales::label_wrap(13)) +
-  labs(y = 'state 1',
-  x = 'state 2',
-  title = paste('all rates different with', length(mod_custom4$par), 'free parameters', sep = ' ')) +
+  labs(y = 'From',
+  x = 'To',
+  title = paste('all rates different with', length(mod_custom3$par), 'free parameters', sep = ' ')) +
   coord_fixed() +
   scale_color_manual(values = c('red', 'black'))
 
 
-## ----mcmc_try-------------------------------------------------------------------------------------------------------------------
-## # set up initial start values
+ggsave('plots/sequencing_rpoB/analyses/discrete_character_evolution/transition_matrix.png', last_plot(), height = 5, width = 7)
+
+#-----------------------------------------------------------------#
+# look at uncertainty in these model estimates by running MCMC ####
+#-----------------------------------------------------------------#
+
+# set up initial start values
 inits_mcmc <- mod_custom3$par
 
-## # set up upper and lower limits - limit the values to be < 10 times the max value
+## # set up upper and lower limits - limit the values to be <3 times the max value
 lower_mcmc <- rep(0, length(inits_mcmc))
-upper_mcmc <- rep(max(inits_mcmc)*5, length(inits_mcmc))
-## 
-## # run first mcmc to tune w
+upper_mcmc <- rep(max(inits_mcmc)*3, length(inits_mcmc))
+
+# run first mcmc to tune w
 fit_mcmc <- mcmc(lik_custom3, inits_mcmc, nsteps = 10, w = 0.1, upper = upper_mcmc, lower = lower_mcmc)
 
-## # tune w for each parameter
+# tune w for each parameter
 w <- diff(sapply(fit_mcmc[2:(ncol(fit_mcmc)-1)], quantile, c(.05, .95)))
 
 # run second mcmc to tune w
@@ -326,8 +276,9 @@ w <- diff(sapply(fit_mcmc2[2:(ncol(fit_mcmc2)-1)], quantile, c(.05, .95)))
 # run third mcmc for 1000 iter
 fit_mcmc3 <- mcmc(lik_custom3, inits_mcmc, nsteps=1000, w=w, upper = upper_mcmc, lower = lower_mcmc)
 
+# save out mcmc chains
+saveRDS(fit_mcmc3, 'data/sequencing_rpoB/processed/transition_rates/asv_mcmc_custom3_v2.rds')
 
-## ----plot_mcmc------------------------------------------------------------------------------------------------------------------
 # make data long format
 d_mcmc <- pivot_longer(fit_mcmc3, names_to = 'param', values_to = 'transition_rate', cols = starts_with('q')) %>%
   left_join(., select(diversitree_df, param, state_1, state_2)) %>%
@@ -357,13 +308,19 @@ ggplot(d_mcmc_summary, aes(transition_rate, forcats::fct_reorder(parameter, tran
        y = 'transition',
        caption = 'red points are ML estimate\nblack points are MCMC average')
 
-# look at whether the two crazy estimates correlate with each other.
-ggplot(fit_mcmc3, aes(q25, q52)) +
-  geom_point() +
+# look at which rates correlate with each
+d_mcmc %>%
+  select(parameter, transition_rate, i) %>%
+  pivot_wider(names_from = parameter, values_from = transition_rate) %>%
+  slice_sample(n = 250) %>%
+  ggpairs(., columns = 2:ncol(.),
+          lower = list(continuous = wrap("points", alpha = 0.3))) +
   theme_bw()
-# yes but not negatively
-# so when one is mad high the other is also mad high
+ggsave('plots/sequencing_rpoB/analyses/discrete_character_evolution/pairs_plot.png', last_plot(), height = 12, width = 14)
 
+#-------------------------------------#
+# run stochastic character mapping ####
+#-------------------------------------#
 
 # create transition matrix
 num_states <- unique(hab_pref) %>% length()
@@ -384,10 +341,10 @@ best_matrix[best_matrix != 0] <- arrange(diversitree_df, state_2, state_1) %>% p
 # make diagonal values make things sum to 0
 diag(best_matrix) <- -rowSums(best_matrix)
 
-simmap_best <- make.simmap(tree, hab_pref, nsim = 1000, Q = best_matrix)
+# simmap_best <- make.simmap(tree, hab_pref, nsim = 1000, Q = best_matrix)
 
-## # need to split this result up so that files are less than 50MB for GitHub
-## # number of splits
+# need to split this result up so that files are less than 50MB for GitHub
+# number of splits
 n_splits <- 10
 
 # find start of each split
@@ -399,16 +356,16 @@ for(i in 1:length(splits)){
   saveRDS(simmap_best[splits[i]:(splits[i]+99)], paste("data/sequencing_rpoB/processed/transition_rates/simmap/simmap_", i, '.rds', sep = ''))
 }
 
-## ----summarise_phytools---------------------------------------------------------------------------------------------------------
+# summarise_phytools
+
 ## # summarise number of switches between states and time spent in each state
 simmap_summary <- describe.simmap(simmap_best, plot=FALSE)
-## 
+
 ## # remove the tree element - this is the simmap_best
 simmap_summary$tree <- NULL
 
 saveRDS(simmap_summary, 'data/sequencing_rpoB/processed/transition_rates/simmap/simmap_summary.rds')
 
-## ----simmap_summary-------------------------------------------------------------------------------------------------------------
 # coerce transitions into dataframe
 d_transitions <- as.data.frame(simmap_summary$count, col.names = colnames(simmap_summary$count)) %>%
   mutate(iter = 1:n()) %>%
@@ -432,7 +389,6 @@ group_by(d_transitions, transition) %>%
        y = 'Count')
 
 
-## ----common_transitions---------------------------------------------------------------------------------------------------------
 d_transitions_summary <- group_by(d_transitions, iter) %>%
   mutate(prop = n_transitions/sum(n_transitions)) %>%
   group_by(state_1, state_2) %>%
@@ -462,10 +418,9 @@ table_flex <- flextable(table) %>%
   autofit()
 
 # save out
-save_as_image(table_flex, here('plots/sequencing_rpoB/analyses/proportion_of_transitions.png'), zoom = 3, webshot = 'webshot2')
+save_as_image(table_flex, here('plots/sequencing_rpoB/analyses/discrete_character_evolution/proportion_of_transitions.png'), zoom = 3, webshot = 'webshot2')
 
 table_flex
-
 
 ## ----plot_best_model------------------------------------------------------------------------------------------------------------
 # coerce time into dataframe
@@ -478,9 +433,7 @@ d_time <- as.data.frame(simmap_summary$times, col.names = colnames(simmap_summar
   ungroup()
 
 # set colours
-cols_hab <- met.brewer('Austria', n = 5)
-names(cols_hab) <- c('marine_mud', 'freshwater', 'terrestrial', 'freshwater:terrestrial', 'marine_mud:generalist')
-hab_labels <- c('marine mud', 'freshwater', 'terrestrial', 'freshwater + terrestrial', 'marine mud generalist')
+cols_hab <- readRDS(here('data/sequencing_rpoB/phyloseq/myxococcus/habitat_preference/summary/habitat_colours.rds'))
 
 # calculate mean time spent in each state
 d_timespent <- group_by(d_time, state) %>%
@@ -492,8 +445,8 @@ d_network <- as_tbl_graph(select(diversitree_df, state_1, state_2, transition_ra
   filter(!is.na(transition_rate) & transition_rate > 0) %>%
   activate(nodes) %>%
   left_join(., select(d_timespent, name = state, mean)) %>%
-  left_join(., tibble(name = names(cols_hab), label = hab_labels)) %>%
-  mutate(order = c(1, 2, 5, 4, 3)) %>%
+  left_join(., tibble(name = names(cols_hab))) %>%
+  mutate(order = c(2, 1, 5, 4, 3)) %>%
   arrange(order)
 
 p <- ggraph(d_network, layout = 'linear', circular = TRUE) + 
@@ -508,17 +461,21 @@ p <- ggraph(d_network, layout = 'linear', circular = TRUE) +
   #geom_node_label(aes(label = label, x=xmin), repel = TRUE) +
   scale_size(range = c(2,20)) +
   scale_edge_width(range = c(0.5, 2)) +
-  scale_color_manual('Habitat preference', values = cols_hab, labels = c('terrestrial', 'freshwater', 'marine mud', 'generalist')) +
-  scale_fill_manual('Habitat preference', values = cols_hab, labels = c('terrestrial', 'freshwater', 'marine mud', 'generalist'))
+  scale_color_manual('Habitat preference', values = cols_hab) +
+  scale_fill_manual('Habitat preference', values = cols_hab)
 
 # grab data for points
 point_data <- p$data %>%
-  select(x, y, label) %>%
+  select(x, y, name) %>%
   mutate(nudge_x = ifelse(x < 0, -0.5, 0.5),
-         nudge_y = ifelse(y < 0, -0.3, 0.3),
-         label = gsub('/', '/\n', label))
+         nudge_y = ifelse(y < 0, -0.3, 0.3))
 
-p + geom_label(aes(nudge_x + x, nudge_y+y, label = label), point_data, size = MicrobioUoE::pts(18)) +
+label_wrap2 <- function(x, width){
+      unlist(lapply(strwrap(x, width = width, simplify = FALSE), 
+                    paste0, collapse = "\n"))
+}
+
+p + geom_label(aes(nudge_x + x, nudge_y+y, label = label_wrap2(name, 15)), point_data, size = MicrobioUoE::pts(18)) +
   theme(legend.position = 'none',
         panel.background = element_rect(fill = 'white', colour = 'white')) +
   coord_cartesian(clip = "off") +
@@ -526,6 +483,227 @@ p + geom_label(aes(nudge_x + x, nudge_y+y, label = label), point_data, size = Mi
   ylim(c(min(point_data$y) + min(point_data$nudge_y) - 0.1), max(point_data$y) + max(point_data$nudge_y) + 0.1)
 
 # save out model
-ggsave(here('plots/sequencing_rpoB/analyses/transition_plot_diversitree.png'), last_plot(), height = 6, width = 8)
+ggsave(here('plots/sequencing_rpoB/analyses/discrete_character_evolution/transition_plot_diversitree.png'), last_plot(), height = 6, width = 8)
+
+# look at whether states are a source or sink
+# first with the transition rates
+d_source_sink_rate <- select(diversitree_df, away = state_1, into = state_2, transition_rate) %>%
+  pivot_longer(cols = c(away, into), names_to = 'direction', values_to = 'habitat_preference') %>%
+  group_by(habitat_preference, direction) %>%
+  summarise(total_rate = sum(transition_rate), .groups = 'drop') %>%
+  pivot_wider(names_from = direction, values_from = total_rate) %>%
+  mutate(source_sink1 = away / into,
+         source_sink2 = into - away)
+
+table_rate <- select(d_source_sink_rate, habitat_preference, away, into, source_sink1) %>%
+  mutate(across(away:source_sink1, ~round(.x, 2)),
+         habitat_preference = gsub(':', ' + ', habitat_preference),
+         habitat_preference = gsub('_', ' ', habitat_preference)) %>%
+  arrange(desc(source_sink1)) %>%
+  flextable(.) %>%
+  set_header_labels(habitat_preference = 'habitat preference',
+                    source_sink1 = 'source sink ratio') %>%
+  align(align = 'center', part = 'all') %>%
+  align(align = 'left', part = 'body', j = 1) %>%
+  bold(part = 'header') %>%
+  font(fontname = 'Times', part = 'all') %>%
+  fontsize(size = 12, part = 'all') %>%
+  autofit()
+
+# save out
+save_as_image(table_rate, here('plots/sequencing_rpoB/analyses/discrete_character_evolution/source_sink_rate.png'), zoom = 3, webshot = 'webshot2')
+
+# next with source sink dynamics using counts
+d_source_sink_count <- select(d_transitions_summary, away = state_1, into = state_2, ave_num) %>%
+  pivot_longer(cols = c(away, into), names_to = 'direction', values_to = 'habitat_preference') %>%
+  group_by(habitat_preference, direction) %>%
+  summarise(total_count = sum(ave_num), .groups = 'drop') %>%
+  pivot_wider(names_from = direction, values_from = total_count) %>%
+  mutate(source_sink1 = away / into,
+         source_sink2 = into - away)
+
+table_count <- select(d_source_sink_count, habitat_preference, away, into, source_sink1) %>%
+  mutate(across(away:source_sink1, ~round(.x, 2)),
+         habitat_preference = gsub(':', ' + ', habitat_preference),
+         habitat_preference = gsub('_', ' ', habitat_preference)) %>%
+  arrange(desc(source_sink1)) %>%
+  flextable(.) %>%
+  set_header_labels(habitat_preference = 'habitat preference',
+                    source_sink1 = 'source sink ratio') %>%
+  align(align = 'center', part = 'all') %>%
+  align(align = 'left', part = 'body', j = 1) %>%
+  bold(part = 'header') %>%
+  font(fontname = 'Times', part = 'all') %>%
+  fontsize(size = 12, part = 'all') %>%
+  autofit()
+
+save_as_image(table_count, here('plots/sequencing_rpoB/analyses/discrete_character_evolution/source_sink_count.png'), zoom = 3, webshot = 'webshot2')
 
 
+# can we look at expected numbers of transitions if they were all equally likely? ####
+
+# work out proportion of tips are each habitat preference
+d_hab_pref <- group_by(d_meta, habitat_preference) %>%
+  tally() %>%
+  ungroup() %>%
+  mutate(prop = n/sum(n))
+
+# work out expectation
+d_expectation <- diversitree_df %>%
+  #filter(free_param == 'yes') %>%
+  select(state_1, state_2) %>%
+  left_join(., select(d_hab_pref, state_1 = habitat_preference, state_1_prop = prop)) %>%
+  left_join(., select(d_hab_pref, state_2 = habitat_preference, state_2_prop = prop)) %>%
+  mutate(expected_prop = state_1_prop * state_2_prop,
+         normalised_expectation = expected_prop/sum(expected_prop))
+
+# observed numbers of transitions
+d_expectation <- left_join(d_expectation, select(d_transitions_summary, state_1, state_2, ave_num)) %>%
+  mutate(ave_num = replace_na(ave_num, 0),
+         tot_transitions = sum(ave_num),
+         expected_num = tot_transitions*normalised_expectation,
+         ratio = ave_num/expected_num) %>%
+  select(state_1, state_2, ave_num, expected_num, ratio)
+
+# make this into a table
+table_expect <- mutate(d_expectation,
+                       across(ave_num:ratio, ~round(.x, 2)),
+                       state_1 = gsub(':', ' + ', state_1),
+                       state_1 = gsub('_', ' ', state_1),
+                       state_2 = gsub(':', ' + ', state_2),
+                       state_2 = gsub('_', ' ', state_2)) %>%
+  arrange(desc(ratio)) %>%
+  flextable(.) %>%
+  set_header_labels(state_1 = 'from',
+                    state_2 = 'to',
+                    ave_num = 'observed number of transitions',
+                    expected_num = 'expected number of transitions',
+                    ratio = 'ratio'
+  ) %>%
+  align(align = 'center', part = 'all') %>%
+  align(align = 'left', part = 'body', j = 1) %>%
+  bold(part = 'header') %>%
+  font(fontname = 'Times', part = 'all') %>%
+  fontsize(size = 12, part = 'all') %>%
+  autofit()
+
+# save out
+save_as_image(table_expect, here('plots/sequencing_rpoB/analyses/discrete_character_evolution/expected_transitions.png'), zoom = 3, webshot = 'webshot2')
+
+#--------------------------------------------------------------#
+# are extant generalists generally younger than specialists ####
+#--------------------------------------------------------------#
+
+# grab dataset for tree
+d_tree <- as_tibble(tree) %>%
+  filter(!is.na(label)) %>%
+  janitor::clean_names() %>%
+  rename(tip_label = label) %>%
+  left_join(., d_meta)
+
+ggplot(d_tree, aes(habitat_preference, branch_length)) +
+  geom_pretty_boxplot(aes(col = habitat_preference, fill = habitat_preference), show.legend = FALSE) +
+  geom_point(shape = 21, fill = 'white', col = 'black', position = position_jitter(width = 0.15), alpha = 0.8) +
+  theme_bw(base_size = 16) +
+  scale_x_discrete(labels = scales::label_wrap(15)) +
+  scale_color_manual(values = cols_hab) +
+  scale_fill_manual(values = cols_hab)
+
+# set up correlation matrix for the tree
+cor_lambda <- corPagel(value = 1, phy = tree, form = ~tip_label)
+
+d_tree <- tibble(tip_label = tree$tip.label) %>%
+  left_join(., d_tree)
+
+# fit phylogenetic generalised linear model
+d_tree <- data.frame(d_tree) %>%
+  select(tip_label, branch_length, habitat_preference)
+row.names(d_tree) <- d_tree$tip_label
+
+d_compare <- caper::comparative.data(phy=tree, data=d_tree, names.col = "tip_label", vcv =TRUE, warn.dropped=TRUE)
+
+mod <- caper::pgls(branch_length ~ habitat_preference, d_compare, lambda = "ML") 
+anova(mod)
+
+
+#---------------------#
+# Fit MuSSE models ####
+#---------------------#
+
+# set up sampling fractions, set them all to 1
+sampling_frac <- setNames(rep(1, times = 5), sort(unique(hab_pref_num)))
+
+# set up likelihood model for diversitree
+lik_musse <- make.musse(tree, hab_pref_num, k = max(hab_pref_num), sampling.f = sampling_frac)
+
+# set constraints for transitions that do not occur
+lik_musse <- constrain(lik_musse, 
+                       q14~0, q24~0, q25~0, q41~0, q42~0, q53~0,
+                       q45~0,
+                       q54~0)
+
+# we can estimate starting values using starting.point.musse()
+start_vals <- starting.point.musse(tree, k = max(hab_pref_num))
+
+for(i in 1:length(mod_custom3$par)){
+    start_vals[names(start_vals) == names(mod_custom3$par)[i]] <- unname(mod_custom3$par[i])
+}
+
+# fit musse model
+fit_musse <- find.mle(lik_musse, x.init = start_vals[argnames(lik_musse)], method = 'subplex', control = list(maxit = 50000))
+
+# set up NULL models
+
+# remove state dependent speciation and extinction parameters
+lik_null_no_sse <- constrain(lik_musse, lambda2 ~ lambda1, lambda3 ~ lambda1, lambda4 ~ lambda1, lambda5 ~ lambda1,
+                              mu2 ~ mu1, mu3 ~ mu1, mu4 ~ mu1, mu5~mu1)
+ 
+# remove only speciation parameters
+lik_null_no_ss <- constrain(lik_musse, lambda2 ~ lambda1, lambda3 ~ lambda1, lambda4 ~ lambda1, lambda5 ~ lambda1)
+ 
+# remove only extinction parameters
+lik_null_no_se <- constrain(lik_musse, mu2 ~ mu1, mu3 ~ mu1, mu4 ~ mu1, mu5 ~ mu1)
+ 
+# fit model
+fit_musse_no_sse <- find.mle(lik_null_no_sse, x.init = start_vals[argnames(lik_null_no_sse)], method = 'subplex', control = list(maxit = 50000))
+fit_musse_no_ss <- find.mle(lik_null_no_ss, x.init = start_vals[argnames(lik_null_no_ss)],method = 'subplex', control = list(maxit = 50000))
+fit_musse_no_se <- find.mle(lik_null_no_se, x.init = start_vals[argnames(lik_null_no_se)], method = 'subplex', control = list(maxit = 50000))
+ 
+# do model selection
+
+# run anova
+anova(no_sse = fit_musse_no_sse,
+      no_ss = fit_musse_no_ss,
+      no_se = fit_musse_no_se,
+      fit_musse)
+
+# make AIC table
+d_musse_aic <- data.frame(model = c('full_sse', 'no_se', 'no_ss', 'no_sse'), aic = c(AIC(fit_musse), AIC(fit_musse_no_se), AIC(fit_musse_no_ss), AIC(fit_musse_no_sse))) %>%
+  dplyr::arrange(., aic) %>%
+  mutate(weights = round(MuMIn::Weights(aic), 3))
+
+d_musse_aic
+
+# musse mcmc
+
+# set up initial start values
+inits_mcmc <- fit_musse_no_se$par
+
+# set up upper and lower limits - limit the values to be < 10 times the max value
+lower_mcmc <- rep(0, length(inits_mcmc))
+upper_mcmc <- rep(max(inits_mcmc)*100, length(inits_mcmc))
+
+# run first mcmc to tune w
+fit_mcmc <- mcmc(lik_null_no_se, inits_mcmc, nsteps = 10, w = 0.1, upper = upper_mcmc, lower = lower_mcmc)
+
+# tune w for each parameter
+w <- diff(sapply(fit_mcmc[2:(ncol(fit_mcmc)-1)], quantile, c(.05, .95)))
+ 
+# run second mcmc to tune w
+fit_mcmc2 <- mcmc(lik_null_no_se, inits_mcmc, nsteps=100, w=w, upper = upper_mcmc, lower = lower_mcmc)
+
+# tune w for each parameter
+w <- diff(sapply(fit_mcmc2[2:(ncol(fit_mcmc2)-1)], quantile, c(.05, .95)))
+ 
+# run third mcmc for 1000 iter
+fit_mcmc3 <- mcmc(lik_null_no_se, inits_mcmc, nsteps=1000, w=w, upper = upper_mcmc, lower = lower_mcmc)
