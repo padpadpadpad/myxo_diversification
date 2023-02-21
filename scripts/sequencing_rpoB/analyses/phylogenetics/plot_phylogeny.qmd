@@ -89,11 +89,12 @@ names(hab_labels) <- cols_labels
 hab_labels <- hab_labels[sort(names(hab_labels))]
 
 ```
+
 ## Plot the tree with taxonomy
 
 We can now plot the taxonomic information on a plot with the habitat preferences to visualise the phylogenetic tree. This uses the R packages **ggtree** and **ggnewscale** to plot the tree and combine multiple colour scales respectively.
 
-We constrained our tree based on the phylogeny on a new consensus single marker phylogeny of all the delta proteobacteria (Waite _et al._ 2020), so we will colour by the families that were used in the constraint tree. These families we used to constrain the tree were those with common, established names in the GTDB database.
+We constrained our tree based on the phylogeny on a new consensus single marker phylogeny of all the delta proteobacteria (Waite *et al.* 2020), so we will colour by the families that were used in the constraint tree. These families we used to constrain the tree were those with common, established names in the GTDB database.
 
 ```{r find_common_taxa}
 # constrained families
@@ -210,14 +211,14 @@ We can now add information about the habitat preference of our ASVs to the datas
 
 Our trait is our own definition of habitat preference for each myxococcota ASV. Briefly, for each ASV we:
 
-- Calculated proportions of occurrence in each of the three habitat clusters identified from the 16S data (broadly these were terrestrial, freshwater, and marine mud).
-- If you only turned up in a single cluster, you were assigned as being a specialist in that habitat.
-- If you turned up in more than one cluster, we used a bootstrapping approach to see assign habitat preference:
-    - Bootstrapped a distribution of proportions of occurrences in each habitat by re-sampling 100 presences based on the actual used proportions 1000 times.
-    - Compared these to the availability of each habitat cluster (different clusters had different total numbers of samples assigned to them)
-    - If an ASV's use of a habitat was significantly less than expected from the cluster's availability (0.975 quantile of bootstrapped use was less than the proportion available) we defined that habitat as unfavourable.
-    - Habitat preferences was defined as all the habitats you use at least as much as is expected by their availability.
-- Overall, an ASV could be assigned to be a specialist in freshwater, terrestrial, or marine mud, or be a generalist in any of these three habitats.
+-   Calculated proportions of occurrence in each of the three habitat clusters identified from the 16S data (broadly these were terrestrial, freshwater, and marine mud).
+-   If you only turned up in a single cluster, you were assigned as being a specialist in that habitat.
+-   If you turned up in more than one cluster, we used a bootstrapping approach to see assign habitat preference:
+    -   Bootstrapped a distribution of proportions of occurrences in each habitat by re-sampling 100 presences based on the actual used proportions 1000 times.
+    -   Compared these to the availability of each habitat cluster (different clusters had different total numbers of samples assigned to them)
+    -   If an ASV's use of a habitat was significantly less than expected from the cluster's availability (0.975 quantile of bootstrapped use was less than the proportion available) we defined that habitat as unfavourable.
+    -   Habitat preferences was defined as all the habitats you use at least as much as is expected by their availability.
+-   Overall, an ASV could be assigned to be a specialist in freshwater, terrestrial, or marine mud, or be a generalist in any of these three habitats.
 
 We can look at the numbers of each of these and how many there are in each group.
 
@@ -247,6 +248,7 @@ d_habpref %>%
   mutate(prop = round(n/sum(n), 2)) %>%
   arrange(habitat_preference, habitats_present)
 ```
+
 Firstly we can see that 50% of our ASVs are only ever present in one habitat, compared to 40% in two habitats, and 9/10% in all three habitats.
 
 Second we can see that within our freshwater specialists, 44% of them only occur in the freshwater cluster, and 56% of them occur in more than a single habitat, this is a much higher number than for marine mud specialists (30% also occur in other habitats) and terrestrial specialists (14% occur in other habitats).
@@ -289,9 +291,9 @@ ggsave(here('plots/sequencing_rpoB/analyses/tree_all_taxonomy.png'), tree_plot2,
 
 Ok this looks pretty darn amazing. There are a couple of things to take home from this.
 
-- Marine mud clades look very well conserved
-- The other states look less well conserved
-- The two rarest states (full generalist and marine mud + terrestrial generalist) do not really cluster together. This may make them very difficult to include in models.
+-   Marine mud clades look very well conserved
+-   The other states look less well conserved
+-   The two rarest states (full generalist and marine mud + terrestrial generalist) do not really cluster together. This may make them very difficult to include in models.
 
 ## Plot tree after collapsing our rare states into a single trait
 
@@ -312,6 +314,7 @@ d_habpref %>% group_by(habitat_preference3) %>%
   arrange(-n)
 
 ```
+
 We can now replot this tree but we need to remake `d_meta` and also set the colour scheme up again, this time for five colours.
 
 ```{r plot_tree3}
@@ -355,6 +358,7 @@ Finally we will save out the new habitat preference vector where we have combine
 ```{r save_out}
 # save out habitat preference vector
 write.csv(d_habpref, here('data/sequencing_rpoB/phyloseq/myxococcus/habitat_preference/summary/habitat_preference_asv_new.csv'), row.names = FALSE)
+saveRDS(cols_hab2, here('data/sequencing_rpoB/phyloseq/myxococcus/habitat_preference/summary/habitat_colours.rds'))
 ```
 
 ## Useful links used
