@@ -11,6 +11,9 @@ tidyverse_conflicts()
 
 # load in data ####
 
+# filename
+name <- 'twohidden_notraitspeciation'
+
 # server - yes or no
 server <- TRUE
 
@@ -116,7 +119,8 @@ q_matrix <- data.frame(idparslist$Q) %>%
          from_hidden = substr(from,2,2),
          to_trait = substr(to, 1,1),
          to_hidden = substr(to, 2,2),
-         transition = paste('q', from_trait, to_trait, sep = ''))
+         transition = paste('q', from_trait, to_trait, sep = ''),
+         id = id*1000) 
 
 # first make any of the transitions not possible in the Markov model 0
 # q14~0, q24~0, q25~0, q41~0, q42~0, q53~0, q45~0, q54~0
@@ -126,6 +130,11 @@ q_matrix <- mutate(q_matrix,
 # make transitions that are across hidden states AND trait states 0. i.e. 1A -> 2B
 q_matrix <- mutate(q_matrix,
                    new_id = ifelse(from_hidden != to_hidden & from_trait != to_trait, 0, new_id))
+
+# make transitions that are across hidden states AND trait states 0. i.e. 1A -> 2B
+q_matrix <- mutate(q_matrix,
+                   new_id = ifelse(from_hidden != to_hidden & from_trait != to_trait, 0, new_id))
+
 
 # work out which parameters need to be the same
 # when the hidden transition is the same, give them the same value
@@ -165,8 +174,9 @@ q_matrix <- mutate(q_matrix, new_id_final = case_when(new_id2 > 0 ~ as.character
 
 # run a for loop to replace each number in the initial q matrix
 q <- idparslist[[3]]
+
 for(i in min(q,na.rm = TRUE):max(q, na.rm = TRUE)){
-  q[which(q == i)] <- filter(q_matrix, id == i) %>% pull(new_id_final)
+  q[which(q == i)] <- filter(q_matrix, (id/1000) == i) %>% pull(new_id_final)
 }
 
 q
@@ -257,6 +267,9 @@ parsfix <- 0
 # set number of iterations
 max_iter <- 1000 * round((1.25)^length(idparsopt))
 
+# save out number length of start values as number of parameters
+saveRDS(length(idparsopt), paste('~/secsse/nparams_', name, '.rds', sep =''))
+
 # right think I have done it! Ridiculous
 mod_secsse <- secsse_ml_func_def_pars(tree,
                                       traits, 
@@ -281,4 +294,4 @@ mod_secsse <- secsse_ml_func_def_pars(tree,
                                       initfactors = init_factor,
                                       functions_defining_params = functions_defining_params)
 
-saveRDS(mod_secsse, '~/secsse/fit_2hidden_notraitspeciation_simplex.rds')
+saveRDS(mod_secsse, paste('~/secsse/fit_', name, '.rds', sep =''))
