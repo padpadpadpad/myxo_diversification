@@ -5,7 +5,7 @@
 # script to run models of discrete character evolution ####
 
 # load packages ####
-librarian::shelf(here, tidyverse, ggtree, ggnewscale, RColorBrewer, patchwork, phytools, ggpp, castor, diversitree, tidygraph, igraph, ggraph, GGally, ggrepel, flextable, ggridges, hisse, padpadpadpad/MicrobioUoE)
+librarian::shelf(here, tidyverse, phytools, ggpp, castor, diversitree, hisse)
 
 # read in datasets ####
 
@@ -61,8 +61,7 @@ coding <- tibble(hab_pref = unname(hab_pref), hab_pref_num = unname(hab_pref_num
 coding
 
 # read in best markov model
-best_model <- readRDS('data/sequencing_rpoB/processed/transition_rates/asv_mod_custom3_v2.rds')
-
+best_model <- readRDS('data/sequencing_rpoB/processed/transition_rates/asv_mod_custom7_nlminb.rds')
 
 # set up sampling fractions, set them all to 1
 sampling_frac <- setNames(rep(1, times = 5), sort(unique(hab_pref_num)))
@@ -73,9 +72,13 @@ lik_musse <- make.musse(tree, hab_pref_num, k = max(hab_pref_num), sampling.f = 
 # set constraints for transitions that do not occur
 # these are taken from the 0s in best_model
 lik_musse <- constrain(lik_musse, 
-                       q14~0, q24~0, q25~0, q41~0, q42~0, q53~0,
-                       q45~0,
-                       q54~0)
+                       q53~0,
+                       q41~0,
+                       q14~0,
+                       q24~0,
+                       q25~0,
+                       q42~0,
+                       q45~0)
 
 # we can estimate starting values using starting.point.musse()
 start_vals <- starting.point.musse(tree, k = max(hab_pref_num))
@@ -100,17 +103,12 @@ lik_null_no_ss <- constrain(lik_musse, lambda2 ~ lambda1, lambda3 ~ lambda1, lam
 lik_null_no_se <- constrain(lik_musse, mu2 ~ mu1, mu3 ~ mu1, mu4 ~ mu1, mu5 ~ mu1)
 
 # fit model
-fit_musse_no_sse <- find.mle(lik_null_no_sse, x.init = start_vals[argnames(lik_null_no_sse)], method = 'subplex', control = list(maxit = 50000))
+fit_musse_no_sse <- find.mle(lik_null_no_sse, x.init = start_vals[argnames(lik_null_no_sse)], method = 'subplex', control = list(maxit = 100000))
 fit_musse_no_ss <- find.mle(lik_null_no_ss, x.init = start_vals[argnames(lik_null_no_ss)],method = 'subplex', control = list(maxit = 50000))
-fit_musse_no_se <- find.mle(lik_null_no_se, x.init = start_vals[argnames(lik_null_no_se)], method = 'subplex', control = list(maxit = 50000))
+fit_musse_no_se <- find.mle(lik_null_no_se, x.init = start_vals[argnames(lik_null_no_se)], method = 'subplex', control = list(maxit = 100000))
+
 
 # do model selection
-
-# run anova
-anova(no_sse = fit_musse_no_sse,
-      no_ss = fit_musse_no_ss,
-      no_se = fit_musse_no_se,
-      fit_musse)
 
 # make AIC table
 d_musse_aic <- data.frame(model = c('full_sse', 'no_se', 'no_ss', 'no_sse'), aic = c(AIC(fit_musse), AIC(fit_musse_no_se), AIC(fit_musse_no_ss), AIC(fit_musse_no_sse))) %>%
@@ -142,6 +140,13 @@ w <- diff(sapply(fit_mcmc2[2:(ncol(fit_mcmc2)-1)], quantile, c(.05, .95)))
 
 # run third mcmc for 1000 iter
 fit_mcmc3 <- mcmc(lik_null_no_se, inits_mcmc, nsteps=1000, w=w, upper = upper_mcmc, lower = lower_mcmc)
+
+profiles.plot(fit_mcmc3["q51"], col.line="red")
+profiles.plot(fit_mcmc3["q15"], col.line="red")
+
+plot(q51 ~ p, fit_mcmc3)
+plot(q15 ~ p, fit_mcmc3)
+plot(lambda3 ~ p, fit_mcmc3)
 
 # save out MuSSE models and mcmc
 saveRDS(fit_musse, 'data/sequencing_rpoB/processed/transition_rates/asv_musse.rds')

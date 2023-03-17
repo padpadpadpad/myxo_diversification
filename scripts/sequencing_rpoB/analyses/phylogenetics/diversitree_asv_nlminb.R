@@ -1,5 +1,7 @@
 # script to run models of discrete character evolution ####
 
+# trying to recreate the analysis but using the nlminb algorithm instead of the subplex algorithm
+
 # load packages ####
 librarian::shelf(here, tidyverse, ggtree, ggnewscale, RColorBrewer, patchwork, phytools, ggpp, castor, diversitree, tidygraph, igraph, ggraph, GGally, ggrepel, flextable, ggridges, hisse, padpadpadpad/MicrobioUoE)
 
@@ -37,10 +39,10 @@ get_diversitree_df <- function(div_obj, trait_vec, replace_vec){
   
   temp <- tibble(param = names(div_obj$par.full)) %>%
     mutate(state_1_num = as.numeric(substr(param, 2,2)),
-         state_2_num = as.numeric(substr(param, 3,3)),
-         transition_rate = unlist(div_obj$par.full),
-         state_1 = stringi::stri_replace_all_regex(state_1_num, pattern = trait_vec, replacement = replace_vec, vectorize=FALSE),
-         state_2 = stringi::stri_replace_all_regex(state_2_num, pattern = trait_vec, replacement = replace_vec, vectorize=FALSE)) %>%
+           state_2_num = as.numeric(substr(param, 3,3)),
+           transition_rate = unlist(div_obj$par.full),
+           state_1 = stringi::stri_replace_all_regex(state_1_num, pattern = trait_vec, replacement = replace_vec, vectorize=FALSE),
+           state_2 = stringi::stri_replace_all_regex(state_2_num, pattern = trait_vec, replacement = replace_vec, vectorize=FALSE)) %>%
     select(param, state_1, state_2, state_1_num, state_2_num, transition_rate) %>%
     mutate(free_param = ifelse(param %in% names(div_obj$par), 'yes', 'no'),
            num_params = length(div_obj$par))
@@ -71,9 +73,9 @@ coding <- tibble(hab_pref = unname(hab_pref), hab_pref_num = unname(hab_pref_num
   distinct() %>%
   arrange(hab_pref) %>%
   mutate(hab_pref_axis = gsub(':', '/ ', hab_pref),
-  hab_pref_axis = gsub('_', ' ', hab_pref_axis),
-  # rename the columns for easy naming
-  initials = c('FG', 'FS', 'MG', 'MS', 'TS'))
+         hab_pref_axis = gsub('_', ' ', hab_pref_axis),
+         # rename the columns for easy naming
+         initials = c('FG', 'FS', 'MG', 'MS', 'TS'))
 
 coding
 
@@ -115,14 +117,10 @@ inits_er <- rep(1, length(argnames(lik_er)))
 inits_trans <- rep(1, length(argnames(lik_transient)))
 
 # run first three models
-mod_sym <- find.mle(lik_sym, inits_sym, method = 'subplex', control = list(maxit = 50000))
-mod_er <- find.mle(lik_er, inits_er, method = 'subplex', control = list(maxit = 50000))
-mod_ard <- find.mle(lik_ard, inits_ard, method = 'subplex', control = list(maxit = 50000))
-mod_sym1 <- find.mle(lik_sym, inits_sym, method = 'optim', control = list(maxit = 50000))
-mod_er1 <- find.mle(lik_er, inits_er, method = 'optim', control = list(maxit = 50000))
-mod_ard1 <- find.mle(lik_ard, inits_ard, method = 'optim', control = list(maxit = 50000))
-mod_ard2 <- find.mle(lik_ard, inits_ard, method = 'nlminb', control = list(maxit = 50000))
-mod_trans <- find.mle(lik_transient, inits_trans, method = 'subplex', control = list(maxit = 50000))
+mod_sym <- find.mle(lik_sym, inits_sym, method = 'nlminb', control = list(maxit = 50000))
+mod_er <- find.mle(lik_er, inits_er, method = 'nlminb', control = list(maxit = 50000))
+mod_ard <- find.mle(lik_ard, inits_ard, method = 'nlminb', control = list(maxit = 50000))
+mod_trans <- find.mle(lik_transient, inits_trans, method = 'nlminb', control = list(maxit = 50000))
 
 # compare models
 AIC(mod_sym, mod_ard, mod_er, mod_trans) %>% arrange(AIC)
@@ -132,52 +130,41 @@ anova(mod_ard, mod_er)
 
 # sort parameter estimates
 mod_ard$par %>% sort()
-mod_ard1$par %>% sort()
-mod_ard2$par %>% sort()
 
 # get parameters close to 0.
 mod_ard$par[mod_ard$par < 1e-03] %>% names(.)
 
 # make custom matrix model
-lik_custom1 <- constrain(lik_ard, 
-                     q14~0, q24~0, q25~0, q41~0, q42~0, q53~0)
+lik_custom1 <- constrain(lik_ard, q53~0)
 
 # make start parameters
 inits_custom1 <- rep(1, length(argnames(lik_custom1)))
 
 # refit model
-mod_custom1 <- find.mle(lik_custom1, inits_custom1, method = 'subplex', control = list(maxit = 50000))
-# refit model
-mod_custom1.1 <- find.mle(lik_custom1, inits_custom1, method = 'nlminb', control = list(maxit = 50000))
+mod_custom1 <- find.mle(lik_custom1, inits_custom1, method = 'nlminb', control = list(maxit = 50000))
 
 # do AIC comparison
 AIC(mod_sym, mod_ard, mod_er, mod_custom1) %>% arrange(AIC)
-AIC(mod_custom1.1)
-AIC(mod_ard2)
 
 # anova
 anova(mod_ard, mod_custom1)
-
-# no change in the log likelihood - this is doing exactly the same
 
 # filter for only estimated parameters
 mod_custom1$par.full[names(mod_custom1$par.full) %in% argnames(lik_custom1)] 
 
 # sort parameter estimates
 mod_custom1$par %>% sort()
-mod_custom1.1$par %>% sort()
-
 
 # make custom matrix model again
 lik_custom2 <- constrain(lik_ard, 
-                         q14~0, q24~0, q25~0, q41~0, q42~0, q53~0,
-                         q45~0)
+                         q53~0,
+                         q41~0)
 
 # make start parameters
 inits_custom2 <- rep(1, length(argnames(lik_custom2)))
 
 ## # run model
-mod_custom2 <- find.mle(lik_custom2, inits_custom2, method = 'subplex', control = list(maxit = 50000))
+mod_custom2 <- find.mle(lik_custom2, inits_custom2, method = 'nlminb', control = list(maxit = 50000))
 
 # do AIC comparison
 AIC(mod_sym, mod_ard, mod_er, mod_custom1, mod_custom2) %>% arrange(AIC)
@@ -191,15 +178,15 @@ mod_custom2$par %>% sort()
 
 # make custom matrix model
 lik_custom3 <- constrain(lik_ard, 
-                         q14~0, q24~0, q25~0, q41~0, q42~0, q53~0,
-                         q45~0,
-                         q54~0)
+                         q53~0,
+                         q41~0,
+                         q14~0)
 
 # make start parameters
 inits_custom3 <- rep(1, length(argnames(lik_custom3)))
 
 # run model
-mod_custom3 <- find.mle(lik_custom3, inits_custom3, method = 'subplex', control = list(maxit = 50000))
+mod_custom3 <- find.mle(lik_custom3, inits_custom3, method = 'nlminb', control = list(maxit = 50000))
 
 # do AIC comparison
 AIC(mod_sym, mod_ard, mod_er, mod_custom1, mod_custom2, mod_custom3) %>% arrange(AIC)
@@ -213,16 +200,16 @@ mod_custom3$par %>% sort()
 
 # make custom matrix model
 lik_custom4 <- constrain(lik_ard, 
-                         q14~0, q24~0, q25~0, q41~0, q42~0, q53~0,
-                         q45~0,
-                         q54~0,
-                         q43~0)
+                         q53~0,
+                         q41~0,
+                         q14~0,
+                         q24~0)
 
 # make start parameters
 inits_custom4 <- rep(1, length(argnames(lik_custom4)))
 
 # run model
-mod_custom4 <- find.mle(lik_custom4, inits_custom4, method = 'subplex', control = list(maxit = 50000))
+mod_custom4 <- find.mle(lik_custom4, inits_custom4, method = 'nlminb', control = list(maxit = 50000))
 
 # do AIC comparison
 AIC(mod_sym, mod_ard, mod_er, mod_custom1, mod_custom2, mod_custom3, mod_custom4) %>% arrange(AIC)
@@ -231,17 +218,141 @@ AIC(mod_sym, mod_ard, mod_er, mod_custom1, mod_custom2, mod_custom3, mod_custom4
 anova(mod_custom3, mod_custom4)
 # super significant
 
-# save out models so far
-saveRDS(mod_ard, 'data/sequencing_rpoB/processed/transition_rates/asv_mod_ard_v2.rds')
-saveRDS(mod_sym, 'data/sequencing_rpoB/processed/transition_rates/asv_mod_sym_v2.rds')
-saveRDS(mod_er, 'data/sequencing_rpoB/processed/transition_rates/asv_mod_er_v2.rds')
-saveRDS(mod_custom1, 'data/sequencing_rpoB/processed/transition_rates/asv_mod_custom1_v2.rds')
-saveRDS(mod_custom2, 'data/sequencing_rpoB/processed/transition_rates/asv_mod_custom2_v2.rds')
-saveRDS(mod_custom3, 'data/sequencing_rpoB/processed/transition_rates/asv_mod_custom3_v2.rds')
-saveRDS(mod_custom4, 'data/sequencing_rpoB/processed/transition_rates/asv_mod_custom4_v2.rds')
+# sort parameter estimates
+mod_custom4$par %>% sort()
+
+# make custom matrix model
+lik_custom5 <- constrain(lik_ard, 
+                         q53~0,
+                         q41~0,
+                         q14~0,
+                         q24~0,
+                         q25~0)
+
+# make start parameters
+inits_custom5 <- rep(1, length(argnames(lik_custom5)))
+
+# run model
+mod_custom5 <- find.mle(lik_custom5, inits_custom5, method = 'nlminb', control = list(maxit = 50000))
+
+# do AIC comparison
+AIC(mod_sym, mod_ard, mod_er, mod_custom1, mod_custom2, mod_custom3, mod_custom4, mod_custom5) %>% arrange(AIC)
+
+# anova
+anova(mod_custom4, mod_custom5)
+
+# sort parameter estimates
+mod_custom5$par %>% sort()
+
+# make custom matrix model
+lik_custom6 <- constrain(lik_ard, 
+                         q53~0,
+                         q41~0,
+                         q14~0,
+                         q24~0,
+                         q25~0,
+                         q42~0)
+
+# make start parameters
+inits_custom6 <- rep(1, length(argnames(lik_custom6)))
+
+# run model
+mod_custom6 <- find.mle(lik_custom6, inits_custom6, method = 'nlminb', control = list(maxit = 50000))
+
+# do AIC comparison
+AIC(mod_sym, mod_ard, mod_er, mod_custom1, mod_custom2, mod_custom3, mod_custom4, mod_custom5, mod_custom6) %>% arrange(AIC)
+
+# anova
+anova(mod_custom5, mod_custom6)
+
+# sort parameter estimates
+mod_custom6$par %>% sort()
+
+# make custom matrix model
+lik_custom7 <- constrain(lik_ard, 
+                         q53~0,
+                         q41~0,
+                         q14~0,
+                         q24~0,
+                         q25~0,
+                         q42~0,
+                         q45~0)
+
+# make start parameters
+inits_custom7 <- rep(1, length(argnames(lik_custom7)))
+
+# run model
+mod_custom7 <- find.mle(lik_custom7, inits_custom7, method = 'nlminb', control = list(maxit = 50000))
+
+# do AIC comparison
+AIC(mod_sym, mod_ard, mod_er, mod_custom1, mod_custom2, mod_custom3, mod_custom4, mod_custom5, mod_custom6, mod_custom7) %>% arrange(AIC)
+
+# anova
+anova(mod_custom6, mod_custom7)
+
+# sort parameter estimates
+mod_custom7$par %>% sort()
+
+# make custom matrix model
+lik_custom8 <- constrain(lik_ard, 
+                         q53~0,
+                         q41~0,
+                         q14~0,
+                         q24~0,
+                         q25~0,
+                         q42~0,
+                         q45~0,
+                         q54~0)
+
+# make start parameters
+inits_custom8 <- rep(1, length(argnames(lik_custom8)))
+
+# run model
+mod_custom8 <- find.mle(lik_custom8, inits_custom8, method = 'nlminb', control = list(maxit = 50000))
+
+# do AIC comparison
+AIC(mod_sym, mod_ard, mod_er, mod_custom1, mod_custom2, mod_custom3, mod_custom4, mod_custom5, mod_custom6, mod_custom7, mod_custom8) %>% arrange(AIC)
+
+# sort parameter estimates
+mod_custom8$par %>% sort()
+
+# make custom matrix model
+lik_custom9 <- constrain(lik_ard, 
+                         q53~0,
+                         q41~0,
+                         q14~0,
+                         q24~0,
+                         q25~0,
+                         q42~0,
+                         q45~0,
+                         q54~0,
+                         q43~0)
+
+# make start parameters
+inits_custom9 <- rep(1, length(argnames(lik_custom9)))
+
+# run model
+mod_custom9 <- find.mle(lik_custom9, inits_custom9, method = 'nlminb', control = list(maxit = 50000))
+
+# do AIC comparison
+AIC(mod_sym, mod_ard, mod_er, mod_custom1, mod_custom2, mod_custom3, mod_custom4, mod_custom5, mod_custom6, mod_custom7, mod_custom8, mod_custom9) %>% arrange(AIC)
+
+anova(mod_custom8, mod_custom9)
+
+d_aic <- AIC(mod_sym, mod_ard, mod_er, mod_trans, mod_custom1, mod_custom2, mod_custom3, mod_custom4, mod_custom5, mod_custom6, mod_custom7, mod_custom8) %>%
+  data.frame() %>%
+  mutate(log_lik = c(mod_sym$lnLik, mod_ard$lnLik, mod_er$lnLik, mod_trans$lnLik, mod_custom1$lnLik, mod_custom2$lnLik, mod_custom3$lnLik, mod_custom4$lnLik, mod_custom5$lnLik, mod_custom6$lnLik, mod_custom7$lnLik, mod_custom8$lnLik),
+         ntips = 2621) %>%
+  janitor::clean_names() %>%
+  rownames_to_column(var = 'model') %>%
+  mutate(aicc = -2*log_lik + 2*df*(ntips/(ntips - df - 1)),
+         aic_weight = round(MuMIn::Weights(aic), 2),
+         aicc_weight = round(MuMIn::Weights(aicc), 2))
+
+saveRDS(mod_custom7, 'data/sequencing_rpoB/processed/transition_rates/asv_mod_custom7_nlminb.rds')
 
 # plot_transition_matrix
-diversitree_df <- get_diversitree_df(mod_custom2, coding$hab_pref_num, coding$hab_pref)
+diversitree_df <- get_diversitree_df(mod_custom7, coding$hab_pref_num, coding$hab_pref)
 
 diversitree_df %>%
   left_join(., select(coding, state_1 = hab_pref, state_1_num = hab_pref_num, state_1_label = hab_pref_axis)) %>%
@@ -251,16 +362,16 @@ diversitree_df %>%
   geom_tile(aes(alpha = transition_rate, col = free_param), width = 0.9, height = 0.9, size = 1.1) +
   theme_bw(base_size = 14) +
   theme(panel.grid.major = element_blank(),
-  legend.position = 'none',
-  axis.text.x.top = element_text(angle = 90, vjust = 0.5),
-  plot.title.position = "plot") +
+        legend.position = 'none',
+        axis.text.x.top = element_text(angle = 90, vjust = 0.5),
+        plot.title.position = "plot") +
   scale_alpha_continuous(range = c(0, 0.6)) +
   geom_text(aes(label = transition_rate), size = MicrobioUoE::pts(10)) +
   scale_x_discrete(position = 'top', labels = scales::label_wrap(13)) +
   scale_y_discrete(position = 'left', labels = scales::label_wrap(13)) +
   labs(y = 'From',
-  x = 'To',
-  title = paste('all rates different with', length(mod_custom2$par), 'free parameters', sep = ' ')) +
+       x = 'To',
+       title = paste('all rates different with', length(mod_custom7$par), 'free parameters', sep = ' ')) +
   coord_fixed() +
   scale_color_manual(values = c('red', 'black'))
 
@@ -272,29 +383,33 @@ ggsave('plots/sequencing_rpoB/analyses/discrete_character_evolution/transition_m
 #-----------------------------------------------------------------#
 
 # set up initial start values
-inits_mcmc <- mod_custom2$par
+inits_mcmc <- mod_custom7$par
 
 ## # set up upper and lower limits - limit the values to be <3 times the max value
 lower_mcmc <- rep(0, length(inits_mcmc))
 upper_mcmc <- rep(max(inits_mcmc)*10, length(inits_mcmc))
 
 # run first mcmc to tune w
-fit_mcmc <- mcmc(lik_custom2, inits_mcmc, nsteps = 10, w = 0.1, upper = upper_mcmc, lower = lower_mcmc)
+fit_mcmc <- mcmc(lik_custom7, inits_mcmc, nsteps = 10, w = 0.1, upper = upper_mcmc, lower = lower_mcmc)
 
 # tune w for each parameter
 w <- diff(sapply(fit_mcmc[2:(ncol(fit_mcmc)-1)], quantile, c(.05, .95)))
 
 # run second mcmc to tune w
-fit_mcmc2 <- mcmc(lik_custom2, inits_mcmc, nsteps=100, w=w, upper = upper_mcmc, lower = lower_mcmc)
+fit_mcmc2 <- mcmc(lik_custom7, inits_mcmc, nsteps=100, w=w, upper = upper_mcmc, lower = lower_mcmc)
 
 ## # tune w for each parameter
 w <- diff(sapply(fit_mcmc2[2:(ncol(fit_mcmc2)-1)], quantile, c(.05, .95)))
 
 # run third mcmc for 1000 iter
-fit_mcmc3 <- mcmc(lik_custom2, inits_mcmc, nsteps=5000, w=w, upper = upper_mcmc, lower = lower_mcmc)
+fit_mcmc3 <- mcmc(lik_custom7, inits_mcmc, nsteps=10000, w=w, upper = upper_mcmc, lower = lower_mcmc)
+
+profiles.plot(fit_mcmc3["q51"], col.line="red")
+plot(q51 ~ p, fit_mcmc3)
+plot(q15 ~ p, fit_mcmc3)
 
 # save out mcmc chains
-saveRDS(fit_mcmc3, 'data/sequencing_rpoB/processed/transition_rates/asv_mcmc_custom2_v2_mad.rds')
+saveRDS(fit_mcmc3, 'data/sequencing_rpoB/processed/transition_rates/asv_mcmc_custom2_v3_mad.rds')
 
 # make data long format
 d_mcmc <- pivot_longer(fit_mcmc3, names_to = 'param', values_to = 'transition_rate', cols = starts_with('q')) %>%
@@ -306,7 +421,7 @@ d_mcmc <- pivot_longer(fit_mcmc3, names_to = 'param', values_to = 'transition_ra
 # find 95% CIs and bind with ML estimates
 d_mcmc_summary <- d_mcmc %>%
   group_by(parameter, param, state_1, state_2) %>%
-  tidybayes::mean_qi(transition_rate) %>%
+  tidybayes::median_qi(transition_rate) %>%
   left_join(., select(diversitree_df, state_1, state_2, ml_estimate = transition_rate))
 
 # plot ridge plot
@@ -358,7 +473,7 @@ best_matrix[best_matrix != 0] <- arrange(diversitree_df, state_2, state_1) %>% p
 # make diagonal values make things sum to 0
 diag(best_matrix) <- -rowSums(best_matrix)
 
-# simmap_best <- make.simmap(tree, hab_pref, nsim = 1000, Q = best_matrix)
+simmap_best <- make.simmap(tree, hab_pref, nsim = 1000, Q = best_matrix)
 
 # need to split this result up so that files are less than 50MB for GitHub
 # number of splits
@@ -488,8 +603,8 @@ point_data <- p$data %>%
          nudge_y = ifelse(y < 0, -0.3, 0.3))
 
 label_wrap2 <- function(x, width){
-      unlist(lapply(strwrap(x, width = width, simplify = FALSE), 
-                    paste0, collapse = "\n"))
+  unlist(lapply(strwrap(x, width = width, simplify = FALSE), 
+                paste0, collapse = "\n"))
 }
 
 p + geom_label(aes(nudge_x + x, nudge_y+y, label = label_wrap2(name, 15)), point_data, size = MicrobioUoE::pts(18)) +
@@ -663,7 +778,7 @@ lik_musse <- constrain(lik_musse,
 start_vals <- starting.point.musse(tree, k = max(hab_pref_num))
 
 for(i in 1:length(mod_custom3$par)){
-    start_vals[names(start_vals) == names(mod_custom3$par)[i]] <- unname(mod_custom3$par[i])
+  start_vals[names(start_vals) == names(mod_custom3$par)[i]] <- unname(mod_custom3$par[i])
 }
 
 # fit musse model
@@ -673,19 +788,19 @@ fit_musse <- find.mle(lik_musse, x.init = start_vals[argnames(lik_musse)], metho
 
 # remove state dependent speciation and extinction parameters
 lik_null_no_sse <- constrain(lik_musse, lambda2 ~ lambda1, lambda3 ~ lambda1, lambda4 ~ lambda1, lambda5 ~ lambda1,
-                              mu2 ~ mu1, mu3 ~ mu1, mu4 ~ mu1, mu5~mu1)
- 
+                             mu2 ~ mu1, mu3 ~ mu1, mu4 ~ mu1, mu5~mu1)
+
 # remove only speciation parameters
 lik_null_no_ss <- constrain(lik_musse, lambda2 ~ lambda1, lambda3 ~ lambda1, lambda4 ~ lambda1, lambda5 ~ lambda1)
- 
+
 # remove only extinction parameters
 lik_null_no_se <- constrain(lik_musse, mu2 ~ mu1, mu3 ~ mu1, mu4 ~ mu1, mu5 ~ mu1)
- 
+
 # fit model
 fit_musse_no_sse <- find.mle(lik_null_no_sse, x.init = start_vals[argnames(lik_null_no_sse)], method = 'subplex', control = list(maxit = 50000))
 fit_musse_no_ss <- find.mle(lik_null_no_ss, x.init = start_vals[argnames(lik_null_no_ss)],method = 'subplex', control = list(maxit = 50000))
 fit_musse_no_se <- find.mle(lik_null_no_se, x.init = start_vals[argnames(lik_null_no_se)], method = 'subplex', control = list(maxit = 50000))
- 
+
 # do model selection
 
 # run anova
@@ -715,12 +830,12 @@ fit_mcmc <- mcmc(lik_null_no_se, inits_mcmc, nsteps = 10, w = 0.1, upper = upper
 
 # tune w for each parameter
 w <- diff(sapply(fit_mcmc[2:(ncol(fit_mcmc)-1)], quantile, c(.05, .95)))
- 
+
 # run second mcmc to tune w
 fit_mcmc2 <- mcmc(lik_null_no_se, inits_mcmc, nsteps=100, w=w, upper = upper_mcmc, lower = lower_mcmc)
 
 # tune w for each parameter
 w <- diff(sapply(fit_mcmc2[2:(ncol(fit_mcmc2)-1)], quantile, c(.05, .95)))
- 
+
 # run third mcmc for 1000 iter
 fit_mcmc3 <- mcmc(lik_null_no_se, inits_mcmc, nsteps=1000, w=w, upper = upper_mcmc, lower = lower_mcmc)
