@@ -4,7 +4,7 @@
 
 # make sure curl is installed
 library(curl)
-librarian::shelf(diversitree, secsse, DDD, apTreeshape, doParallel, foreach, doMC, tidyverse, here)
+librarian::shelf(diversitree, secsse, DDD, apTreeshape, doParallel, foreach, doMC, tidyverse, here, furrr)
 
 # identify conflicts in the tidyverse packages and other packages
 tidyverse_conflicts()
@@ -220,49 +220,60 @@ sampled_fraction_0.25 <- rep(0.25, times = length(unique(traits)))
 
 sampled_fractions <- list(sampled_fraction_1, sampled_fraction_0.75, sampled_fraction_0.5, sampled_fraction_0.25)
 
-# run a for loop to run each of combination of sampled fraction and initial values
-for(i in 1:length(inits)){
-  for(j in 1:length(sampled_fractions)){
-    
-    # pick out inits
-    temp_inits <- inits[[i]]
-    
-    # pick out sampled_fractions
-    temp_samp_frac <- sampled_fractions[[j]]
-    
-    # run secsse
-    # right think I have done it! Ridiculous
-    mod_secsse <- secsse_ml(
-      tree,
-      traits,
-      num_concealed_states = num_concealed_states,
-      idparslist,
-      idparsopt,
-      initparsopt = temp_inits,
-      idparsfix,
-      parsfix,
-      cond = "maddison_cond",
-      root_state_weight = "maddison_weights",
-      tol = c(1e-04, 1e-05, 1e-07),
-      sampling_fraction = temp_samp_frac,
-      maxiter = max_iter,
-      use_fortran = TRUE,
-      methode = "ode45",
-      optimmethod = "simplex",
-      num_cycles = 1,
-      run_parallel = TRUE
-    )
-    
-    # create a list of the output
-    output <- list(n_params = length(idparsopt),
-                   inits = temp_inits,
-                   samp_frac = temp_samp_frac,
-                   mod = mod_secsse)
-    
-    # save out the list
-    temp_name <- paste(name, '_', 'sampfrac', unique(temp_samp_frac), sep = '')
-    
-    saveRDS(output, paste('~/secsse/seccse_', temp_name, '.rds', sep =''))
-    
-  }
+# create all combinations of the two lists
+all_combs <- expand_grid(sampled_fractions, inits) %>%
+  mutate(run = 1:n()) %>%
+  purrr::transpose()
+
+# write a custom function to do everything we want in terms of fitting the model and saving it out
+fit_secsse <- function(list_inits_sampfrac){
+  
+  # pick out inits
+  temp_inits <- list_inits_sampfrac$inits
+  
+  # pick out sampled_fractions
+  temp_samp_frac <- list_inits_sampfrac$sampled_fractions
+  
+  # run secsse
+  # right think I have done it! Ridiculous
+  mod_secsse <- secsse_ml(
+    tree,
+    traits,
+    num_concealed_states = num_concealed_states,
+    idparslist,
+    idparsopt,
+    initparsopt = temp_inits,
+    idparsfix,
+    parsfix,
+    cond = "maddison_cond",
+    root_state_weight = "maddison_weights",
+    tol = c(1e-04, 1e-05, 1e-07),
+    sampling_fraction = temp_samp_frac,
+    maxiter = max_iter,
+    use_fortran = TRUE,
+    methode = "ode45",
+    optimmethod = "simplex",
+    num_cycles = 1,
+    run_parallel = TRUE
+  )
+  
+  # create a list of the output
+  output <- list(n_params = length(idparsopt),
+                 inits = temp_inits,
+                 samp_frac = temp_samp_frac,
+                 setup = idparslist,
+                 mod = mod_secsse)
+  
+  # save out the list
+  temp_name <- paste(name, '_', 'sampfrac', unique(temp_samp_frac), '_', 'run', list_inits_sampfrac$run,  sep = '')
+  
+  saveRDS(output, paste('~/secsse/seccse_', temp_name, '.rds', sep =''))
+  
 }
+
+
+# Set a "plan" for how the code should run.
+plan(multisession, workers = 12)
+
+# run future_walk
+furrr::future_walk(all_combs, fit_secsse)

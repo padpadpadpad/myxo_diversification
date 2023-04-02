@@ -15,7 +15,7 @@ tidyverse_conflicts()
 name <- 'muhisseSSonly'
 
 # server - yes or no
-server <- TRUE
+server <- FALSE
 
 if(server == TRUE){
   d_habpref <- read.csv('~/secsse/habitat_preference_asv_new.csv')
@@ -247,12 +247,12 @@ max_iter <- 1000 * round((1.25)^length(idparsopt))
 inits_one <- initparsopt
 
 # double speciation rates and halve transition rates
-inits_two <- c(c(rep(init_lambda*2, times = 5),
+inits_two <- c(c(rep(init_lambda*2, times = 10),
                  rep(init_mu, times = 1),
                  init_transition/2))
 
 # halve speciaton rates and double transition rates
-inits_three <- c(c(rep(init_lambda/2, times = 5),
+inits_three <- c(c(rep(init_lambda/2, times = 10),
                    rep(init_mu, times = 1),
                    init_transition*2))
 

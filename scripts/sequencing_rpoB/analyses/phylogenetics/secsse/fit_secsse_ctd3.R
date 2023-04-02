@@ -3,8 +3,7 @@
 # load in packages ####
 
 # make sure curl is installed
-library(curl)
-librarian::shelf(diversitree, secsse, DDD, apTreeshape, doParallel, foreach, doMC, tidyverse, here, furrr)
+librarian::shelf(curl, diversitree, secsse, DDD, apTreeshape, doParallel, foreach, doMC, tidyverse, here, furrr)
 
 # identify conflicts in the tidyverse packages and other packages
 tidyverse_conflicts()
@@ -15,7 +14,7 @@ tidyverse_conflicts()
 name <- 'muctd3'
 
 # server - yes or no
-server <- FALSE
+server <- TRUE
 
 if(server == TRUE){
   d_habpref <- read.csv('~/secsse/habitat_preference_asv_new.csv')
@@ -247,12 +246,12 @@ max_iter <- 1000 * round((1.25)^length(idparsopt))
 inits_one <- initparsopt
 
 # double speciation rates and halve transition rates
-inits_two <- c(c(rep(init_lambda*2, times = 5),
+inits_two <- c(c(rep(init_lambda*2, times = 3),
                  rep(init_mu, times = 1),
                  init_transition/2))
 
 # halve speciaton rates and double transition rates
-inits_three <- c(c(rep(init_lambda/2, times = 5),
+inits_three <- c(c(rep(init_lambda/2, times = 3),
                    rep(init_mu, times = 1),
                    init_transition*2))
 
