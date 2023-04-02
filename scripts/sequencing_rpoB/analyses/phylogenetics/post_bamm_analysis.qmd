@@ -77,7 +77,7 @@ d_taxa <- readRDS(here('data/sequencing_rpoB/phyloseq/myxococcus/prevalence_filt
   rownames_to_column('otu')
 
 # create d_meta
-d_meta <- left_join(select(d_habpref, otu, habitat_preference, num_present), select(d_taxa, otu:family))
+d_meta <- left_join(select(d_habpref, otu, habitat_preference, num_present), dplyr::select(d_taxa, otu:family))
 
 ```
 
@@ -369,7 +369,7 @@ p2 +
                 offset = 10,
                 barsize = 2) +
   scale_color_manual('Family (outer bar)', values = cols) +
-  guides(color = guide_legend(override.aes = list(size = 5)))
+  guides(color = guide_legend(override.aes = list(size = 0.1, shape = 1)))
 
 ggsave(here('plots/sequencing_rpoB/analyses/bamm_tree.png'), last_plot(), height = 9, width = 12)
 ```

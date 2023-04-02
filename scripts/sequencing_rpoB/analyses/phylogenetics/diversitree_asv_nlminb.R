@@ -122,6 +122,12 @@ mod_er <- find.mle(lik_er, inits_er, method = 'nlminb', control = list(maxit = 5
 mod_ard <- find.mle(lik_ard, inits_ard, method = 'nlminb', control = list(maxit = 50000))
 mod_trans <- find.mle(lik_transient, inits_trans, method = 'nlminb', control = list(maxit = 50000))
 
+# read these in from the subplex method
+mod_sym <- readRDS('data/sequencing_rpoB/processed/transition_rates/asv_mod_sym_v2.rds')
+mod_ard <- readRDS('data/sequencing_rpoB/processed/transition_rates/asv_mod_ard_v2.rds')
+mod_er <- readRDS('data/sequencing_rpoB/processed/transition_rates/asv_mod_er_v2.rds')
+mod_trans <- readRDS('data/sequencing_rpoB/processed/transition_rates/asv_mod_trans.rds')
+
 # compare models
 AIC(mod_sym, mod_ard, mod_er, mod_trans) %>% arrange(AIC)
 
@@ -411,6 +417,8 @@ plot(q15 ~ p, fit_mcmc3)
 # save out mcmc chains
 saveRDS(fit_mcmc3, 'data/sequencing_rpoB/processed/transition_rates/asv_mcmc_custom2_v3_mad.rds')
 
+fit_mcmc3 <- readRDS('data/sequencing_rpoB/processed/transition_rates/asv_mcmc_custom2_v3_mad.rds')
+
 # make data long format
 d_mcmc <- pivot_longer(fit_mcmc3, names_to = 'param', values_to = 'transition_rate', cols = starts_with('q')) %>%
   left_join(., select(diversitree_df, param, state_1, state_2)) %>%
@@ -498,6 +506,8 @@ simmap_summary$tree <- NULL
 
 saveRDS(simmap_summary, 'data/sequencing_rpoB/processed/transition_rates/simmap/simmap_summary.rds')
 
+simmap_summary <- readRDS('data/sequencing_rpoB/processed/transition_rates/simmap/simmap_summary.rds')
+
 # coerce transitions into dataframe
 d_transitions <- as.data.frame(simmap_summary$count, col.names = colnames(simmap_summary$count)) %>%
   mutate(iter = 1:n()) %>%
@@ -583,10 +593,14 @@ d_network <- as_tbl_graph(select(diversitree_df, state_1, state_2, transition_ra
 
 p <- ggraph(d_network, layout = 'linear', circular = TRUE) + 
   geom_edge_fan(aes(alpha = transition_rate, 
-                    width = transition_rate),
+                    width = transition_rate,
+                    label = round(transition_rate, 2)),
                 arrow = arrow(length = unit(4, 'mm')),
                 end_cap = circle(10, 'mm'),
-                start_cap = circle(10, 'mm')) + 
+                start_cap = circle(10, 'mm'),
+                angle_calc = 'along',
+                label_dodge = unit(2.5, 'mm'),
+                strength = 1.3) + 
   geom_node_point(aes(size = mean,
                       col = name)) +
   theme_void() +

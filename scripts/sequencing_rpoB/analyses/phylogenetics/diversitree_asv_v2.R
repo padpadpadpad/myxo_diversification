@@ -118,10 +118,6 @@ inits_trans <- rep(1, length(argnames(lik_transient)))
 mod_sym <- find.mle(lik_sym, inits_sym, method = 'subplex', control = list(maxit = 50000))
 mod_er <- find.mle(lik_er, inits_er, method = 'subplex', control = list(maxit = 50000))
 mod_ard <- find.mle(lik_ard, inits_ard, method = 'subplex', control = list(maxit = 50000))
-mod_sym1 <- find.mle(lik_sym, inits_sym, method = 'optim', control = list(maxit = 50000))
-mod_er1 <- find.mle(lik_er, inits_er, method = 'optim', control = list(maxit = 50000))
-mod_ard1 <- find.mle(lik_ard, inits_ard, method = 'optim', control = list(maxit = 50000))
-mod_ard2 <- find.mle(lik_ard, inits_ard, method = 'nlminb', control = list(maxit = 50000))
 mod_trans <- find.mle(lik_transient, inits_trans, method = 'subplex', control = list(maxit = 50000))
 
 # compare models
