@@ -1,4 +1,4 @@
-"sample","habitat_group","location","clust","sample_depth","n_species","freshwater","freshwater:terrestrial","terrestrial","freshwater:marine_mud","freshwater:marine_mud:terrestrial","marine_mud","marine_mud:terrestrial"
+"sample","habitat_group_16s","location","clust","sample_depth","n_species","freshwater","freshwater:terrestrial","terrestrial","freshwater:marine_mud","freshwater:marine_mud:terrestrial","marine_mud","marine_mud:terrestrial"
 "sample_s53","estuarine mud_oligohaline","Tamar","marine_mud",257705,96,3,27,1,14,1,48,2
 "sample_s69","reservoir","Fal","freshwater",159660,56,16,34,1,4,0,1,0
 "sample_s55","estuarine mud_oligohaline","Fal","marine_mud",241639,102,1,25,0,10,1,63,2
@@ -10,7 +10,7 @@
 "sample_s49","woodland_pine","Tamar","terrestrial",175357,25,1,21,3,0,0,0,0
 "sample_s67","marine mud_full saline","Fal","marine_mud",192991,46,0,2,0,6,0,37,1
 "sample_s24","beach_subtidal","Looe","marine_mud",193302,32,0,3,0,4,0,25,0
-"sample_s46","pasture","Tamar","terrestrial",137368,64,0,10,0,6,1,45,2
+"sample_s46","pasture","Tamar","marine_mud",137368,64,0,10,0,6,1,45,2
 "sample_s38","estuarine mud_full saline","Fowey","marine_mud",142836,39,0,3,0,5,1,30,0
 "sample_s6","woodland_oak","Helford","terrestrial",340355,73,4,56,7,2,2,1,1
 "sample_s22","river","Looe","freshwater",240888,117,44,55,0,17,1,0,0

@@ -1,11 +1,11 @@
 "otu","habitat_preference","average_prop","average_abundance","habitats_present","num_present","habitat_preference_n"
-"otu_1","freshwater:marine_mud",0.281515120136729,33674.296969697,3,32,2
-"otu_24","freshwater:marine_mud:terrestrial",0.317172262007955,30625.5221260221,3,57,3
-"otu_27","freshwater:marine_mud",0.0795884741228066,7428.11272141707,3,52,2
+"otu_1","freshwater:marine_mud",0.22990416151345,26440.3956521739,3,32,2
+"otu_24","freshwater:marine_mud:terrestrial",0.319176588042165,30690.5119617225,3,57,3
+"otu_27","freshwater:marine_mud:terrestrial",0.0774529022712024,7221.98366013072,3,52,3
 "otu_2760","freshwater",0.000935738279184436,103.166666666667,1,6,1
 "otu_3410","freshwater",0.00156616607705261,123,1,4,1
-"otu_36","freshwater:marine_mud",0.0113934116183313,1711.46111111111,3,26,2
+"otu_36","freshwater:marine_mud",0.011275459373464,1694.19401709402,3,26,2
 "otu_3952","marine_mud",0.00120797190091141,88,1,9,1
 "otu_4063","marine_mud",0.00103059655090047,109.7,1,10,1
-"otu_6","freshwater:marine_mud:terrestrial",0.394692439855507,31234.0654761905,3,63,3
+"otu_6","freshwater:marine_mud:terrestrial",0.400794156903476,31620.412345679,3,63,3
 "otu_6204","freshwater",0.000211791648099868,42.1666666666667,2,4,1
