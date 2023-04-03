@@ -47,12 +47,12 @@ meta <- sample_data(ps) %>% data.frame()
 #-----------------------------------------------------------------------#
 
 # remove some habitats we do not want
-to_keep <- filter(meta, !habitat_group %in% c('estuarine mud_low polyhaline', 'thrift_rhizosphere', 'beach_supratidal')) %>%
+to_keep <- filter(meta, !habitat_group_16s %in% c('estuarine mud_low polyhaline', 'thrift_rhizosphere', 'beach_supratidal')) %>%
   row.names(.)
 
 ps <- prune_samples(to_keep, ps)
 meta <- sample_data(ps) %>% data.frame()
-summary <- group_by(meta, habitat_group) %>%
+summary <- group_by(meta, habitat_group_16s) %>%
   tally()
 
 # transform counts to relative abundances for ordination
@@ -61,7 +61,7 @@ ps_prop <- transform_sample_counts(ps, function(x){x / sum(x)})
 # wrangle the metadata
 d_samp <- data.frame(sample_data(ps_prop))
 d_samp <- mutate(d_samp, location_fac = as.factor(location),
-                 habitat_group_fac = as.factor(habitat_group)) %>%
+                 habitat_group_fac = as.factor(habitat_group_16s)) %>%
   unite(., 'id', location_fac, habitat_group_fac, sep = ':', remove = FALSE)
 
 # calculate distance matrix
@@ -103,8 +103,8 @@ ggplot(tibble(eig = correct_eigenvalues, n = 1:length(correct_eigenvalues)), aes
 cols <- tibble(group = c("woodland_oak", "estuarine mud_low polyhaline", "woodland_pine", "reservoir", "river", "estuarine mud_oligohaline", "estuarine mud_full saline", "beach_supratidal", "pasture", "beach_subtidal","thrift_rhizosphere","beach_seaweed","field_wheat","rock_samphire","marine mud_full saline"),
                col = c('#089a2d', '#995a08', '#106c12', '#1170bd', '#9dcdf4', '#663c05', '#b6966b', '#f5e279', '#61dd1e', '#f2f426', '#c5f8ae', '#a6ab52', '#9ff121', '#5e8128', '#714a03'),
                hab_order = c(1.1, 2.1, 1.2, 3.1, 3.2, 2.2, 2.3, 2.4, 1.3, 2.5, 2.6, 2.7, 1.4, 1.5, 2.8))
-cols <- filter(cols, group %in% d_samp$habitat_group)
-cols <- mutate(cols, habitat_group = group) %>% arrange(hab_order)
+cols <- filter(cols, group %in% d_samp$habitat_group_16s)
+cols <- mutate(cols, habitat_group_16s = group) %>% arrange(hab_order)
 
 # plot the samples across the first 4 axes
 d_fig$eigenvector %>%
@@ -367,10 +367,10 @@ write.csv(d_clusters, 'data/sequencing_16S/sample_cluster_assignments.csv', row.
 # compare clusters
 d_compare_cluster <- left_join(d_clusters, rownames_to_column(d_samp, var = 'sample')) %>%
   pivot_longer(cols = c(medoid_gap:hier_nbclust), names_to = 'method', values_to = 'cluster') %>%
-  group_by(habitat_group, cluster, method) %>%
+  group_by(habitat_group_16s, cluster, method) %>%
   tally() %>%
   ungroup() %>%
-  mutate(habitat2 = gsub('_', '\n', habitat_group)) 
+  mutate(habitat2 = gsub('_', '\n', habitat_group_16s)) 
 
 ggplot(d_compare_cluster, aes(x = forcats::fct_reorder(habitat2, cluster), y = n, fill = cluster)) +
   geom_bar(stat = 'identity', col = 'black', show.legend = FALSE) +

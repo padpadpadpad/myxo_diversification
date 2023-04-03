@@ -38,7 +38,7 @@ ps_prop <- transform_sample_counts(ps, function(x){x / sum(x)})
 # wrangle the metadata
 d_samp <- data.frame(sample_data(ps_prop))
 d_samp <- mutate(d_samp, location_fac = as.factor(location),
-                 habitat_group_fac = as.factor(habitat_group)) %>%
+                 habitat_group_fac = as.factor(habitat_group_16s)) %>%
   unite(., 'id', location_fac, habitat_group_fac, sep = ':', remove = FALSE)
 
 # calculate distance matrix

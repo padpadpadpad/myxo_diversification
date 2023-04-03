@@ -129,12 +129,12 @@ meta_data = sample_data(ps) %>%
   data.frame() %>%
   mutate(sample = paste('sample_s', id, sep = ''))
 
-rarefaction_curves <- left_join(rarefaction_curves, select(meta_data, sample, habitat_group, location))
+rarefaction_curves <- left_join(rarefaction_curves, select(meta_data, sample, habitat_group_16s, location))
 
 ggplot(filter(rarefaction_curves, measure == 'Observed')) +
   geom_line(aes(depth, diversity_mean, group = sample)) +
   geom_ribbon(aes(x = depth, ymin = diversity_mean - sd, ymax = diversity_mean + sd, group = sample), alpha = 0.3) +
-  facet_wrap(~habitat_group) +
+  facet_wrap(~habitat_group_16s) +
   theme_bw()
 
 ggsave(file.path(path_fig, 'rarefaction_curves_16s.pdf'), last_plot(), width = 10, height = 7)

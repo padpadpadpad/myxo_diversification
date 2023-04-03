@@ -43,7 +43,7 @@ filter(meta_new, !row.names(meta_new) %in% sample_names(ps))
 
 # check number of samples in each habitat
 filter(meta_new, row.names(meta_new) %in% sample_names(ps)) %>%
-  group_by(habitat_group) %>%
+  group_by(habitat_group_16s) %>%
   tally()
 
 # look at object
