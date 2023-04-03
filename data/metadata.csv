@@ -1,75 +1,74 @@
-﻿id,habitat,location,habitat_group
-18,high subtidal/low intertidal sand (beach),Helford,beach_subtidal
-28,beachcast seaweed,Helford,beach_seaweed
-45,beachcast seaweed,Tamar,beach_seaweed
-60,beachcast seaweed,Camel,beach_seaweed
-70,beachcast seaweed,Fal,beach_seaweed
-72,beachcast seaweed,Helford,beach_seaweed
-24,high subtidal/low intertidal sand (beach),Looe,beach_subtidal
-27,high subtidal/low intertidal sand (beach),Fal,beach_subtidal
-42,high subtidal/low intertidal sand (beach),Tamar,beach_subtidal
-59,high subtidal/low intertidal sand (beach),Camel,beach_subtidal
-19,supratidal sand (beach),Helford,beach_supratidal
-44,supratidal sand (beach),Tamar,beach_supratidal
-16,estuarine mud - (close to) full salinity,Helford,estuarine mud_full saline
-23,estuarine mud - (close to) full salinity,Looe,estuarine mud_full saline
-30,estuarine mud - (close to) full salinity,Fal,estuarine mud_full saline
-38,estuarine mud - (close to) full salinity,Fowey,estuarine mud_full saline
-52,estuarine mud - (close to) full salinity,Tamar,estuarine mud_full saline
-10,estuarine mud - low polyhaline/high mesohaline,Fal,estuarine mud_low polyhaline
-15,estuarine mud - low polyhaline/high mesohaline,Helford,estuarine mud_low polyhaline
-41,estuarine mud - low polyhaline/high mesohaline,Fowey,estuarine mud_low polyhaline
-46,estuarine mud - low polyhaline/high mesohaline,Tamar,pasture
-63,estuarine mud - low polyhaline/high mesohaline,Camel,estuarine mud_low polyhaline
-14,estuarine mud - oligohaline,Helford,estuarine mud_oligohaline
-20,estuarine mud - oligohaline,Looe,estuarine mud_oligohaline
-37,estuarine mud - oligohaline,Fowey,estuarine mud_oligohaline
-53,estuarine mud - oligohaline,Tamar,estuarine mud_oligohaline
-55,estuarine mud - oligohaline,Fal,estuarine mud_oligohaline
-64,estuarine mud - oligohaline,Camel,estuarine mud_oligohaline
-4,wheat field,Fal,field_wheat
-8,wheat field,Helford,field_wheat
-26,wheat field,Looe,field_wheat
-36,wheat field,Fowey,field_wheat
-48,wheat field,Camel,field_wheat
-58,wheat field,Tamar,field_wheat
-65b,marine mud - full salinity,Fal,marine mud_full saline
-66,marine mud - full salinity,Fal,marine mud_full saline
-67,marine mud - full salinity,Fal,marine mud_full saline
-68,marine mud - full salinity,Fal,marine mud_full saline
-2,pasture,Fal,pasture
-5,pasture,Helford,pasture
-34,pasture,Looe,pasture
-40,pasture,Fowey,pasture
-47,pasture,Tamar,estuarine mud_low polyhaline
-57,pasture,Camel,pasture
-9,reservoir,Fal,reservoir
-12,reservoir,Helford,reservoir
-33,reservoir,Looe,reservoir
-65,reservoir,Camel,reservoir
-69,reservoir,Fal,reservoir
-13,river/stream,Helford,river
-22,river/stream,Looe,river
-35,river/stream,Fowey,river
-51,river/stream,Tamar,river
-54,river/stream,Fal,river
-56,river/stream,Camel,river
-29,rock sampphire,Helford,rock_samphire
-39,rock sampphire,Fowey,rock_samphire
-43,rock sampphire,Tamar,rock_samphire
-71,rock sampphire,Fal,rock_samphire
-73,rock samphire,Helford,rock_samphire
-3,Thrift rhizosphere,Fal,thrift_rhizosphere
-7,Thrift rhizosphere,Helford,thrift_rhizosphere
-25,Thrift rhizosphere,Looe,thrift_rhizosphere
-1,woodland oak,Fal,woodland_oak
-6,woodland oak,Helford,woodland_oak
-21,woodland oak,Looe,woodland_oak
-32,woodland oak,Fowey,woodland_oak
-50,woodland oak,Tamar,woodland_oak
-61,woodland oak,Camel,woodland_oak
-11,Scotch Pine,Fal,woodland_pine
-17,Scotch Pine,Helford,woodland_pine
-31,Scotch Pine,Fowey,woodland_pine
-49,Scotch Pine,Tamar,woodland_pine
-62,Scotch Pine,Camel,woodland_pine
+"","id","location","habitat_group_16s"
+"sample_s1","1","Fal","woodland_oak"
+"sample_s10","10","Fal","estuarine mud_low polyhaline"
+"sample_s11","11","Fal","woodland_pine"
+"sample_s12","12","Helford","reservoir"
+"sample_s13","13","Helford","river"
+"sample_s14","14","Helford","estuarine mud_oligohaline"
+"sample_s15","15","Helford","estuarine mud_low polyhaline"
+"sample_s16","16","Helford","estuarine mud_full saline"
+"sample_s17","17","Helford","woodland_pine"
+"sample_s19","19","Helford","beach_supratidal"
+"sample_s2","2","Fal","pasture"
+"sample_s20","20","Looe","estuarine mud_oligohaline"
+"sample_s21","21","Looe","woodland_oak"
+"sample_s22","22","Looe","river"
+"sample_s23","23","Looe","estuarine mud_full saline"
+"sample_s24","24","Looe","beach_subtidal"
+"sample_s25","25","Looe","thrift_rhizosphere"
+"sample_s27","27","Fal","beach_subtidal"
+"sample_s28","28","Helford","beach_seaweed"
+"sample_s3","3","Fal","thrift_rhizosphere"
+"sample_s31","31","Fowey","woodland_pine"
+"sample_s32","32","Fowey","woodland_oak"
+"sample_s33","33","Looe","reservoir"
+"sample_s34","34","Looe","pasture"
+"sample_s35","35","Fowey","river"
+"sample_s36","36","Fowey","field_wheat"
+"sample_s37","37","Fowey","estuarine mud_oligohaline"
+"sample_s38","38","Fowey","estuarine mud_full saline"
+"sample_s39","39","Fowey","rock_samphire"
+"sample_s4","4","Fal","field_wheat"
+"sample_s40","40","Fowey","pasture"
+"sample_s41","41","Fowey","estuarine mud_low polyhaline"
+"sample_s42","42","Tamar","beach_subtidal"
+"sample_s43","43","Tamar","rock_samphire"
+"sample_s44","44","Tamar","beach_supratidal"
+"sample_s46","46","Tamar","pasture"
+"sample_s47","47","Tamar","estuarine mud_low polyhaline"
+"sample_s48","48","Camel","field_wheat"
+"sample_s49","49","Tamar","woodland_pine"
+"sample_s5","5","Helford","pasture"
+"sample_s50","50","Tamar","woodland_oak"
+"sample_s51","51","Tamar","river"
+"sample_s52","52","Tamar","estuarine mud_full saline"
+"sample_s53","53","Tamar","estuarine mud_oligohaline"
+"sample_s54","54","Fal","river"
+"sample_s55","55","Fal","estuarine mud_oligohaline"
+"sample_s56","56","Camel","river"
+"sample_s57","57","Camel","pasture"
+"sample_s58","58","Tamar","field_wheat"
+"sample_s59","59","Camel","beach_subtidal"
+"sample_s6","6","Helford","woodland_oak"
+"sample_s60","60","Camel","beach_seaweed"
+"sample_s61","61","Camel","woodland_oak"
+"sample_s62","62","Camel","woodland_pine"
+"sample_s63","63","Camel","estuarine mud_low polyhaline"
+"sample_s64","64","Camel","estuarine mud_oligohaline"
+"sample_s65","65","Camel","reservoir"
+"sample_s65b","65b","Fal","marine mud_full saline"
+"sample_s66","66","Fal","marine mud_full saline"
+"sample_s67","67","Fal","marine mud_full saline"
+"sample_s68","68","Fal","marine mud_full saline"
+"sample_s69","69","Fal","reservoir"
+"sample_s7","7","Helford","thrift_rhizosphere"
+"sample_s70","70","Fal","beach_seaweed"
+"sample_s71","71","Fal","rock_samphire"
+"sample_s72","72","Helford","beach_seaweed"
+"sample_s73","73","Helford","rock_samphire"
+"sample_s8","8","Helford","field_wheat"
+"sample_s9","9","Fal","reservoir"
+"sample_s18","18","Helford","beach_subtidal"
+"sample_s26","26","Looe","field_wheat"
+"sample_s29","29","Helford","rock_samphire"
+"sample_s30","30","Fal","estuarine mud_full saline"
