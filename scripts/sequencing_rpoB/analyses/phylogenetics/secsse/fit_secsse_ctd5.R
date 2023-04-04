@@ -21,7 +21,7 @@ if(server == TRUE){
   d_habpref <- read.csv('~/secsse/habitat_preference_asv_new.csv')
   d_taxa <- readRDS('~/secsse/ps_otu_asv_filt.rds')
   tree <- read.tree('~/secsse/myxo_asv_chronopl10.tre')
-  fit_musse_no_se <- readRDS('~/secsse/asv_musse_no_se.rds')
+  fit_mk <- readRDS('~/secsse/mod_custom5.rds')
 }
 
 if(server == FALSE){
@@ -31,8 +31,8 @@ if(server == FALSE){
   d_taxa <- readRDS(here('data/sequencing_rpoB/phyloseq/myxococcus/prevalence_filtered/ps_otu_asv_filt.rds'))
   # read in tree
   tree <- read.tree(here('data/sequencing_rpoB/raxml/trees/myxo_asv/myxo_asv_chronopl10.tre'))
-  # read in musse model
-  fit_musse_no_se <- readRDS('data/sequencing_rpoB/processed/transition_rates/asv_musse_no_se.rds')
+  # read in Mk model
+  fit_mk <- readRDS('data/sequencing_rpoB/processed/transition_rates/mod_custom5.rds')
 }
 
 d_taxa <- d_taxa %>%
@@ -122,9 +122,9 @@ q_matrix <- data.frame(idparslist$Q) %>%
 colnames(q_matrix)
 
 # first make any of the transitions not possible in the Markov model 0
-# q14~0, q24~0, q25~0, q41~0, q42~0, q53~0, q45~0, q54~0
+# q14~0, q24~0, q25~0, q41~0, q53~0, q42~0, q45~0, q54~0, q52~0
 q_matrix <- mutate(q_matrix,
-                   new_id = ifelse(transition %in% c('q14', 'q24', 'q25', 'q41', 'q42', 'q53', 'q45'), 0, id))
+                   new_id = ifelse(transition %in% c('q14', 'q24', 'q25', 'q41', 'q53', 'q42', 'q45', 'q54', 'q52'), 0, id))
 
 # make transitions that are across hidden states AND trait states 0. i.e. 1A -> 2B
 q_matrix <- mutate(q_matrix,
@@ -202,8 +202,8 @@ idparslist$Q
 
 # set initial values ####
 
-# musse transition rates
-musse_transitions <- fit_musse_no_se$par[grepl('q', names(fit_musse_no_se$par))]
+# mk transition rates
+mk_transitions <- fit_mk$par[grepl('q', names(fit_mk$par))]
 
 # for lambda and mu
 startingpoint <- bd_ML(brts = ape::branching.times(tree))
@@ -219,11 +219,12 @@ init_transition <- data.frame(idparslist$Q) %>%
   arrange(id) %>%
   select(id, transition) %>%
   distinct() %>%
-  left_join(., data.frame(transition = names(musse_transitions), rate = unname(musse_transitions))) %>%
+  left_join(., data.frame(transition = names(mk_transitions), rate = unname(mk_transitions))) %>%
   mutate(rate = replace_na(rate, mean(rate, na.rm = TRUE))) %>%
   select(id, rate) %>%
   distinct() %>%
   pull(rate)
+
 
 initparsopt <- c(rep(init_lambda, times = 5),
                  rep(init_mu, times = 1),

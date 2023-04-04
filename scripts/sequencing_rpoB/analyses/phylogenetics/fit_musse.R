@@ -26,12 +26,6 @@ d_meta <- left_join(select(d_habpref, otu, habitat_preference = habitat_preferen
 # read in tree
 tree <- read.tree(here('data/sequencing_rpoB/raxml/trees/myxo_asv/myxo_asv_chronopl10.tre'))
 
-# read in shift nodes
-shiftnodes <- readRDS(here('data/sequencing_rpoB/processed/shiftnodes.rds'))
-
-# read in colours for states
-cols_hab <- readRDS(here('data/sequencing_rpoB/phyloseq/myxococcus/habitat_preference/summary/habitat_colours.rds'))
-
 # setup for analyses ####
 
 # reorder metadata to match tip labels of tree
@@ -61,7 +55,7 @@ coding <- tibble(hab_pref = unname(hab_pref), hab_pref_num = unname(hab_pref_num
 coding
 
 # read in best markov model
-best_model <- readRDS('data/sequencing_rpoB/processed/transition_rates/asv_mod_custom7_nlminb.rds')
+best_model <- readRDS('data/sequencing_rpoB/processed/transition_rates/mod_custom5.rds')
 
 # set up sampling fractions, set them all to 1
 sampling_frac <- setNames(rep(1, times = 5), sort(unique(hab_pref_num)))
@@ -72,17 +66,16 @@ lik_musse <- make.musse(tree, hab_pref_num, k = max(hab_pref_num), sampling.f = 
 # set constraints for transitions that do not occur
 # these are taken from the 0s in best_model
 lik_musse <- constrain(lik_musse, 
-                       q53~0,
-                       q41~0,
-                       q14~0,
-                       q24~0,
-                       q25~0,
+                       q14~0, q24~0, q25~0, q41~0, q53~0,
                        q42~0,
-                       q45~0)
+                       q45~0,
+                       q54~0,
+                       q52~0)
 
 # we can estimate starting values using starting.point.musse()
 start_vals <- starting.point.musse(tree, k = max(hab_pref_num))
 
+# replace the start values with those in the best Mk model
 for(i in 1:length(best_model$par)){
   start_vals[names(start_vals) == names(best_model$par)[i]] <- unname(best_model$par[i])
 }
@@ -106,7 +99,6 @@ lik_null_no_se <- constrain(lik_musse, mu2 ~ mu1, mu3 ~ mu1, mu4 ~ mu1, mu5 ~ mu
 fit_musse_no_sse <- find.mle(lik_null_no_sse, x.init = start_vals[argnames(lik_null_no_sse)], method = 'subplex', control = list(maxit = 100000))
 fit_musse_no_ss <- find.mle(lik_null_no_ss, x.init = start_vals[argnames(lik_null_no_ss)],method = 'subplex', control = list(maxit = 50000))
 fit_musse_no_se <- find.mle(lik_null_no_se, x.init = start_vals[argnames(lik_null_no_se)], method = 'subplex', control = list(maxit = 100000))
-
 
 # do model selection
 

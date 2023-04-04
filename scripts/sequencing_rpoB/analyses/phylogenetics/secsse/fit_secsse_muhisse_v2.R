@@ -15,13 +15,13 @@ tidyverse_conflicts()
 name <- 'muhisseSSonly'
 
 # server - yes or no
-server <- FALSE
+server <- TRUE
 
 if(server == TRUE){
   d_habpref <- read.csv('~/secsse/habitat_preference_asv_new.csv')
   d_taxa <- readRDS('~/secsse/ps_otu_asv_filt.rds')
   tree <- read.tree('~/secsse/myxo_asv_chronopl10.tre')
-  fit_musse_no_se <- readRDS('~/secsse/asv_musse_no_se.rds')
+  fit_mk <- readRDS('~/secsse/mod_custom5.rds')
 }
 
 if(server == FALSE){
@@ -31,9 +31,10 @@ if(server == FALSE){
   d_taxa <- readRDS(here('data/sequencing_rpoB/phyloseq/myxococcus/prevalence_filtered/ps_otu_asv_filt.rds'))
   # read in tree
   tree <- read.tree(here('data/sequencing_rpoB/raxml/trees/myxo_asv/myxo_asv_chronopl10.tre'))
-  # read in musse model
-  fit_musse_no_se <- readRDS('data/sequencing_rpoB/processed/transition_rates/asv_musse_no_se.rds')
+  # read in Mk model
+  fit_mk <- readRDS('data/sequencing_rpoB/processed/transition_rates/mod_custom5.rds')
 }
+
 
 d_taxa <- d_taxa %>%
   phyloseq::tax_table() %>%
@@ -122,9 +123,9 @@ q_matrix <- data.frame(idparslist$Q) %>%
 colnames(q_matrix)
 
 # first make any of the transitions not possible in the Markov model 0
-# q14~0, q24~0, q25~0, q41~0, q42~0, q53~0, q45~0, q54~0
+# q14~0, q24~0, q25~0, q41~0, q53~0, q42~0, q45~0, q54~0, q52~0
 q_matrix <- mutate(q_matrix,
-                   new_id = ifelse(transition %in% c('q14', 'q24', 'q25', 'q41', 'q42', 'q53', 'q45'), 0, id))
+                   new_id = ifelse(transition %in% c('q14', 'q24', 'q25', 'q41', 'q53', 'q42', 'q45', 'q54', 'q52'), 0, id))
 
 # make transitions that are across hidden states AND trait states 0. i.e. 1A -> 2B
 q_matrix <- mutate(q_matrix,
@@ -202,8 +203,8 @@ idparslist$Q
 
 # set initial values ####
 
-# musse transition rates
-musse_transitions <- fit_musse_no_se$par[grepl('q', names(fit_musse_no_se$par))]
+# mk transition rates
+mk_transitions <- fit_mk$par[grepl('q', names(fit_mk$par))]
 
 # for lambda and mu
 startingpoint <- bd_ML(brts = ape::branching.times(tree))
@@ -219,11 +220,12 @@ init_transition <- data.frame(idparslist$Q) %>%
   arrange(id) %>%
   select(id, transition) %>%
   distinct() %>%
-  left_join(., data.frame(transition = names(musse_transitions), rate = unname(musse_transitions))) %>%
+  left_join(., data.frame(transition = names(mk_transitions), rate = unname(mk_transitions))) %>%
   mutate(rate = replace_na(rate, mean(rate, na.rm = TRUE))) %>%
   select(id, rate) %>%
   distinct() %>%
   pull(rate)
+
 
 initparsopt <- c(rep(init_lambda, times = 10),
                  rep(init_mu, times = 1),
@@ -247,29 +249,46 @@ max_iter <- 1000 * round((1.25)^length(idparsopt))
 inits_one <- initparsopt
 
 # double speciation rates and halve transition rates
-inits_two <- c(c(rep(init_lambda*2, times = 10),
-                 rep(init_mu, times = 1),
-                 init_transition/2))
+inits_two <- c(rep(init_lambda*2, times = max(idparslist$lambdas)),
+               rep(init_mu, times = 1),
+               init_transition/2)
 
 # halve speciaton rates and double transition rates
-inits_three <- c(c(rep(init_lambda/2, times = 10),
-                   rep(init_mu, times = 1),
-                   init_transition*2))
+inits_three <- c(rep(init_lambda/2, times = max(idparslist$lambdas)),
+                 rep(init_mu, times = 1),
+                 init_transition*2)
 
-inits <- list(inits_one, inits_two, inits_three)
+# double extinction rates, halve transition rates the same
+inits_four <- c(rep(init_lambda, times = max(idparslist$lambdas)),
+                rep(init_mu*2, times = 1),
+                init_transition/2)
+
+# halve extinction rates, double transition rates
+inits_five <- c(rep(init_lambda, times = max(idparslist$lambdas)),
+                rep(init_mu/2, times = 1),
+                init_transition*2)
+
+# take mean of transition rates for all transitions
+inits_six <- c(rep(init_lambda*2, times = max(idparslist$lambdas)),
+               rep(init_mu, times = 1),
+               rep(mean(init_transition), times = length(init_transition)))
+
+inits <- list(inits_one, inits_two, inits_three, inits_four, inits_five, inits_six)
 
 # also need to change the sample fractions ####
+# use 1, 0.75 and 0.5 to see how they change the fit
+
 sampled_fraction_1 <- rep(1, times = length(unique(traits)))
 sampled_fraction_0.75 <- rep(0.75, times = length(unique(traits)))
 sampled_fraction_0.5 <- rep(0.5, times = length(unique(traits)))
-sampled_fraction_0.25 <- rep(0.25, times = length(unique(traits)))
 
-sampled_fractions <- list(sampled_fraction_1, sampled_fraction_0.75, sampled_fraction_0.5, sampled_fraction_0.25)
+sampled_fractions <- list(sampled_fraction_1, sampled_fraction_0.75, sampled_fraction_0.5)
 
 # create all combinations of the two lists
 all_combs <- expand_grid(sampled_fractions, inits) %>%
   mutate(run = 1:n()) %>%
   purrr::transpose()
+
 
 # write a custom function to do everything we want in terms of fitting the model and saving it out
 fit_secsse <- function(list_inits_sampfrac){
@@ -299,7 +318,7 @@ fit_secsse <- function(list_inits_sampfrac){
     use_fortran = TRUE,
     methode = "ode45",
     optimmethod = "simplex",
-    num_cycles = 1,
+    num_cycles = 3,
     run_parallel = TRUE
   )
   
@@ -319,7 +338,7 @@ fit_secsse <- function(list_inits_sampfrac){
 
 
 # Set a "plan" for how the code should run.
-plan(multisession, workers = 12)
+plan(multisession, workers = 18)
 
 # run future_walk
 furrr::future_walk(all_combs, fit_secsse)
