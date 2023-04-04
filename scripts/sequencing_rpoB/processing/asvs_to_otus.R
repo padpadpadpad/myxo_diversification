@@ -7,17 +7,12 @@
 
 # reads in myxo asv object
 # does prevalence filtering: present in at least four samples and have a total abundance > 100
-# aligns this object and creates a distnace matrix
+# aligns this object and creates a distance matrix
 # clusters the ASVs at a given similarity
 # saves out clustered phyloseq object
 
 # load in packages
-library(phyloseq)
-library(dada2)
-library(DECIPHER)
-library(here)
-library(tidyverse)
-library(speedyseq)
+librarian::shelf(phyloseq, dada2, DECIPHER, here, tidyverse, mikemc/speedyseq)
 
 # set number of processors to use
 num_processors <- 4
@@ -88,19 +83,12 @@ for(i in 1:length(cut_off))
     processors = num_processors
   )
   
-  # create new phyloseq object from the 
+  # create new phyloseq object from the clusters
   ps0 <- merge_taxa_vec(
     ps_sub, 
     group = clusters$cluster,
   )
-  
+
   # save this out
-  saveRDS(ps0, here(paste('data/sequencing_rpoB/phyloseq/myxococcus/clustered/ps_otu_', percent_similarity[i], 'percent.rds', sep = '')))
-  
-  # do prevalence filtering
-  # remove things that are only present in 3 or fewer samples & abundance > 100 overall
-  ps0_sub <- microViz::tax_filter(ps0, min_prevalence = 4, min_total_abundance = 100)
-  
-  # save this out
-  saveRDS(ps0_sub, here(paste('data/sequencing_rpoB/phyloseq/myxococcus/prevalence_filtered/ps_otu_', percent_similarity[i], 'percent_filt.rds', sep = '')))
+  saveRDS(ps0, here(paste('data/sequencing_rpoB/phyloseq/myxococcus/prevalence_filtered/ps_otu_', percent_similarity[i], 'percent_filt.rds', sep = '')))
 }

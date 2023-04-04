@@ -26,7 +26,7 @@ library(ape)
 library(here)
 
 # set variable for ASV or otu similarity
-otu_similarity <- c(98:91, 97.7)
+otu_similarity <- c(99:91, 97.7, 'asv')
 
 # set number of iterations or permutations
 n_iter = 50 # number of iterations for calculating Pagel's lambda
@@ -125,7 +125,7 @@ for(i in 1:length(otu_similarity)){
   
   # first fit for all traits - use ER as SYM and ARD takes SO LONG
   # run it for less iterations
-  mod_all <- fitDiscrete(phy = tree, dat = hab_pref_vec, model = 'ER', transform = 'lambda', ncores = n_cores, control = list(niter = 10))
+  mod_all <- fitDiscrete(phy = tree, dat = hab_pref_vec, model = 'ER', transform = 'lambda', ncores = n_cores, control = list(niter = 100))
   
   # second for all freshwater
   mod_freshwater <- fitDiscrete(phy = tree, dat = freshwater_vec, model = 'ARD', transform = 'lambda', ncores = n_cores, control = list(niter = n_iter))

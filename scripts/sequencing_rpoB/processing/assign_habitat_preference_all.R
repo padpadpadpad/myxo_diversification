@@ -35,6 +35,12 @@ clusters <- clusters %>%
                                      medoid_nbclust == '2' ~ 'freshwater',
                                      medoid_nbclust == '3' ~ 'marine_mud'))
 
+# from the PCoA plot of the myxobacteria, it can be seen that sample s46 actually is not terrestrial (as it was for the 16s)
+# it is instead marine mud and the misidentification likely happened during the DNA extraction / sequencing
+
+# change this cluster assignment
+clusters <- mutate(clusters, clust = ifelse(sample == 'sample_s46', 'marine_mud', clust))
+
 # look at availability of clusters
 d_habitats <- clusters %>% 
   select(sample, clust) %>%
@@ -42,12 +48,13 @@ d_habitats <- clusters %>%
   group_by(clust) %>%
   tally() %>%
   mutate(prop_available = n / sum(n)) %>%
-  rename(num_available = n)
+  dplyr::rename(num_available = n)
 
 d_habitats
 # terrestrial is more commonly sampled than mud and shore and freshwater is our least well sampled cluster
 
 head(clusters)
+clusters <- select(clusters, sample, clust)
 
 #------------------------------#
 # assign habitat preference ####
@@ -96,7 +103,7 @@ for(i in 1:length(percent_similarity)){
     mutate(sample_depth = sum(abundance),
            n_species = n()) %>%
     ungroup() %>%
-    select(sample, habitat_group, location, clust, sample_depth, n_species) %>% 
+    select(sample, habitat_group_16s, location, clust, sample_depth, n_species) %>% 
     distinct()
   
   #------------------------------#
@@ -149,13 +156,13 @@ for(i in 1:length(percent_similarity)){
     select(., otu, clust, num_present) %>%
     uncount(weights = num_present) %>%
     group_by(otu) %>%
-    slice(rep(1:n(), times = n_boots)) %>%
+    dplyr::slice(rep(1:n(), times = n_boots)) %>%
     mutate(boot = rep(1:n_boots, each = n()/n_boots)) %>%
     group_by(otu, boot) %>%
     nest(data = clust) %>%
-    mutate(new_data = map(data, ~sample(.x$clust, 100, replace = TRUE))) %>%
+    mutate(new_data = purrr::map(data, ~sample(.x$clust, 100, replace = TRUE))) %>%
     unnest(new_data) %>%
-    rename(clust = new_data) %>%
+    dplyr::rename(clust = new_data) %>%
     group_by(otu, boot, clust) %>%
     summarise(num_present = n(), .groups = 'drop') %>%
     complete(otu, boot, clust,
@@ -186,7 +193,7 @@ for(i in 1:length(percent_similarity)){
   #  calculate number of preferences for each otu
   d_pref_multiple2 <- group_by(d_quantiles2, otu) %>%
     tally() %>%
-    rename(number_habitats = n)
+    dplyr::rename(number_habitats = n)
   
   # calculate summary of habitats
   boots_summary <- group_by(d_quantiles2, otu) %>%

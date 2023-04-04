@@ -24,6 +24,7 @@ read_habpref <- function(x){
 
 # list all the habitat preference files
 files <- list.files('data/sequencing_rpoB/phyloseq/myxococcus/habitat_preference/summary', pattern = '.csv', full.names = TRUE)
+files <- files[! basename(files) %in% c('habitat_preference_asv_new.csv', 'habitat_preference_asv_check.csv')]
 
 # read them all in
 d <- map_df(files, read_habpref)
@@ -42,7 +43,6 @@ cols_hab <- met.brewer('Austria', n = 7)
 names(cols_hab) <- c('marine_mud', 'freshwater', 'terrestrial', 'freshwater:terrestrial', 'freshwater:marine_mud:terrestrial', 'marine_mud:terrestrial', 'freshwater:marine_mud')
 hab_labels <- c('marine mud', 'freshwater', 'terrestrial', 'freshwater + terrestrial', 'generalist', 'marine mud + terrestrial', 'freshwater + marine mud')
 names(hab_labels) <- c('marine_mud', 'freshwater', 'terrestrial', 'freshwater:terrestrial', 'freshwater:marine_mud:terrestrial', 'marine_mud:terrestrial', 'freshwater:marine_mud')
-
 
 # create plot
 ggplot(d_summary, aes(prop, forcats::fct_reorder(habitat_preference, n, .fun = mean))) +
