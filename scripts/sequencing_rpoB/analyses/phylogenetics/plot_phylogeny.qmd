@@ -231,7 +231,7 @@ group_by(d_meta, habitat_preference) %>%
   mutate(prop = round(n/sum(n)*100, 2))
 ```
 
-We only have 4 ASVs that have been classified as full generalists, and only six that are marine mud + terrestrial generalists. These are only 0.23% and 0.15% of all the ASVs. This will likely make them very, very difficult to include in our comparative phylogenetic analyses. The next smallest group of ASVs are freshwater + terrestrial generalists (4.4% of ASVs), so it makes sense to group all of these together as "marine mud generalists". We will have a look at doing this later on in the script.
+We only have 6 ASVs that have been classified as full generalists, and only 5 that are marine mud + terrestrial generalists. These are only 0.23% and 0.15% of all the ASVs. This will likely make them very, very difficult to include in our comparative phylogenetic analyses. The next smallest group of ASVs are freshwater + terrestrial generalists (4.4% of ASVs), so it makes sense to group all of these together as "marine mud generalists". We will have a look at doing this later on in the script.
 
 We can also see how many of our ASVs just turned up in a single cluster and which of those turned up in multiple.
 
