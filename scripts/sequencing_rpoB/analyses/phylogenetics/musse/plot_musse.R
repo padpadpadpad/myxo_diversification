@@ -5,8 +5,7 @@
 #--------------------------#
 
 # load in packages ####
-
-librarian::shelf(ggtree, diversitree, tidybayes, ggdist, tidyverse)
+librarian::shelf(ggtree, diversitree, tidybayes, ggdist, tidyverse, here, GGally)
 
 # identify conflicts in the tidyverse packages and other packages
 tidyverse_conflicts()
@@ -29,9 +28,6 @@ d_meta <- left_join(select(d_habpref, otu, habitat_preference = habitat_preferen
 
 # read in tree
 tree <- read.tree(here('data/sequencing_rpoB/raxml/trees/myxo_asv/myxo_asv_chronopl10.tre'))
-
-# read in shift nodes
-shiftnodes <- readRDS(here('data/sequencing_rpoB/processed/shiftnodes.rds'))
 
 # read in colours for states
 cols_hab <- readRDS(here('data/sequencing_rpoB/phyloseq/myxococcus/habitat_preference/summary/habitat_colours.rds'))
@@ -68,10 +64,6 @@ coding
 # musse model wrangling ####
 #--------------------------#
 
-# read in best markov model
-fit_markov <- readRDS('data/sequencing_rpoB/processed/transition_rates/asv_mod_custom3_v2.rds')
-max(fit_musse_no_se$par)*5
-
 # read in musse models
 fit_musse <- readRDS('data/sequencing_rpoB/processed/transition_rates/asv_musse.rds')
 fit_musse_no_se <- readRDS('data/sequencing_rpoB/processed/transition_rates/asv_musse_no_se.rds')
@@ -79,12 +71,6 @@ fit_musse_no_sse <- readRDS('data/sequencing_rpoB/processed/transition_rates/asv
 fit_musse_no_ss <- readRDS('data/sequencing_rpoB/processed/transition_rates/asv_musse_no_ss.rds')
 
 # do model selection
-
-# run anova
-anova(no_sse = fit_musse_no_sse,
-      no_ss = fit_musse_no_ss,
-      no_se = fit_musse_no_se,
-      fit_musse)
 
 # make AIC table
 d_musse_aic <- data.frame(model = c('full_sse', 'no_se', 'no_ss', 'no_sse'), aic = c(AIC(fit_musse), AIC(fit_musse_no_se), AIC(fit_musse_no_ss), AIC(fit_musse_no_sse))) %>%
@@ -123,6 +109,7 @@ ggplot(d_speciation_summary, aes(hab_pref, speciation_rate, col = hab_pref)) +
 
 ggsave('plots/sequencing_rpoB/analyses/musse_speciation.png', last_plot(), height = 5, width = 6)
 
+
 # how similar are the transition rates between the musse model and the simpler markov model
 d_transitions_musse <- select(musse_mcmc, i, starts_with('q')) %>%
   pivot_longer(cols = starts_with('q'), names_to = 'transition', values_to = 'transition_rate', names_prefix = 'q') %>%
@@ -133,7 +120,7 @@ d_transitions_musse <- select(musse_mcmc, i, starts_with('q')) %>%
   group_by(transition, state_1_num, state_1, state_2_num, state_2) %>%
   tidybayes::mean_qi(transition_rate)
 
-d_transitions_markov <- readRDS('data/sequencing_rpoB/processed/transition_rates/asv_mcmc_custom3_v2.rds') %>%
+d_transitions_markov <- readRDS('data/sequencing_rpoB/processed/transition_rates/asv_mcmc_custom5.rds') %>%
   select(., i, starts_with('q')) %>%
   pivot_longer(cols = starts_with('q'), names_to = 'transition', values_to = 'transition_rate', names_prefix = 'q') %>%
   mutate(state_1_num = as.numeric(substr(transition, 1,1)),
@@ -155,10 +142,19 @@ ggplot(d_transitions, aes(rate_markov, rate_musse)) +
   xlim(c(0, 60)) +
   ylim(c(0, 65))
 
-# look at which rates correlate with each other from the Musse model
+# look at which transition rates correlate with each other from the Musse model
 select(musse_mcmc, i, starts_with('q')) %>%
   slice_sample(n = 250) %>%
   ggpairs(., columns = 2:ncol(.),
           lower = list(continuous = wrap("points", alpha = 0.3))) +
   theme_bw()
-ggsave('plots/sequencing_rpoB/analyses/discrete_character_evolution/pairs_plot_musse.png', last_plot(), height = 12, width = 14)
+ggsave('plots/sequencing_rpoB/analyses/pairs_plot_musse.png', last_plot(), height = 12, width = 14)
+
+# look at correlation between the strongest rates and speciation rates
+select(musse_mcmc, i, c(starts_with('lambda'), q15, q51, q31, q35)) %>%
+  slice_sample(n = 250) %>%
+  ggpairs(., columns = 2:ncol(.),
+          lower = list(continuous = wrap("points", alpha = 0.3))) +
+  theme_bw()
+
+ggsave('plots/sequencing_rpoB/analyses/pairs_plot_musse_speciation.png', last_plot(), height = 12, width = 14)
