@@ -17,3 +17,4 @@ Icon?
 data/sequencing_rpoB/phyloseq/myxococcus/dist_matrix.rds
 data/sequencing_rpoB/processed/transition_rates/previous/*
 .httr-oauth
+scripts/to_ignore/*
