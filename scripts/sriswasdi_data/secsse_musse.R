@@ -214,7 +214,7 @@ max_iter <- 1000 * round((1.25)^length(idparsopt))
 inits_one <- initparsopt
 
 # double speciation rates and halve transition rates
-inits_two <- c(rep(init_lambda*2, times = max(idparslist$lambdas)),
+inits_two <- c(rep(init_lambda*1.2, times = max(idparslist$lambdas)),
                rep(init_mu, times = length(unique(idparslist$lambdas))),
                init_transition/2)
 
@@ -225,7 +225,7 @@ inits_three <- c(rep(init_lambda/2, times = max(idparslist$lambdas)),
 
 # double extinction rates, halve transition rates the same
 inits_four <- c(rep(init_lambda, times = max(idparslist$lambdas)),
-                rep(init_mu*2, times = length(unique(idparslist$lambdas))),
+                rep(init_mu*1.2, times = length(unique(idparslist$lambdas))),
                 init_transition/2)
 
 # halve extinction rates, double transition rates
