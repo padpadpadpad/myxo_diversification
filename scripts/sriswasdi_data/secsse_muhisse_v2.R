@@ -35,6 +35,9 @@ if(server == FALSE){
   fit_mk <- readRDS('data/sriswasdi_data/mod_ard.rds')
 }
 
+# add a very tiny number onto branch lengths that are zero
+tree$edge.length[tree$edge.length == 0] <- 0.000001
+
 # make tree ultrametric
 tree <- phytools::force.ultrametric(tree, method = 'extend')
 

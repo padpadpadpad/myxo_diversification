@@ -85,6 +85,7 @@ for(i in 1:length(mod_ard$par)){
 # fit musse model
 fit_bisse <- find.mle(lik_bisse, x.init = start_vals[argnames(lik_bisse)], method = 'subplex', control = list(maxit = 50000))
 fit_bisse$par
+fit_bisse1 <- fit_bisse
 
 # remove state dependent speciation and extinction parameters
 lik_null_no_sse <- constrain(lik_bisse, 
@@ -110,7 +111,64 @@ d_bisse_aic <- data.frame(model = c('full_sse', 'no_se', 'no_ss', 'no_sse'),
   mutate(weights = round(MuMIn::Weights(aic), 3))
 
 d_bisse_aic
+
+d_bisse_aic1 <- d_bisse_aic
 # no se model is favoured - makes fitting the hisse easier
+
+# run models again but with ultrametric tree with no zero branches
+tree2 <- read.tree('data/sriswasdi_data/treecut_representative_topology_scale0.5_patched.newick')
+
+# add a very tiny number onto branch lengths that are zero
+tree2$edge.length[tree$edge.length == 0] <- 0.000001
+
+# make tree ultrametric
+tree2 <- phytools::force.ultrametric(tree2, method = 'extend')
+
+# set up sampling fractions, set them all to 1
+sampling_frac <- setNames(rep(1, times = 2), sort(unique(trait)))
+
+# set up likelihood model for diversitree
+lik_bisse <- make.bisse(tree2, trait, sampling.f = sampling_frac)
+
+# we can estimate starting values using starting.point.bisse()
+start_vals <- starting.point.bisse(tree)
+
+# replace the start values with those in the best Mk model
+for(i in 1:length(mod_ard$par)){
+  start_vals[names(start_vals) == names(mod_ard$par)[i]] <- unname(mod_ard$par[i])
+}
+
+# fit musse model
+fit_bisse <- find.mle(lik_bisse, x.init = start_vals[argnames(lik_bisse)], method = 'subplex', control = list(maxit = 50000))
+fit_bisse$par
+
+# remove state dependent speciation and extinction parameters
+lik_null_no_sse <- constrain(lik_bisse, 
+                             lambda1 ~ lambda0,
+                             mu1 ~ mu0)
+
+# remove only speciation parameters
+lik_null_no_ss <- constrain(lik_bisse, 
+                            lambda1 ~ lambda0)
+
+# remove only extinction parameters
+lik_null_no_se <- constrain(lik_bisse, mu1 ~ mu0)
+
+# fit model
+fit_bisse_no_sse <- find.mle(lik_null_no_sse, x.init = start_vals[argnames(lik_null_no_sse)], method = 'subplex', control = list(maxit = 100000))
+fit_bisse_no_ss <- find.mle(lik_null_no_ss, x.init = start_vals[argnames(lik_null_no_ss)],method = 'subplex', control = list(maxit = 50000))
+fit_bisse_no_se <- find.mle(lik_null_no_se, x.init = start_vals[argnames(lik_null_no_se)], method = 'subplex', control = list(maxit = 100000))
+
+# make AIC table
+d_bisse_aic2 <- data.frame(model = c('full_sse', 'no_se', 'no_ss', 'no_sse'), 
+                          aic = c(AIC(fit_bisse), AIC(fit_bisse_no_se), AIC(fit_bisse_no_ss), AIC(fit_bisse_no_sse))) %>%
+  dplyr::arrange(., aic) %>%
+  mutate(weights = round(MuMIn::Weights(aic), 3))
+
+d_bisse_aic1
+d_bisse_aic2
+
+# do not run this code ####
 
 # set up the hisse model
 

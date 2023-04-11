@@ -35,6 +35,9 @@ if(server == FALSE){
   fit_mk <- readRDS('data/sriswasdi_data/mod_ard.rds')
 }
 
+# add a very tiny number onto branch lengths that are zero
+tree$edge.length[tree$edge.length == 0] <- 0.000001
+
 # make tree ultrametric
 tree <- phytools::force.ultrametric(tree, method = 'extend')
 
@@ -257,11 +260,11 @@ fit_secsse <- function(list_inits_sampfrac){
     tree,
     traits,
     num_concealed_states = num_concealed_states,
-    idparslist,
-    idparsopt,
+    idparslist = idparslist,
+    idparsopt = idparsopt,
     initparsopt = temp_inits,
-    idparsfix,
-    parsfix,
+    idparsfix = NULL,
+    parsfix = NULL,
     cond = "maddison_cond",
     root_state_weight = "maddison_weights",
     tol = c(1e-04, 1e-05, 1e-07),

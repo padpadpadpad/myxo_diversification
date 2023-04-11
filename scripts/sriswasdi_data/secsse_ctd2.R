@@ -35,6 +35,9 @@ if(server == FALSE){
   fit_mk <- readRDS('data/sriswasdi_data/mod_ard.rds')
 }
 
+# add a very tiny number onto branch lengths that are zero
+tree$edge.length[tree$edge.length == 0] <- 0.000001
+
 # make tree ultrametric
 tree <- phytools::force.ultrametric(tree, method = 'extend')
 
@@ -210,24 +213,24 @@ max_iter <- 1000 * round((1.25)^length(idparsopt))
 inits_one <- initparsopt
 
 # double speciation rates and halve transition rates
-inits_two <- c(rep(init_lambda*2, times = max(idparslist$lambdas)),
+inits_two <- c(rep(init_lambda*1.2, times = max(idparslist$lambdas)),
                rep(init_mu, times = length(unique(idparslist$lambdas))),
                init_transition/2)
 
 # halve speciaton rates and double transition rates
 inits_three <- c(rep(init_lambda/2, times = max(idparslist$lambdas)),
                  rep(init_mu, times = length(unique(idparslist$lambdas))),
-                 init_transition*2)
+                 init_transition*1.5)
 
 # double extinction rates, halve transition rates the same
 inits_four <- c(rep(init_lambda, times = max(idparslist$lambdas)),
-                rep(init_mu*2, times = length(unique(idparslist$lambdas))),
+                rep(init_mu*1.5, times = length(unique(idparslist$lambdas))),
                 init_transition/2)
 
 # halve extinction rates, double transition rates
 inits_five <- c(rep(init_lambda, times = max(idparslist$lambdas)),
                 rep(init_mu/2, times = length(unique(idparslist$lambdas))),
-                init_transition*2)
+                init_transition*1.5)
 
 inits <- list(inits_one, inits_two, inits_three, inits_four, inits_five)
 
