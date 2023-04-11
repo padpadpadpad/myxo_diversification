@@ -230,7 +230,7 @@ inits_four <- c(rep(init_lambda, times = max(idparslist$lambdas)),
 
 # halve extinction rates, double transition rates
 inits_five <- c(rep(init_lambda, times = max(idparslist$lambdas)),
-                rep(init_mu/2, times = length(unique(idparslist$lambdas))),
+                rep(init_mu/1.5, times = length(unique(idparslist$lambdas))),
                 init_transition*2)
 
 inits <- list(inits_one, inits_two, inits_three, inits_four, inits_five)
