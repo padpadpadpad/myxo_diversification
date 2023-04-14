@@ -1,4 +1,4 @@
-# try a MuHiSSE using secSSE for the Sriswasdi data
+# try a CTD2 model using secSSE for the Sriswasdi data
 
 # load in packages ####
 
@@ -12,10 +12,10 @@ tidyverse_conflicts()
 # load in data ####
 
 # filename
-name <- 'muhissefull'
+name <- 'ctd2'
 
 # server - yes or no
-server <- TRUE
+server <- FALSE
 
 if(server == TRUE){
   # load in phylogenetic tree
@@ -24,8 +24,6 @@ if(server == TRUE){
   trait_file <- read.table('sriswasdi/treecut_representative_topology_scale0.5_patched_states.txt')
   # read in ARD Mk model
   fit_mk <- readRDS('sriswasdi/mod_ard.rds')
-  # read in start value dataframe
-  start_vals <- readRDS(paste('sriswasdi/start_vals/', name, '.rds', sep = ''))
 }
 
 if(server == FALSE){
@@ -35,8 +33,6 @@ if(server == FALSE){
   trait_file <- read.table('data/sriswasdi_data/treecut_representative_topology_scale0.5_patched_states.txt')
   # read in ARD Mk model
   fit_mk <- readRDS('data/sriswasdi_data/mod_ard.rds')
-  # read in start values
-  start_vals <- readRDS(paste('data/sriswasdi_data/init_vals_ml/', name, '.rds', sep = ''))
 }
 
 # add a very tiny number onto branch lengths that are zero
@@ -79,11 +75,11 @@ idparslist
 
 # setup speciation rates ####
 # first make all speciation rates the same within hidden states
-idparslist$lambdas[] <- 1:4
+idparslist$lambdas[] <- c(1,1,2,2)
 
 # setup extinction rates ####
 # firstly make all extinction rates the same
-idparslist$mus[] <- c(5,6,5,6)
+idparslist$mus[] <- c(3,3,4,4)
 
 # setup transition rates ####
 
@@ -111,9 +107,8 @@ hidden_to_assign <- select(q_matrix, from_hidden, to_hidden) %>%
   distinct() %>%
   mutate(hidden_id = letters[1:n()])
 
-# give all trait transitions different values 1A -> 2A != 1B -> 2B
-# do this by adding from_hidden to the select argument
-trait_to_assign <- select(q_matrix, from_trait, to_trait, from_hidden) %>%
+# give all trait transitions the same value 1A -> 2A != 1B -> 2B
+trait_to_assign <- select(q_matrix, from_trait, to_trait) %>%
   distinct() %>%
   mutate(trait_id = 1:n())
 
@@ -197,7 +192,7 @@ init_transition <- data.frame(idparslist$Q) %>%
   pull(rate)
 
 initparsopt <- c(rep(init_lambda, times = max(idparslist$lambdas)),
-                 rep(init_mu, times = length(unique(idparslist$mus))),
+                 rep(init_mu, times = length(unique(idparslist$lambdas))),
                  init_transition)
 
 # check number of estimated parameters is the same as number of initial values
@@ -214,82 +209,71 @@ parsfix <- 0
 # set number of iterations
 max_iter <- 1000 * round((1.25)^length(idparsopt))
 
-# setup different inits ####
-start_vals
+# test initial values to work out their initial log likelihood
+idparslist
 
-# filter out NaN and Inf
-start_vals <- filter(start_vals, !is.nan(loglik) & !is.infinite(loglik) & !is.na(loglik)) %>%
-  # keep the six best log liks
-  slice_max(., order_by = loglik, n = 6)
+# write function to get initial values into the correct format
+get_inits_matrix <- function(inits, idparslist){
+  for(i in 1:length(idparslist)){
+    for(j in 1:length(idparslist[[i]])){
+      if(idparslist[[i]][j] %in% 1:length(inits)){idparslist[[i]][j] <- inits[idparslist[[i]][j]]}
+      else next 
+    }
+  }
+  return(idparslist)
+}
 
-inits <- start_vals$inits
+# set up parameter combinations
 
-# also need to change the sample fractions ####
-# use only one for now
-sampled_fraction_1 <- rep(1, times = length(unique(traits)))
-sampled_fractions <- list(sampled_fraction_1)
+# name the start values
+inits_lambda <- rep(init_lambda, times = max(idparslist$lambdas))
+inits_mu <- rep(init_mu, times = length(unique(idparslist$mus)))
+inits_q <- init_transition
 
-# create all combinations of the two lists
-all_combs <- expand_grid(sampled_fractions, inits) %>%
-  mutate(run = 1:n(),
-         lambda = start_vals$lambda,
-         mu = start_vals$mu,
-         q = start_vals$q) %>%
-  purrr::transpose()
+# create multiplication factors for the initial values
 
-# write a custom function to do everything we want in terms of fitting the model and saving it out
-fit_secsse <- function(list_inits_sampfrac){
+# 50% and double each set
+vals <- c(0.5,1,2)
+
+# create full grid of start values
+vals <- expand.grid(lambda = vals, mu = vals, q = vals) %>%
+  as.tibble()
+
+# create an empty dataframe
+inits_ml <- mutate(vals, inits = list(NA), loglik = NA,
+                   id = 1:n())
+
+# set up for loop to run screen for initial values
+pb <- progress::progress_bar$new(total = nrow(inits_ml))
+
+for(i in 1:nrow(inits_ml)){
+  pb$tick()
   
-  # pick out inits
-  temp_inits <- list_inits_sampfrac$inits
+  # create inits
+  temp_inits <- c((inits_lambda*inits_ml$lambda[i]),
+                  (inits_mu*inits_ml$mu[i]),
+                  (inits_q*inits_ml$q[i]))
   
-  # pick out sampled_fractions
-  temp_samp_frac <- list_inits_sampfrac$sampled_fractions
+  temp_mat <- get_inits_matrix(temp_inits, idparslist)
   
-  # run secsse
-  # right think I have done it! Ridiculous
-  mod_secsse <- secsse_ml(
-    tree,
-    traits,
-    num_concealed_states = num_concealed_states,
-    idparslist,
-    idparsopt,
-    initparsopt = temp_inits,
-    idparsfix,
-    parsfix,
-    cond = "maddison_cond",
-    root_state_weight = "maddison_weights",
-    tol = c(1e-04, 1e-05, 1e-07),
-    sampling_fraction = temp_samp_frac,
-    maxiter = max_iter,
-    use_fortran = TRUE,
-    methode = "ode45",
-    optimmethod = "simplex",
-    num_cycles = 3,
-    run_parallel = TRUE
-  )
+  temp_ml <- # check maximum likelihood values of initial values
+    secsse_loglik(
+      temp_mat,
+      tree,
+      traits,
+      num_concealed_states = num_concealed_states,
+      parsfix,
+      cond = "maddison_cond",
+      root_state_weight = "maddison_weights",
+      sampling_fraction = sampled_fraction_1,
+      see_ancestral_states = FALSE
+    )
   
-  # create a list of the output
-  output <- list(n_params = length(idparsopt),
-                 inits = temp_inits,
-                 samp_frac = temp_samp_frac,
-                 setup = idparslist,
-                 mod = mod_secsse,
-                 lambda_inits_fac = list_inits_sampfrac$lambda,
-                 mu_inits_fac = list_inits_sampfrac$mu,
-                 q_inits_fac = list_inits_sampfrac$q)
+  inits_ml$inits[[i]] <- temp_inits
   
-  # save out the list
-  temp_name <- paste(name, '_', 'sampfrac', unique(temp_samp_frac), '_', 'run', list_inits_sampfrac$run,  sep = '')
-  
-  saveRDS(output, paste('~/sriswasdi/seccse_', temp_name, '.rds', sep =''))
+  inits_ml$loglik[i] <- temp_ml
   
 }
 
-detectCores()
-
-# Set a "plan" for how the code should run.
-plan(multisession, workers = 6)
-
-# run future_walk
-furrr::future_walk(all_combs, fit_secsse)
+# save this out
+saveRDS(inits_ml, paste('data/sriswasdi_data/init_vals_ml/', name, '.rds', sep = ''))

@@ -24,6 +24,8 @@ if(server == TRUE){
   trait_file <- read.table('sriswasdi/treecut_representative_topology_scale0.5_patched_states.txt')
   # read in ARD Mk model
   fit_mk <- readRDS('sriswasdi/mod_ard.rds')
+  # read in start value dataframe
+  start_vals <- readRDS(paste('sriswasdi/start_vals/', name, '.rds', sep = ''))
 }
 
 if(server == FALSE){
@@ -33,6 +35,8 @@ if(server == FALSE){
   trait_file <- read.table('data/sriswasdi_data/treecut_representative_topology_scale0.5_patched_states.txt')
   # read in ARD Mk model
   fit_mk <- readRDS('data/sriswasdi_data/mod_ard.rds')
+  # read in start values
+  start_vals <- readRDS(paste('data/sriswasdi_data/init_vals_ml/', name, '.rds', sep = ''))
 }
 
 # add a very tiny number onto branch lengths that are zero
@@ -210,29 +214,14 @@ parsfix <- 0
 max_iter <- 1000 * round((1.25)^length(idparsopt))
 
 # setup different inits ####
-inits_one <- initparsopt
+start_vals
 
-# double speciation rates and halve transition rates
-inits_two <- c(rep(init_lambda*1.2, times = max(idparslist$lambdas)),
-               rep(init_mu, times = length(unique(idparslist$lambdas))),
-               init_transition/2)
+# filter out NaN and Inf
+start_vals <- filter(start_vals, !is.nan(loglik) & !is.infinite(loglik) & !is.na(loglik)) %>%
+  # keep the six best log liks
+  slice_max(., order_by = loglik, n = 6)
 
-# halve speciaton rates and double transition rates
-inits_three <- c(rep(init_lambda/2, times = max(idparslist$lambdas)),
-                 rep(init_mu, times = length(unique(idparslist$lambdas))),
-                 init_transition*1.5)
-
-# double extinction rates, halve transition rates the same
-inits_four <- c(rep(init_lambda, times = max(idparslist$lambdas)),
-                rep(init_mu*1.5, times = length(unique(idparslist$lambdas))),
-                init_transition/2)
-
-# halve extinction rates, double transition rates
-inits_five <- c(rep(init_lambda, times = max(idparslist$lambdas)),
-                rep(init_mu/2, times = length(unique(idparslist$lambdas))),
-                init_transition*1.5)
-
-inits <- list(inits_one, inits_two, inits_three, inits_four, inits_five)
+inits <- start_vals$inits
 
 # also need to change the sample fractions ####
 # use only one for now
@@ -241,7 +230,10 @@ sampled_fractions <- list(sampled_fraction_1)
 
 # create all combinations of the two lists
 all_combs <- expand_grid(sampled_fractions, inits) %>%
-  mutate(run = 1:n()) %>%
+  mutate(run = 1:n(),
+         lambda = start_vals$lambda,
+         mu = start_vals$mu,
+         q = start_vals$q) %>%
   purrr::transpose()
 
 # write a custom function to do everything we want in terms of fitting the model and saving it out
@@ -281,7 +273,10 @@ fit_secsse <- function(list_inits_sampfrac){
                  inits = temp_inits,
                  samp_frac = temp_samp_frac,
                  setup = idparslist,
-                 mod = mod_secsse)
+                 mod = mod_secsse,
+                 lambda_inits_fac = list_inits_sampfrac$lambda,
+                 mu_inits_fac = list_inits_sampfrac$mu,
+                 q_inits_fac = list_inits_sampfrac$q)
   
   # save out the list
   temp_name <- paste(name, '_', 'sampfrac', unique(temp_samp_frac), '_', 'run', list_inits_sampfrac$run,  sep = '')
@@ -293,7 +288,7 @@ fit_secsse <- function(list_inits_sampfrac){
 detectCores()
 
 # Set a "plan" for how the code should run.
-plan(multisession, workers = 5)
+plan(multisession, workers = 6)
 
 # run future_walk
 furrr::future_walk(all_combs, fit_secsse)

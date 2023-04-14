@@ -87,6 +87,8 @@ fit_bisse <- find.mle(lik_bisse, x.init = start_vals[argnames(lik_bisse)], metho
 fit_bisse$par
 fit_bisse1 <- fit_bisse
 
+saveRDS(fit_bisse, 'data/sriswasdi_data/diversitree_bisse.rds')
+
 # remove state dependent speciation and extinction parameters
 lik_null_no_sse <- constrain(lik_bisse, 
                              lambda1 ~ lambda0,
