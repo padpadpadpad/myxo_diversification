@@ -15,16 +15,7 @@ tidyverse_conflicts()
 name <- 'muhisseSSonly'
 
 # server - yes or no
-server <- TRUE
-
-if(server == TRUE){
-  d_habpref <- read.csv('~/secsse/habitat_preference_asv_new.csv')
-  d_taxa <- readRDS('~/secsse/ps_otu_asv_filt.rds')
-  tree <- read.tree('~/secsse/myxo_asv_chronopl10.tre')
-  fit_mk <- readRDS('~/secsse/mod_custom5.rds')
-  # read in start value dataframe
-  start_vals <- readRDS(paste('~/secsse/start_vals/', name, '.rds', sep = ''))
-}
+server <- FALSE
 
 if(server == FALSE){
   # read in habitat preference
@@ -35,8 +26,6 @@ if(server == FALSE){
   tree <- read.tree(here('data/sequencing_rpoB/raxml/trees/myxo_asv/myxo_asv_chronopl10.tre'))
   # read in Mk model
   fit_mk <- readRDS('data/sequencing_rpoB/processed/transition_rates/mod_custom5.rds')
-  # read in start value dataframe
-  start_vals <- readRDS(paste('data/sequencing_rpoB/processed/secsse/init_vals_ml/', name, '.rds', sep = ''))
 }
 
 
@@ -249,89 +238,74 @@ parsfix <- 0
 # set number of iterations
 max_iter <- 1000 * round((1.25)^length(idparsopt))
 
-# setup different inits ####
-start_vals
+# test initial values to work out their initial log likelihood
+idparslist
 
-# filter out NaN and Inf
-start_vals <- filter(start_vals, !is.nan(loglik) & !is.infinite(loglik) & !is.na(loglik)) %>%
-  # keep the six best log liks
-  slice_max(., order_by = loglik, n = 6)
+# write function to get initial values into the correct format
+get_inits_matrix <- function(inits, idparslist){
+  for(i in 1:length(idparslist)){
+    for(j in 1:length(idparslist[[i]])){
+      if(idparslist[[i]][j] %in% 1:length(inits)){idparslist[[i]][j] <- inits[idparslist[[i]][j]]}
+      else next 
+    }
+  }
+  return(idparslist)
+}
 
-inits <- start_vals$inits
+# set up parameter combinations
 
-# also need to change the sample fractions ####
-# use 1, 0.75 and 0.5 to see how they change the fit
+# name the start values
+inits_lambda <- rep(init_lambda, times = max(idparslist$lambdas))
+inits_mu <- rep(init_mu, times = length(unique(idparslist$mus)))
+inits_q <- init_transition
 
-sampled_fraction_1 <- rep(1, times = length(unique(traits)))
-sampled_fraction_0.75 <- rep(0.75, times = length(unique(traits)))
-sampled_fraction_0.5 <- rep(0.5, times = length(unique(traits)))
+# create multiplication factors for the initial values
 
-sampled_fractions <- list(sampled_fraction_1, sampled_fraction_0.75, sampled_fraction_0.5)
-num_samp_frac <- length(sampled_fractions)
+# 50% and double each set
+vals <- c(0.5,1,2)
 
-# create all combinations of the two lists
-all_combs <- expand_grid(sampled_fractions, inits) %>%
-  mutate(run = 1:n(),
-         lambda = rep(start_vals$lambda, times = num_samp_frac),
-         mu = rep(start_vals$mu, times = num_samp_frac),
-         q = rep(start_vals$q, times = num_samp_frac)) %>%
-  purrr::transpose()
+# create full grid of start values
+vals <- expand.grid(lambda = vals, mu = vals, q = vals) %>%
+  as.tibble()
 
-# write a custom function to do everything we want in terms of fitting the model and saving it out
-fit_secsse <- function(list_inits_sampfrac){
+# create an empty dataframe
+inits_ml <- mutate(vals, inits = list(NA), loglik = NA,
+                   id = 1:n())
+
+# set up for loop to run screen for initial values
+pb <- progress::progress_bar$new(total = nrow(inits_ml))
+
+for(i in 1:nrow(inits_ml)){
+  pb$tick()
   
-  # pick out inits
-  temp_inits <- list_inits_sampfrac$inits
+  # create inits
+  temp_inits <- c((inits_lambda*inits_ml$lambda[i]),
+                  (inits_mu*inits_ml$mu[i]),
+                  (inits_q*inits_ml$q[i]))
   
-  # pick out sampled_fractions
-  temp_samp_frac <- list_inits_sampfrac$sampled_fractions
+  temp_mat <- get_inits_matrix(temp_inits, idparslist)
   
-  # run secsse
-  # right think I have done it! Ridiculous
-  mod_secsse <- secsse_ml(
-    tree,
-    traits,
-    num_concealed_states = num_concealed_states,
-    idparslist,
-    idparsopt,
-    initparsopt = temp_inits,
-    idparsfix,
-    parsfix,
-    cond = "maddison_cond",
-    root_state_weight = "maddison_weights",
-    tol = c(1e-04, 1e-05, 1e-07),
-    sampling_fraction = temp_samp_frac,
-    maxiter = max_iter,
-    use_fortran = TRUE,
-    methode = "ode45",
-    optimmethod = "simplex",
-    num_cycles = 5,
-    run_parallel = TRUE
-  )
+  temp_ml <- # check maximum likelihood values of initial values
+    secsse_loglik(
+      temp_mat,
+      tree,
+      traits,
+      num_concealed_states = num_concealed_states,
+      parsfix,
+      cond = "maddison_cond",
+      root_state_weight = "maddison_weights",
+      sampling_fraction = rep(1, times = length(unique(traits))),
+      see_ancestral_states = FALSE
+    )
   
-  # create a list of the output
-  output <- list(n_params = length(idparsopt),
-                 inits = temp_inits,
-                 samp_frac = temp_samp_frac,
-                 setup = idparslist,
-                 mod = mod_secsse,
-                 lambda_inits_fac = list_inits_sampfrac$lambda,
-                 mu_inits_fac = list_inits_sampfrac$mu,
-                 q_inits_fac = list_inits_sampfrac$q)
+  inits_ml$inits[[i]] <- temp_inits
   
-  # save out the list
-  temp_name <- paste(name, '_', 'sampfrac', unique(temp_samp_frac), '_', 'run', list_inits_sampfrac$run,  sep = '')
-  
-  saveRDS(output, paste('~/secsse/seccse_', temp_name, '.rds', sep =''))
+  inits_ml$loglik[i] <- temp_ml
   
 }
 
+# save this out
+saveRDS(inits_ml, paste('data/sequencing_rpoB/processed/secsse/init_vals_ml/', name, '.rds', sep = ''))
 
-# just run the first 6
-all_combs <- all_combs[1:6]
-
-# Set a "plan" for how the code should run.
-plan(multisession, workers = 6)
-
-# run future_walk
-furrr::future_walk(all_combs, fit_secsse)
+ggplot(inits_ml, aes(loglik)) +
+  geom_histogram()

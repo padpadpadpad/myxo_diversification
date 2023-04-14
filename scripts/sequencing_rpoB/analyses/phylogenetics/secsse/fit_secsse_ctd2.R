@@ -22,6 +22,8 @@ if(server == TRUE){
   d_taxa <- readRDS('~/secsse/ps_otu_asv_filt.rds')
   tree <- read.tree('~/secsse/myxo_asv_chronopl10.tre')
   fit_mk <- readRDS('~/secsse/mod_custom5.rds')
+  # read in start value dataframe
+  start_vals <- readRDS(paste('~/secsse/start_vals/', name, '.rds', sep = ''))
 }
 
 if(server == FALSE){
@@ -33,6 +35,8 @@ if(server == FALSE){
   tree <- read.tree(here('data/sequencing_rpoB/raxml/trees/myxo_asv/myxo_asv_chronopl10.tre'))
   # read in Mk model
   fit_mk <- readRDS('data/sequencing_rpoB/processed/transition_rates/mod_custom5.rds')
+  # read in start value dataframe
+  start_vals <- readRDS(paste('data/sequencing_rpoB/processed/secsse/init_vals_ml/', name, '.rds', sep = ''))
 }
 
 d_taxa <- d_taxa %>%
@@ -244,34 +248,14 @@ parsfix <- 0
 max_iter <- 1000 * round((1.25)^length(idparsopt))
 
 # setup different inits ####
-inits_one <- initparsopt
+start_vals
 
-# double speciation rates and halve transition rates
-inits_two <- c(rep(init_lambda*2, times = max(idparslist$lambdas)),
-               rep(init_mu, times = 1),
-               init_transition/2)
+# filter out NaN and Inf
+start_vals <- filter(start_vals, !is.nan(loglik) & !is.infinite(loglik) & !is.na(loglik)) %>%
+  # keep the six best log liks
+  slice_max(., order_by = loglik, n = 6)
 
-# halve speciaton rates and double transition rates
-inits_three <- c(rep(init_lambda/2, times = max(idparslist$lambdas)),
-                 rep(init_mu, times = 1),
-                 init_transition*2)
-
-# double extinction rates, halve transition rates the same
-inits_four <- c(rep(init_lambda, times = max(idparslist$lambdas)),
-                rep(init_mu*2, times = 1),
-                init_transition/2)
-
-# halve extinction rates, double transition rates
-inits_five <- c(rep(init_lambda, times = max(idparslist$lambdas)),
-                rep(init_mu/2, times = 1),
-                init_transition*2)
-
-# take mean of transition rates for all transitions
-inits_six <- c(rep(init_lambda*2, times = max(idparslist$lambdas)),
-               rep(init_mu, times = 1),
-               rep(mean(init_transition), times = length(init_transition)))
-
-inits <- list(inits_one, inits_two, inits_three, inits_four, inits_five, inits_six)
+inits <- start_vals$inits
 
 # also need to change the sample fractions ####
 # use 1, 0.75 and 0.5 to see how they change the fit
@@ -281,10 +265,14 @@ sampled_fraction_0.75 <- rep(0.75, times = length(unique(traits)))
 sampled_fraction_0.5 <- rep(0.5, times = length(unique(traits)))
 
 sampled_fractions <- list(sampled_fraction_1, sampled_fraction_0.75, sampled_fraction_0.5)
+num_samp_frac <- length(sampled_fractions)
 
 # create all combinations of the two lists
 all_combs <- expand_grid(sampled_fractions, inits) %>%
-  mutate(run = 1:n()) %>%
+  mutate(run = 1:n(),
+         lambda = rep(start_vals$lambda, times = num_samp_frac),
+         mu = rep(start_vals$mu, times = num_samp_frac),
+         q = rep(start_vals$q, times = num_samp_frac)) %>%
   purrr::transpose()
 
 # write a custom function to do everything we want in terms of fitting the model and saving it out
@@ -315,7 +303,7 @@ fit_secsse <- function(list_inits_sampfrac){
     use_fortran = TRUE,
     methode = "ode45",
     optimmethod = "simplex",
-    num_cycles = 3,
+    num_cycles = 5,
     run_parallel = TRUE
   )
   
@@ -324,7 +312,10 @@ fit_secsse <- function(list_inits_sampfrac){
                  inits = temp_inits,
                  samp_frac = temp_samp_frac,
                  setup = idparslist,
-                 mod = mod_secsse)
+                 mod = mod_secsse,
+                 lambda_inits_fac = list_inits_sampfrac$lambda,
+                 mu_inits_fac = list_inits_sampfrac$mu,
+                 q_inits_fac = list_inits_sampfrac$q)
   
   # save out the list
   temp_name <- paste(name, '_', 'sampfrac', unique(temp_samp_frac), '_', 'run', list_inits_sampfrac$run,  sep = '')
@@ -334,8 +325,11 @@ fit_secsse <- function(list_inits_sampfrac){
 }
 
 
+# just run the first 6
+all_combs <- all_combs[1:6]
+
 # Set a "plan" for how the code should run.
-plan(multisession, workers = 18)
+plan(multisession, workers = 6)
 
 # run future_walk
 furrr::future_walk(all_combs, fit_secsse)

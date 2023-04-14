@@ -1,4 +1,4 @@
-# try a MuHiSSE using secSSE
+# fit the MuSSE model using secsse
 
 # load in packages ####
 
@@ -12,19 +12,10 @@ tidyverse_conflicts()
 # load in data ####
 
 # filename
-name <- 'muhisseSSonly'
+name <- 'musse'
 
 # server - yes or no
-server <- TRUE
-
-if(server == TRUE){
-  d_habpref <- read.csv('~/secsse/habitat_preference_asv_new.csv')
-  d_taxa <- readRDS('~/secsse/ps_otu_asv_filt.rds')
-  tree <- read.tree('~/secsse/myxo_asv_chronopl10.tre')
-  fit_mk <- readRDS('~/secsse/mod_custom5.rds')
-  # read in start value dataframe
-  start_vals <- readRDS(paste('~/secsse/start_vals/', name, '.rds', sep = ''))
-}
+server <- FALSE
 
 if(server == FALSE){
   # read in habitat preference
@@ -35,10 +26,7 @@ if(server == FALSE){
   tree <- read.tree(here('data/sequencing_rpoB/raxml/trees/myxo_asv/myxo_asv_chronopl10.tre'))
   # read in Mk model
   fit_mk <- readRDS('data/sequencing_rpoB/processed/transition_rates/mod_custom5.rds')
-  # read in start value dataframe
-  start_vals <- readRDS(paste('data/sequencing_rpoB/processed/secsse/init_vals_ml/', name, '.rds', sep = ''))
 }
-
 
 d_taxa <- d_taxa %>%
   phyloseq::tax_table() %>%
@@ -80,6 +68,7 @@ coding
 
 # read in musse model
 fit_musse_no_se <- readRDS('data/sequencing_rpoB/processed/transition_rates/asv_musse_no_se.rds')
+#fit_musse_no_se <- readRDS('~/secsse/asv_musse_no_se.rds')
 
 # try and run SecSSE which runs concealed state and speciation models
 # https://cran.r-project.org/web/packages/secsse/vignettes/Using_secsse.html
@@ -91,7 +80,7 @@ traits <- sortingtraits(trait, tree)
 # setup arguments to pass to secsse_ml
 
 # set number of concealed states
-num_concealed_states <- 2
+num_concealed_states <- 1
 
 # setup parameter list
 idparslist <- id_paramPos(traits, num_concealed_states = num_concealed_states)
@@ -99,18 +88,17 @@ idparslist <- id_paramPos(traits, num_concealed_states = num_concealed_states)
 idparslist
 
 # setup speciation rates ####
-# first make all speciation rates the same within hidden states
-idparslist$lambdas[] <- 1:10
+idparslist$lambdas[] <- c(1,2,3,4,5)
 
 # setup extinction rates ####
 # firstly make all extinction rates the same
-idparslist$mus[] <- 11
+idparslist$mus[] <- 6
 
 # setup transition rates ####
 
 # make a bunch of transitions 0 
 # these transitions were not possible in the markov model
-# q14~0, q24~0, q25~0, q41~0, q42~0, q53~0, q45~0
+# q14~0, q24~0, q25~0, q41~0, q53~0, q42~0, q45~0, q54~0, q52~0
 
 # make transition matrix a dataframe so I can set rules more easily
 q_matrix <- data.frame(idparslist$Q) %>%
@@ -122,65 +110,18 @@ q_matrix <- data.frame(idparslist$Q) %>%
          to_trait = substr(to, 1,1),
          to_hidden = substr(to, 2,2),
          transition = paste('q', from_trait, to_trait, sep = ''),
-         id = -id) # make id negative to prevent mismatches in ids when setting rules
-
-colnames(q_matrix)
+         id = -id) 
 
 # first make any of the transitions not possible in the Markov model 0
 # q14~0, q24~0, q25~0, q41~0, q53~0, q42~0, q45~0, q54~0, q52~0
 q_matrix <- mutate(q_matrix,
                    new_id = ifelse(transition %in% c('q14', 'q24', 'q25', 'q41', 'q53', 'q42', 'q45', 'q54', 'q52'), 0, id))
 
-# make transitions that are across hidden states AND trait states 0. i.e. 1A -> 2B
-q_matrix <- mutate(q_matrix,
-                   new_id = ifelse(from_hidden != to_hidden & from_trait != to_trait, 0, new_id))
-
-# make transitions that are across hidden states AND trait states 0. i.e. 1A -> 2B
-q_matrix <- mutate(q_matrix,
-                   new_id = ifelse(from_hidden != to_hidden & from_trait != to_trait, 0, new_id))
-
-# work out which parameters need to be the same
-# when the hidden transition is the same, give them the same value
-hidden_to_assign <- select(q_matrix, from_hidden, to_hidden) %>%
-  distinct() %>%
-  mutate(hidden_id = letters[1:n()])
-
-# give all trait transitions different values 1A -> 2A != 1B -> 2B
-# do this by adding from_hidden to the select argument
-trait_to_assign <- select(q_matrix, from_trait, to_trait) %>%
-  distinct() %>%
-  mutate(trait_id = 1:n())
-
-# merge altogether with the q matrix
-q_matrix <- left_join(q_matrix, hidden_to_assign) %>%
-  left_join(trait_to_assign)
-
-# if the trait state changes, is not 0 or NA, create a column giving it the trait id
-q_matrix <- mutate(q_matrix, new_id2 = ifelse(from_trait != to_trait & new_id != 0 & !is.na(new_id), trait_id, new_id))
-# if the hidden state changes, is not 0 or NA, create a column giving it the hidden id
-q_matrix <- mutate(q_matrix, new_id3 = ifelse(from_hidden != to_hidden & new_id != 0 & !is.na(new_id), hidden_id, new_id))
-
-# when numbers and letters are not in the possible set (from trait and hidden ID) (make them 0)
-q_matrix <- mutate(q_matrix, new_id2 = ifelse(!new_id2 %in% trait_to_assign$trait_id, 0, new_id2),
-                    new_id3 = ifelse(!new_id3 %in% hidden_to_assign$hidden_id, 0, new_id3))
-
-# look at unique values of new id
-unique(q_matrix$new_id3)
-
-# make the final new ID
-# make the numbers higher than would be possible for relabelling later
-q_matrix <- mutate(q_matrix, new_id_final = case_when(new_id2 > 0 ~ as.character(new_id2),
-                                                        new_id3 != 0 ~ new_id3,
-                                                        TRUE ~ '0'),
-                    new_id_final = as.numeric(as.factor(new_id_final)),
-                    new_id_final = ifelse(new_id_final == 1, 0, new_id_final),
-                    new_id_final = new_id_final*100)
-
 # run a for loop to replace each number in the initial q matrix
 q <- idparslist[[3]]
 
 for(i in min(q,na.rm = TRUE):max(q, na.rm = TRUE)){
-  q[which(q == i)] <- filter(q_matrix, -id == i) %>% pull(new_id_final)
+  q[which(q == i)] <- filter(q_matrix, -id == i) %>% pull(new_id)
 }
 
 q
@@ -230,8 +171,7 @@ init_transition <- data.frame(idparslist$Q) %>%
   distinct() %>%
   pull(rate)
 
-
-initparsopt <- c(rep(init_lambda, times = 10),
+initparsopt <- c(rep(init_lambda, times = max(idparslist$lambdas)),
                  rep(init_mu, times = 1),
                  init_transition)
 
@@ -249,89 +189,74 @@ parsfix <- 0
 # set number of iterations
 max_iter <- 1000 * round((1.25)^length(idparsopt))
 
-# setup different inits ####
-start_vals
+# test initial values to work out their initial log likelihood
+idparslist
 
-# filter out NaN and Inf
-start_vals <- filter(start_vals, !is.nan(loglik) & !is.infinite(loglik) & !is.na(loglik)) %>%
-  # keep the six best log liks
-  slice_max(., order_by = loglik, n = 6)
+# write function to get initial values into the correct format
+get_inits_matrix <- function(inits, idparslist){
+  for(i in 1:length(idparslist)){
+    for(j in 1:length(idparslist[[i]])){
+      if(idparslist[[i]][j] %in% 1:length(inits)){idparslist[[i]][j] <- inits[idparslist[[i]][j]]}
+      else next 
+    }
+  }
+  return(idparslist)
+}
 
-inits <- start_vals$inits
+# set up parameter combinations
 
-# also need to change the sample fractions ####
-# use 1, 0.75 and 0.5 to see how they change the fit
+# name the start values
+inits_lambda <- rep(init_lambda, times = max(idparslist$lambdas))
+inits_mu <- rep(init_mu, times = length(unique(idparslist$mus)))
+inits_q <- init_transition
 
-sampled_fraction_1 <- rep(1, times = length(unique(traits)))
-sampled_fraction_0.75 <- rep(0.75, times = length(unique(traits)))
-sampled_fraction_0.5 <- rep(0.5, times = length(unique(traits)))
+# create multiplication factors for the initial values
 
-sampled_fractions <- list(sampled_fraction_1, sampled_fraction_0.75, sampled_fraction_0.5)
-num_samp_frac <- length(sampled_fractions)
+# 50% and double each set
+vals <- c(0.5,1,2)
 
-# create all combinations of the two lists
-all_combs <- expand_grid(sampled_fractions, inits) %>%
-  mutate(run = 1:n(),
-         lambda = rep(start_vals$lambda, times = num_samp_frac),
-         mu = rep(start_vals$mu, times = num_samp_frac),
-         q = rep(start_vals$q, times = num_samp_frac)) %>%
-  purrr::transpose()
+# create full grid of start values
+vals <- expand.grid(lambda = vals, mu = vals, q = vals) %>%
+  as.tibble()
 
-# write a custom function to do everything we want in terms of fitting the model and saving it out
-fit_secsse <- function(list_inits_sampfrac){
+# create an empty dataframe
+inits_ml <- mutate(vals, inits = list(NA), loglik = NA,
+                   id = 1:n())
+
+# set up for loop to run screen for initial values
+pb <- progress::progress_bar$new(total = nrow(inits_ml))
+
+for(i in 1:nrow(inits_ml)){
+  pb$tick()
   
-  # pick out inits
-  temp_inits <- list_inits_sampfrac$inits
+  # create inits
+  temp_inits <- c((inits_lambda*inits_ml$lambda[i]),
+                  (inits_mu*inits_ml$mu[i]),
+                  (inits_q*inits_ml$q[i]))
   
-  # pick out sampled_fractions
-  temp_samp_frac <- list_inits_sampfrac$sampled_fractions
+  temp_mat <- get_inits_matrix(temp_inits, idparslist)
   
-  # run secsse
-  # right think I have done it! Ridiculous
-  mod_secsse <- secsse_ml(
-    tree,
-    traits,
-    num_concealed_states = num_concealed_states,
-    idparslist,
-    idparsopt,
-    initparsopt = temp_inits,
-    idparsfix,
-    parsfix,
-    cond = "maddison_cond",
-    root_state_weight = "maddison_weights",
-    tol = c(1e-04, 1e-05, 1e-07),
-    sampling_fraction = temp_samp_frac,
-    maxiter = max_iter,
-    use_fortran = TRUE,
-    methode = "ode45",
-    optimmethod = "simplex",
-    num_cycles = 5,
-    run_parallel = TRUE
-  )
+  temp_ml <- # check maximum likelihood values of initial values
+    secsse_loglik(
+      temp_mat,
+      tree,
+      traits,
+      num_concealed_states = num_concealed_states,
+      parsfix,
+      cond = "maddison_cond",
+      root_state_weight = "maddison_weights",
+      sampling_fraction = rep(1, times = length(unique(traits))),
+      see_ancestral_states = FALSE
+    )
   
-  # create a list of the output
-  output <- list(n_params = length(idparsopt),
-                 inits = temp_inits,
-                 samp_frac = temp_samp_frac,
-                 setup = idparslist,
-                 mod = mod_secsse,
-                 lambda_inits_fac = list_inits_sampfrac$lambda,
-                 mu_inits_fac = list_inits_sampfrac$mu,
-                 q_inits_fac = list_inits_sampfrac$q)
+  inits_ml$inits[[i]] <- temp_inits
   
-  # save out the list
-  temp_name <- paste(name, '_', 'sampfrac', unique(temp_samp_frac), '_', 'run', list_inits_sampfrac$run,  sep = '')
-  
-  saveRDS(output, paste('~/secsse/seccse_', temp_name, '.rds', sep =''))
+  inits_ml$loglik[i] <- temp_ml
   
 }
 
+# save this out
+saveRDS(inits_ml, paste('data/sequencing_rpoB/processed/secsse/init_vals_ml/', name, '.rds', sep = ''))
 
-# just run the first 6
-all_combs <- all_combs[1:6]
-
-# Set a "plan" for how the code should run.
-plan(multisession, workers = 6)
-
-# run future_walk
-furrr::future_walk(all_combs, fit_secsse)
+ggplot(inits_ml, aes(loglik)) +
+  geom_histogram()
