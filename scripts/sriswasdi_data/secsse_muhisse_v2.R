@@ -265,7 +265,7 @@ fit_secsse <- function(list_inits_sampfrac){
     use_fortran = TRUE,
     methode = "ode45",
     optimmethod = "simplex",
-    num_cycles = 3,
+    num_cycles = 5,
     run_parallel = TRUE
   )
   
