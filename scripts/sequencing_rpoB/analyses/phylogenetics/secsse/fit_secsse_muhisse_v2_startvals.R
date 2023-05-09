@@ -214,26 +214,28 @@ init_transition <- data.frame(idparslist$Q) %>%
   select(id, transition) %>%
   distinct() %>%
   left_join(., data.frame(transition = names(mk_transitions), rate = unname(mk_transitions))) %>%
-  mutate(rate = replace_na(rate, mean(rate, na.rm = TRUE))) %>%
-  select(id, rate) %>%
-  distinct() %>%
-  pull(rate)
+  mutate(hidden = ifelse(is.na(rate), 'hidden', 'actual'),
+         rate = replace_na(rate, mean(rate, na.rm = TRUE))) %>%
+  select(id, rate, hidden) %>%
+  distinct()
 
-
-initparsopt <- c(rep(init_lambda, times = 10),
-                 rep(init_mu, times = 1),
-                 init_transition)
+initparsopt <- c(rep(init_lambda, times = max(idparslist$lambdas)),
+                 rep(init_mu, times = 1))
 
 # check number of estimated parameters is the same as number of initial values
 idparsopt <- c(1:max(idparslist$Q, na.rm=TRUE))
 
-length(initparsopt) == length(idparsopt)
-
 idparslist
 
 # set the ID and values for the fixed parameters
-idparsfix <- 0 # zeroes have the value of zero
-parsfix <- 0
+# fix the values of the transition rates we estimated from the Mk model
+idparsfix <- c(0, init_transition[init_transition$hidden =='actual',]$id) # zeroes have the value of zero
+parsfix <- c(0, init_transition[init_transition$hidden =='actual',]$rate)
+
+# remove any parameters from the idparsopt (to estimate) that are present in idparsfix (parameters with fixed values)
+idparsopt <- idparsopt[!idparsopt %in% idparsfix]
+
+length(initparsopt) == length(idparsopt)
 
 # set number of iterations
 max_iter <- 1000 * round((1.25)^length(idparsopt))
@@ -242,10 +244,14 @@ max_iter <- 1000 * round((1.25)^length(idparsopt))
 idparslist
 
 # write function to get initial values into the correct format
-get_inits_matrix <- function(inits, idparslist){
+get_inits_matrix <- function(inits, idparsopt, idparsfix, parsfix){
+  
+  temp <- c(inits, parsfix) 
+  names(temp) <- c(idparsopt, idparsfix)
+  
   for(i in 1:length(idparslist)){
     for(j in 1:length(idparslist[[i]])){
-      if(idparslist[[i]][j] %in% 1:length(inits)){idparslist[[i]][j] <- inits[idparslist[[i]][j]]}
+      if(idparslist[[i]][j] %in% names(temp)){idparslist[[i]][j] <- temp[names(temp) == idparslist[[i]][j]]}
       else next 
     }
   }
@@ -257,7 +263,7 @@ get_inits_matrix <- function(inits, idparslist){
 # name the start values
 inits_lambda <- rep(init_lambda, times = max(idparslist$lambdas))
 inits_mu <- rep(init_mu, times = length(unique(idparslist$mus)))
-inits_q <- init_transition
+inits_transition <- init_transition[init_transition$hidden == 'hidden',]$rate
 
 # create multiplication factors for the initial values
 
@@ -281,9 +287,9 @@ for(i in 1:nrow(inits_ml)){
   # create inits
   temp_inits <- c((inits_lambda*inits_ml$lambda[i]),
                   (inits_mu*inits_ml$mu[i]),
-                  (inits_q*inits_ml$q[i]))
+                  (inits_transition*inits_ml$q[i]))
   
-  temp_mat <- get_inits_matrix(temp_inits, idparslist)
+  temp_mat <- get_inits_matrix(temp_inits, idparsopt, idparsfix, parsfix)
   
   temp_ml <- # check maximum likelihood values of initial values
     secsse_loglik(
@@ -291,7 +297,6 @@ for(i in 1:nrow(inits_ml)){
       tree,
       traits,
       num_concealed_states = num_concealed_states,
-      parsfix,
       cond = "maddison_cond",
       root_state_weight = "maddison_weights",
       sampling_fraction = rep(1, times = length(unique(traits))),
