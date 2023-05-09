@@ -4,7 +4,7 @@
 
 # make sure curl is installed
 library(curl)
-librarian::shelf(diversitree, secsse, DDD, apTreeshape, doParallel, foreach, doMC, tidyverse, here, furrr)
+librarian::shelf(diversitree, rsetienne/secsse, DDD, apTreeshape, doParallel, foreach, doMC, tidyverse, here, furrr)
 
 # identify conflicts in the tidyverse packages and other packages
 tidyverse_conflicts()
@@ -15,7 +15,7 @@ tidyverse_conflicts()
 name <- 'musse'
 
 # server - yes or no
-server <- TRUE
+server <- FALSE
 
 if(server == TRUE){
   d_habpref <- read.csv('~/secsse/habitat_preference_asv_new.csv')
@@ -179,23 +179,25 @@ init_transition <- data.frame(idparslist$Q) %>%
   left_join(., data.frame(transition = names(mk_transitions), rate = unname(mk_transitions))) %>%
   mutate(rate = replace_na(rate, mean(rate, na.rm = TRUE))) %>%
   select(id, rate) %>%
-  distinct() %>%
-  pull(rate)
+  distinct()
 
 initparsopt <- c(rep(init_lambda, times = max(idparslist$lambdas)),
-                 rep(init_mu, times = 1),
-                 init_transition)
+                 rep(init_mu, times = 1))
 
 # check number of estimated parameters is the same as number of initial values
 idparsopt <- c(1:max(idparslist$Q, na.rm=TRUE))
 
-length(initparsopt) == length(idparsopt)
-
 idparslist
 
 # set the ID and values for the fixed parameters
-idparsfix <- 0 # zeroes have the value of zero
-parsfix <- 0
+# fix the values of the transition rates we estimated from the Mk model
+idparsfix <- c(0, init_transition$id) # zeroes have the value of zero
+parsfix <- c(0, init_transition$rate)
+
+# remove any parameters from the idparsopt (to estimate) that are present in idparsfix (parameters with fixed values)
+idparsopt <- idparsopt[!idparsopt %in% idparsfix]
+
+length(initparsopt) == length(idparsopt)
 
 # set number of iterations
 max_iter <- 1000 * round((1.25)^length(idparsopt))
@@ -253,11 +255,10 @@ fit_secsse <- function(list_inits_sampfrac){
     tol = c(1e-04, 1e-05, 1e-07),
     sampling_fraction = temp_samp_frac,
     maxiter = max_iter,
-    use_fortran = TRUE,
-    methode = "ode45",
     optimmethod = "simplex",
-    num_cycles = 5,
-    run_parallel = TRUE
+    num_cycles = 20,
+    num_threads = 2,
+    method = 'odeint::runge_kutta_cash_karp54'
   )
   
   # create a list of the output
