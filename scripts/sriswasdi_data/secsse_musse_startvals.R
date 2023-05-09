@@ -79,7 +79,7 @@ idparslist$lambdas[] <- 1:2
 
 # setup extinction rates ####
 # firstly make all extinction rates the same
-idparslist$mus[] <- 3:4
+idparslist$mus[] <- 3
 
 # setup transition rates ####
 
@@ -193,7 +193,7 @@ init_transition <- data.frame(idparslist$Q) %>%
   pull(rate)
 
 initparsopt <- c(rep(init_lambda, times = max(idparslist$lambdas)),
-                 rep(init_mu, times = length(unique(idparslist$lambdas))),
+                 rep(init_mu, times = length(unique(idparslist$mus))),
                  init_transition)
 
 # check number of estimated parameters is the same as number of initial values
@@ -263,7 +263,6 @@ for(i in 1:nrow(inits_ml)){
       tree,
       traits,
       num_concealed_states = num_concealed_states,
-      parsfix,
       cond = "maddison_cond",
       root_state_weight = "maddison_weights",
       sampling_fraction = sampled_fraction_1,

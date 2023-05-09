@@ -79,7 +79,7 @@ idparslist$lambdas[] <- c(1,1,2,2)
 
 # setup extinction rates ####
 # firstly make all extinction rates the same
-idparslist$mus[] <- c(3,3,4,4)
+idparslist$mus[] <- 3
 
 # setup transition rates ####
 
@@ -262,7 +262,6 @@ for(i in 1:nrow(inits_ml)){
       tree,
       traits,
       num_concealed_states = num_concealed_states,
-      parsfix,
       cond = "maddison_cond",
       root_state_weight = "maddison_weights",
       sampling_fraction = sampled_fraction_1,

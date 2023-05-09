@@ -79,7 +79,7 @@ idparslist$lambdas[] <- 1:4
 
 # setup extinction rates ####
 # do not have hidden states in the extinction rates
-idparslist$mus[] <- c(5, 6, 5, 6)
+idparslist$mus[] <- 5
 
 # setup transition rates ####
 
@@ -263,7 +263,6 @@ for(i in 1:nrow(inits_ml)){
       tree,
       traits,
       num_concealed_states = num_concealed_states,
-      parsfix,
       cond = "maddison_cond",
       root_state_weight = "maddison_weights",
       sampling_fraction = sampled_fraction_1,

@@ -15,7 +15,7 @@ tidyverse_conflicts()
 name <- 'musse'
 
 # server - yes or no
-server <- FALSE
+server <- TRUE
 
 if(server == TRUE){
   # load in phylogenetic tree
@@ -83,7 +83,7 @@ idparslist$lambdas[] <- 1:2
 
 # setup extinction rates ####
 # firstly make all extinction rates the same
-idparslist$mus[] <- 3:4
+idparslist$mus[] <- 3
 
 # setup transition rates ####
 
@@ -173,37 +173,10 @@ idparslist$Q
 
 # set initial values ####
 
-# mk transition rates
-mk_transitions <- fit_mk$par[grepl('q', names(fit_mk$par))]
-
-# for lambda and mu
-startingpoint <- bd_ML(brts = ape::branching.times(tree))
-init_lambda <- startingpoint$lambda0
-init_mu <- startingpoint$mu0
-
-# set initial values for transition rates based on those from diversitree
-init_transition <- data.frame(idparslist$Q) %>%
-  rownames_to_column(var = 'from') %>%
-  pivot_longer(starts_with('X'), values_to = 'id', names_to = 'to') %>%
-  mutate(transition = paste('q', parse_number(from), parse_number(to), sep = '')) %>%
-  filter(id > 0) %>%
-  arrange(id) %>%
-  select(id, transition) %>%
-  distinct() %>%
-  left_join(., data.frame(transition = names(mk_transitions), rate = unname(mk_transitions))) %>%
-  mutate(rate = replace_na(rate, mean(rate, na.rm = TRUE))) %>%
-  select(id, rate) %>%
-  distinct() %>%
-  pull(rate)
-
-initparsopt <- c(rep(init_lambda, times = max(idparslist$lambdas)),
-                 rep(init_mu, times = length(unique(idparslist$lambdas))),
-                 init_transition)
-
 # check number of estimated parameters is the same as number of initial values
 idparsopt <- c(1:max(idparslist$Q, na.rm=TRUE))
 
-length(initparsopt) == length(idparsopt)
+length(start_vals$inits[[1]]) == length(idparsopt)
 
 idparslist
 
@@ -262,11 +235,10 @@ fit_secsse <- function(list_inits_sampfrac){
     tol = c(1e-04, 1e-05, 1e-07),
     sampling_fraction = temp_samp_frac,
     maxiter = max_iter,
-    use_fortran = TRUE,
-    methode = "ode45",
     optimmethod = "simplex",
-    num_cycles = 5,
-    run_parallel = TRUE
+    num_cycles = 20,
+    num_threads = 2,
+    method = 'odeint::runge_kutta_cash_karp54'
   )
   
   # create a list of the output
