@@ -226,8 +226,7 @@ num_samp_frac <- length(sampled_fractions)
 all_combs <- expand_grid(sampled_fractions, inits) %>%
   mutate(run = 1:n(),
          lambda = rep(start_vals$lambda, times = num_samp_frac),
-         mu = rep(start_vals$mu, times = num_samp_frac),
-         q = rep(start_vals$q, times = num_samp_frac)) %>%
+         mu = rep(start_vals$mu, times = num_samp_frac)) %>%
   purrr::transpose()
 
 # write a custom function to do everything we want in terms of fitting the model and saving it out
