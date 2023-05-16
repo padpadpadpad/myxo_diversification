@@ -1,0 +1,153 @@
+#---------------------------------#
+# create map of sampling sites ####
+#---------------------------------#
+
+# load in packages
+library(tidyverse)
+library(ggmap)
+library(patchwork)
+
+# load in data
+d_locations <- readxl::read_excel('data/Supplemetal Table 1 - Sampling.xlsx') %>%
+  select(`sample nr`, location, coordinates, site) %>%
+  mutate(id = gsub('\\.0', '', `sample nr`)) %>%
+  select(-`sample nr`)
+
+d_samples <- readxl::read_excel('data/Supplemetal Table 1 - Sampling.xlsx') %>%
+  select(`sample type`) %>%
+  group_by_all() %>%
+  tally()
+
+# load in metadata
+d_meta <- read.csv('data/metadata.csv') %>%
+  select(-location)
+
+d <- left_join(d_meta, d_locations) 
+
+# ones that need checking by Mick
+# 70 - beachcast seaweed - Fal
+# 72 - beachcast seaweed - Helford
+# 65b - marine mud full saline - Fal
+# 66 - marine mud full saline - Fal
+# 67 - marine mud full saline - Fal
+# 73 - rock samphire - Helford
+# 13 - river - Helford
+# 48 - wheat field - Camel - does not look like its in the right place
+
+# remove sites that are currently not present
+d <- filter(d, !is.na(coordinates))
+
+# split lat and long
+d <- separate(d, coordinates, c('lat', 'lon'), sep = ',') %>%
+  mutate(across(c(lat, lon), as.numeric))
+
+# get average coordinates for each location
+d_location <- group_by(d, site) %>%
+  summarise(ave_lat = mean(lat),
+            ave_lon = mean(lon),
+            .groups = 'drop')
+d_location
+
+# make bounding box
+box <- make_bbox(ave_lon, ave_lat, data = d_location, f = .10)
+
+box[1] <- c(-5.8)
+box[2] <- 49.9
+box[3] <- -4
+box[4] <- 50.57
+
+# set up colours
+cols <- tibble(group = c("woodland_oak", "estuarine mud_low polyhaline", "woodland_pine", "reservoir", "river", "estuarine mud_oligohaline", "estuarine mud_full saline", "beach_supratidal", "pasture", "beach_subtidal","thrift_rhizosphere","beach_seaweed","field_wheat","rock_samphire","marine mud_full saline"),
+               col = c('#089a2d', '#995a08', '#106c12', '#1170bd', '#9dcdf4', '#663c05', '#b6966b', '#f5e279', '#61dd1e', '#f2f426', '#c5f8ae', '#a6ab52', '#9ff121', '#5e8128', '#714a03'),
+               hab_order = c(1.1, 2.1, 1.2, 3.1, 3.2, 2.2, 2.3, 2.4, 1.3, 2.5, 2.6, 2.7, 1.4, 1.5, 2.8))
+cols <- filter(cols, group %in% d$habitat_group_16s)
+cols <- mutate(cols, habitat_group_16s = group) %>% arrange(hab_order)
+
+# change colours names
+cols <- mutate(cols, group2 = gsub('_', ' ', group))
+
+map1_base <- get_stamenmap(box, zoom = 11, maptype = "terrain") %>% 
+  ggmap() +
+  geom_point(aes(ave_lon, ave_lat), d_location, size = 3) +
+  ggrepel::geom_label_repel(aes(ave_lon, ave_lat, label = site), d_location, size = MicrobioUoE::pts(14), box.padding = 0.5) +
+  geom_point(aes(lon, lat, col = habitat_group_16s), d) +
+  theme_bw(base_size = 14) +
+  labs(x = 'Longitude',
+       y = 'Latitude',
+       title = '(a)') +
+  scale_color_manual('Habitat', values = setNames(cols$col, cols$habitat_group_16s), labels = sort(cols$group2))
+
+map1 <- map1_base +
+  ggforce::theme_no_axes() +
+  annotate(y = box[2], x = box[3], label = 'Map made using ggmap, map tiles by Stamen Design, under CC BY 3.0', geom = 'label', size = MicrobioUoE::pts(8), vjust = -0.03, hjust = 1) +
+  NULL
+
+map1
+
+legend <- cowplot::get_legend(map1)
+saveRDS(legend, file.path('plots', 'map_legend.rds'))
+
+map1 + 
+  guides(colour = 'none')
+
+cowplot::plot_grid(legend)
+
+
+ggsave('sampling_map.pdf', last_plot(), height = 6, width = 8, bg = 'transparent')
+
+# create a map of the UK with Cornwall as a point
+
+box2 <- box
+box2[1] <- -10.8
+box2[2] <- 49.6
+box2[3] <- 1.9
+box2[4] <- 59.7
+
+cornwall <- tibble(x = -5.06971, y = 50.29189, label = 'Cornwall')
+
+map2 <- get_stamenmap(box2, zoom = 7, maptype = "terrain") %>% 
+  ggmap() +
+  geom_point(aes(-5.06971, 50.29189)) +
+  ggrepel::geom_label_repel(aes(x, y, label = label), cornwall, size = MicrobioUoE::pts(10), box.padding = 0.5) +
+  ggforce::theme_no_axes() +
+  theme(plot.margin = unit(c(0,0,-1,-1), 'mm'))
+  
+map3 <- map1 + inset_element(map2, 0.01, 0.6, 0.2, 0.95)
+
+# save this plot 
+saveRDS(map3, file.path('plots', 'map.rds'))
+
+
+
+# zoom in on a single site
+d_camel <- filter(d, location == 'Camel') %>%
+  filter(id != '48')
+
+# set up colours based on habitats
+cols <- tibble(habitat_group = c("woodland_oak", "estuarine mud_low polyhaline", "woodland_pine", "reservoir", "river", "estuarine mud_oligohaline", "estuarine mud_full saline", "beach_supratidal", "pasture", "beach_subtidal","thrift_rhizosphere","beach_seaweed","field_wheat","rock_samphire","marine mud_full saline"),
+               col = c('#089a2d', '#995a08', '#106c12', '#1170bd', '#9dcdf4', '#663c05', '#b6966b', '#f5e279', '#61dd1e', '#f2f426', '#c5f8ae', '#a6ab52', '#9ff121', '#5e8128', '#714a03'),
+               hab_order = c(1.1, 2.1, 1.2, 3.1, 3.2, 2.2, 2.3, 2.4, 1.3, 2.5, 2.6, 2.7, 1.4, 1.5, 2.8))
+cols <- filter(cols, habitat_group != 'thrift_rhizosphere') %>% arrange(hab_order)
+
+# make bounding box
+box <- make_bbox(lon, lat, data = d_camel, f = .10)
+
+map2_base <- get_stamenmap(box, zoom = 13, maptype = "terrain") %>% 
+  ggmap() +
+  theme_bw(base_size = 14) +
+  labs(x = 'Longitude',
+       y = 'Latitude')
+
+map2 <- map2_base +
+  geom_point(aes(lon, lat, fill = habitat_group), col = 'black', shape = 21, d_camel, size = 6, show.legend = FALSE) +
+  ggforce::theme_no_axes() +
+  annotate(y = box[2], x = box[3], label = 'Map made using ggmap, map tiles by Stamen Design, under CC BY 3.0', geom = 'label', size = MicrobioUoE::pts(8), vjust = -0.03, hjust = 1) +
+  scale_fill_manual(values = setNames(cols$col, cols$habitat_group)) +
+  NULL
+
+map2
+
+ggsave('camel_map.pdf', last_plot(), height = 6, width = 8, bg = 'transparent')
+
+d_meta_summary <- group_by(d_meta, habitat_group) %>%
+  tally()

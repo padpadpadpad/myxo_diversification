@@ -106,6 +106,9 @@ cols <- tibble(group = c("woodland_oak", "estuarine mud_low polyhaline", "woodla
 cols <- filter(cols, group %in% d_samp$habitat_group_16s)
 cols <- mutate(cols, habitat_group_16s = group) %>% arrange(hab_order)
 
+# change colours names
+cols <- mutate(cols, group2 = gsub('_', ' ', group))
+
 # plot the samples across the first 4 axes
 d_fig$eigenvector %>%
   select(group:PCoA4) %>%
@@ -120,7 +123,7 @@ d_fig$eigenvector %>%
   geom_hline(aes(yintercept = 0)) +
   geom_point(aes(col = group), size = 2) +
   facet_wrap(~axis) +
-  scale_color_manual('Habitat', values = setNames(cols$col, cols$group)) +
+  scale_color_manual('Habitat', values = setNames(cols$col, cols$group2)) +
   labs(x = 'Habitat',
        y = 'Eigenvector') +
   theme_bw() +
@@ -138,9 +141,14 @@ p1 <- ggplot() +
   theme(strip.background = element_blank(),
         strip.text = element_text(hjust = 0, size = 12),
         legend.position = 'right') +
-  scale_color_manual('Habitat', values = setNames(cols$col, cols$group)) +
+  scale_color_manual('Habitat', values = setNames(cols$col, cols$group), labels = function(x) gsub("_", " ", x)) +
+  scale_shape_discrete('Location') +
   labs(y = 'Axis 2 (14.24%)',
        x = 'Axis 1 (34.69%)')
+
+# save out plot
+saveRDS(p1, file.path(path_fig, 'ordination_16S_clean.rds'))
+
 ggsave(file.path(path_fig, 'ordination_16S_clean.pdf'), p1, width = 10, height = 7)
 ggsave(file.path(path_fig, 'ordination_16S_clean.png'), p1, width = 10, height = 7)
 
@@ -382,4 +390,36 @@ ggplot(d_compare_cluster, aes(x = forcats::fct_reorder(habitat2, cluster), y = n
 
 ggsave(file.path(path_fig, 'partition_cluster_assignment.png'), last_plot(), width = 11, height = 9)
 # partition assignment here is great
+
+# make final clustering plot 
+
+# plot out the medoid nbclust samples because they are the ones we observed
+
+# make the clustered datasets
+d_clustering <- rownames_to_column(d_pcoa_samples, var = 'sample') %>%
+  left_join(cluster_medoid)
+d_centroids <- d_clustering %>%
+  group_by(., medoid_nbclust) %>%
+  summarise(across(starts_with('PCoA'), mean), .groups = 'drop')
+
+d_lines <- merge(select(d_clustering, sample, medoid_nbclust, PCoA1, PCoA2), select(d_centroids, medoid_nbclust, PCoA1, PCoA2), by = c('medoid_nbclust')) %>%
+  mutate(distances = dist_between_points(PCoA1.x, PCoA2.x, PCoA1.y, PCoA2.y))
+
+# make the plot
+
+ggplot() +
+  geom_point(aes(PCoA1*-1, PCoA2, col = medoid_nbclust), d_clustering) +
+  geom_point(aes(PCoA1*-1, PCoA2, col = medoid_nbclust), d_centroids, size = 5, show.legend = FALSE) +
+  geom_segment(aes(x = PCoA1.x*-1, y = PCoA2.x, yend = PCoA2.y, xend = PCoA1.y*-1, group = sample, col = medoid_nbclust), d_lines) +
+  theme_bw(base_size = 14) +
+  theme(strip.background = element_blank(),
+        strip.text = element_text(hjust = 0, size = 12),
+        legend.position = 'right') +
+  scale_color_manual('Habitat cluster', values = c('#53C20A', '#5ECAE2', '#3911EE'), labels = c('Land', 'Freshwater', 'Marine')) +
+  labs(y = 'Axis 2 (14.24%)',
+       x = 'Axis 1 (34.69%)')
+
+# save out object
+saveRDS(last_plot(), file.path(path_fig, 'cluster_pcoa.rds'))
+
 
