@@ -15,7 +15,7 @@ tidyverse_conflicts()
 name <- 'muhissefull'
 
 # server - yes or no
-server <- FALSE
+server <- TRUE
 
 if(server == TRUE){
   # load in phylogenetic tree

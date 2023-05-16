@@ -15,7 +15,7 @@ tidyverse_conflicts()
 name <- 'muctd2'
 
 # server - yes or no
-server <- FALSE
+server <- TRUE
 
 if(server == TRUE){
   d_habpref <- read.csv('~/secsse/habitat_preference_asv_new.csv')

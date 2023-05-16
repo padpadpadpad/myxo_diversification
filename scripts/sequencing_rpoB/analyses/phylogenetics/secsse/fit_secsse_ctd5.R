@@ -15,7 +15,7 @@ tidyverse_conflicts()
 name <- 'muctd5'
 
 # server - yes or no
-server <- FALSE
+server <- TRUE
 
 if(server == TRUE){
   d_habpref <- read.csv('~/secsse/habitat_preference_asv_new.csv')
@@ -307,7 +307,7 @@ fit_secsse <- function(list_inits_sampfrac){
     maxiter = max_iter,
     optimmethod = "simplex",
     num_cycles = 20,
-    num_threads = 2,
+    num_threads = 1,
     method = 'odeint::runge_kutta_cash_karp54'
   )
   

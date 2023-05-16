@@ -4,7 +4,7 @@
 
 # make sure curl is installed
 library(curl)
-librarian::shelf(diversitree, secsse, DDD, apTreeshape, doParallel, foreach, doMC, tidyverse, here, furrr)
+librarian::shelf(diversitree, rsetienne/secsse, DDD, apTreeshape, doParallel, foreach, doMC, tidyverse, here, furrr)
 
 # identify conflicts in the tidyverse packages and other packages
 tidyverse_conflicts()
@@ -303,11 +303,9 @@ fit_secsse <- function(list_inits_sampfrac){
     tol = c(1e-04, 1e-05, 1e-07),
     sampling_fraction = temp_samp_frac,
     maxiter = max_iter,
-    use_fortran = TRUE,
-    methode = "ode45",
     optimmethod = "simplex",
-    num_cycles = 5,
-    run_parallel = TRUE
+    num_cycles = 20,
+    num_threads = 2
   )
   
   # create a list of the output
