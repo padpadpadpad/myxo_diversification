@@ -283,75 +283,6 @@ diversitree_df %>%
 
 ggsave('plots/sequencing_rpoB/analyses/discrete_character_evolution/transition_matrix.png', last_plot(), height = 5, width = 7)
 
-#-----------------------------------------------------------------#
-# look at uncertainty in these model estimates by running MCMC ####
-#-----------------------------------------------------------------#
-
-# set up initial start values
-inits_mcmc <- mod_custom5$par
-
-## # set up upper and lower limits - limit the values to be <3 times the max value
-lower_mcmc <- rep(0, length(inits_mcmc))
-upper_mcmc <- rep(max(inits_mcmc)*10, length(inits_mcmc))
-
-# run first mcmc to tune w
-fit_mcmc <- mcmc(lik_custom5, inits_mcmc, nsteps = 10, w = 0.1, upper = upper_mcmc, lower = lower_mcmc)
-
-# tune w for each parameter
-w <- diff(sapply(fit_mcmc[2:(ncol(fit_mcmc)-1)], quantile, c(.05, .95)))
-
-# run second mcmc to tune w
-fit_mcmc2 <- mcmc(lik_custom5, inits_mcmc, nsteps=100, w=w, upper = upper_mcmc, lower = lower_mcmc)
-
-## # tune w for each parameter
-w <- diff(sapply(fit_mcmc2[2:(ncol(fit_mcmc2)-1)], quantile, c(.05, .95)))
-
-# run third mcmc for 1000 iter
-fit_mcmc3 <- mcmc(lik_custom5, inits_mcmc, nsteps=1000, w=w, upper = upper_mcmc, lower = lower_mcmc)
-
-# save out mcmc chains
-saveRDS(fit_mcmc3, 'data/sequencing_rpoB/processed/transition_rates/asv_mcmc_trans.rds')
-
-# make data long format
-d_mcmc <- pivot_longer(fit_mcmc3, names_to = 'param', values_to = 'transition_rate', cols = starts_with('q')) %>%
-  left_join(., select(diversitree_df, param, state_1, state_2)) %>%
-  left_join(., select(coding, state_1 = hab_pref, state_1_num = hab_pref_num, state_1_label = initials)) %>%
-  left_join(., select(coding, state_2 = hab_pref, state_2_num = hab_pref_num, state_2_label = initials)) %>%
-  mutate(parameter = paste(state_1_label, '->', state_2_label))
-
-# find 95% CIs and bind with ML estimates
-d_mcmc_summary <- d_mcmc %>%
-  group_by(parameter, param, state_1, state_2) %>%
-  tidybayes::mean_qi(transition_rate) %>%
-  left_join(., select(diversitree_df, state_1, state_2, ml_estimate = transition_rate))
-
-# plot ridge plot
-ggplot(d_mcmc, aes(transition_rate, forcats::fct_reorder(parameter, transition_rate))) +
-  geom_density_ridges() +
-  theme_bw(base_size = 14) +
-  labs(x = 'transition rate',
-       y = 'transition')
-
-ggplot(d_mcmc_summary, aes(transition_rate, forcats::fct_reorder(parameter, transition_rate))) +
-  geom_linerange(aes(xmin = .lower, xmax = .upper)) +
-  geom_point(size = 3) +
-  geom_point(aes(x = ml_estimate), size = 3, col = 'red') +
-  theme_bw(base_size = 14) +
-  labs(x = 'transition rate',
-       y = 'transition',
-       caption = 'red points are ML estimate\nblack points are MCMC average')
-
-# look at which rates correlate with each
-d_mcmc %>%
-  select(parameter, transition_rate, i) %>%
-  pivot_wider(names_from = parameter, values_from = transition_rate) %>%
-  slice_sample(n = 250) %>%
-  ggpairs(., columns = 2:ncol(.),
-          lower = list(continuous = wrap("points", alpha = 0.3))) +
-  theme_bw()
-
-ggsave('plots/sequencing_rpoB/analyses/discrete_character_evolution/pairs_plot.png', last_plot(), height = 12, width = 14)
-
 #------------------------------------#
 # plot best transition rate model ####
 #------------------------------------#
@@ -373,7 +304,7 @@ cols_hab <- readRDS(here('data/sequencing_rpoB/phyloseq/myxococcus/habitat_prefe
 # make very simple plot to grab legend from
 p_legend <- ggplot(d_habpref_summary, aes(habitat_preference, prop, col = habitat_preference)) +
   geom_point() +
-  scale_color_manual('Habitat preference', values = cols_hab) +
+  scale_color_manual('Habitat preference', values = cols_hab, labels = c('freshwater + land generalist', 'freshwater specialist', 'marine generalist', 'marine specialist', 'land specialist')) +
   theme_bw() +
   guides(colour = guide_legend(override.aes = list(size=5)))
 p_legend <- cowplot::get_legend(p_legend)
@@ -582,6 +513,8 @@ p_best + p_2 + p_legend + p_3 + p_4 + plot_layout(design = design, widths = c(0.
 
 # save out model
 ggsave(here('plots/sequencing_rpoB/analyses/discrete_character_evolution/transition_plot_multiple.png'), last_plot(), height = 9, width = 12)
+ggsave(here('plots/manuscript_plots/Figure_4.png'), last_plot(), height = 9, width = 12)
+
 
 #------------------------------------------------#
 # look at whether states are a source or sink ####
@@ -612,6 +545,77 @@ table_rate <- select(d_source_sink_rate, habitat_preference, away, into, source_
 
 # save out
 save_as_image(table_rate, here('plots/sequencing_rpoB/analyses/discrete_character_evolution/source_sink_rate.png'), zoom = 3, webshot = 'webshot2')
+
+
+#-----------------------------------------------------------------#
+# look at uncertainty in these model estimates by running MCMC ####
+#-----------------------------------------------------------------#
+
+# set up initial start values
+inits_mcmc <- mod_custom5$par
+
+## # set up upper and lower limits - limit the values to be <3 times the max value
+lower_mcmc <- rep(0, length(inits_mcmc))
+upper_mcmc <- rep(max(inits_mcmc)*10, length(inits_mcmc))
+
+# run first mcmc to tune w
+fit_mcmc <- mcmc(lik_custom5, inits_mcmc, nsteps = 10, w = 0.1, upper = upper_mcmc, lower = lower_mcmc)
+
+# tune w for each parameter
+w <- diff(sapply(fit_mcmc[2:(ncol(fit_mcmc)-1)], quantile, c(.05, .95)))
+
+# run second mcmc to tune w
+fit_mcmc2 <- mcmc(lik_custom5, inits_mcmc, nsteps=100, w=w, upper = upper_mcmc, lower = lower_mcmc)
+
+## # tune w for each parameter
+w <- diff(sapply(fit_mcmc2[2:(ncol(fit_mcmc2)-1)], quantile, c(.05, .95)))
+
+# run third mcmc for 1000 iter
+fit_mcmc3 <- mcmc(lik_custom5, inits_mcmc, nsteps=1000, w=w, upper = upper_mcmc, lower = lower_mcmc)
+
+# save out mcmc chains
+saveRDS(fit_mcmc3, 'data/sequencing_rpoB/processed/transition_rates/asv_mcmc_trans.rds')
+
+# make data long format
+d_mcmc <- pivot_longer(fit_mcmc3, names_to = 'param', values_to = 'transition_rate', cols = starts_with('q')) %>%
+  left_join(., select(diversitree_df, param, state_1, state_2)) %>%
+  left_join(., select(coding, state_1 = hab_pref, state_1_num = hab_pref_num, state_1_label = initials)) %>%
+  left_join(., select(coding, state_2 = hab_pref, state_2_num = hab_pref_num, state_2_label = initials)) %>%
+  mutate(parameter = paste(state_1_label, '->', state_2_label))
+
+# find 95% CIs and bind with ML estimates
+d_mcmc_summary <- d_mcmc %>%
+  group_by(parameter, param, state_1, state_2) %>%
+  tidybayes::mean_qi(transition_rate) %>%
+  left_join(., select(diversitree_df, state_1, state_2, ml_estimate = transition_rate))
+
+# plot ridge plot
+ggplot(d_mcmc, aes(transition_rate, forcats::fct_reorder(parameter, transition_rate))) +
+  geom_density_ridges() +
+  theme_bw(base_size = 14) +
+  labs(x = 'transition rate',
+       y = 'transition')
+
+ggplot(d_mcmc_summary, aes(transition_rate, forcats::fct_reorder(parameter, transition_rate))) +
+  geom_linerange(aes(xmin = .lower, xmax = .upper)) +
+  geom_point(size = 3) +
+  geom_point(aes(x = ml_estimate), size = 3, col = 'red') +
+  theme_bw(base_size = 14) +
+  labs(x = 'transition rate',
+       y = 'transition',
+       caption = 'red points are ML estimate\nblack points are MCMC average')
+
+# look at which rates correlate with each
+d_mcmc %>%
+  select(parameter, transition_rate, i) %>%
+  pivot_wider(names_from = parameter, values_from = transition_rate) %>%
+  slice_sample(n = 250) %>%
+  ggpairs(., columns = 2:ncol(.),
+          lower = list(continuous = wrap("points", alpha = 0.3))) +
+  theme_bw()
+
+ggsave('plots/sequencing_rpoB/analyses/discrete_character_evolution/pairs_plot.png', last_plot(), height = 12, width = 14)
+
 
 #-------------------------#
 # CODE NOT RAN ANYMORE ####
