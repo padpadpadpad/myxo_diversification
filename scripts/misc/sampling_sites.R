@@ -69,8 +69,8 @@ cols <- mutate(cols, group2 = gsub('_', ' ', group))
 map1_base <- get_stamenmap(box, zoom = 11, maptype = "terrain") %>% 
   ggmap() +
   geom_point(aes(ave_lon, ave_lat), d_location, size = 3) +
-  ggrepel::geom_label_repel(aes(ave_lon, ave_lat, label = site), d_location, size = MicrobioUoE::pts(14), box.padding = 0.5) +
   geom_point(aes(lon, lat, col = habitat_group_16s), d) +
+  ggrepel::geom_label_repel(aes(ave_lon, ave_lat, label = site), d_location, size = MicrobioUoE::pts(14), box.padding = 0.7) +
   theme_bw(base_size = 14) +
   labs(x = 'Longitude',
        y = 'Latitude',
@@ -89,9 +89,6 @@ saveRDS(legend, file.path('plots', 'map_legend.rds'))
 
 map1 + 
   guides(colour = 'none')
-
-cowplot::plot_grid(legend)
-
 
 ggsave('sampling_map.pdf', last_plot(), height = 6, width = 8, bg = 'transparent')
 
