@@ -148,3 +148,10 @@ ggsave('camel_map.pdf', last_plot(), height = 6, width = 8, bg = 'transparent')
 
 d_meta_summary <- group_by(d_meta, habitat_group) %>%
   tally()
+
+# look at the rpoB sequencing
+readRDS('data/sequencing_rpoB/phyloseq/myxococcus/ps_phyloseq_myxo.rds') %>%
+  phyloseq::sample_data() %>%
+  data.frame() %>%
+  pull(habitat_group_16s) %>%
+  unique()

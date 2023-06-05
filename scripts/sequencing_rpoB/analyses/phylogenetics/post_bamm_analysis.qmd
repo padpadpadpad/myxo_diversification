@@ -23,19 +23,7 @@ editor: visual
 
 This walk-through goes through the analysis of a BAMM run on our phylogenetic tree, which is short for Bayesian Analysis of Macroevolutionary Mixtures. This model identifies changes in speciation, extinction, and diversification rates on a tree without any knowledge of tip states or traits, and identifies the most likely number of transitions, where they are likely to occur, and outputs a bunch of other useful things.
 
-From the online documentation of BAMM, we are following [Section 8](http://bamm-project.org/postprocess.html#bammtools): Analysing BAMM Output with BAMMtools. We have previously ran **bamm** on our tree. *Input information about that run here.*
-
-## Progress and Results
-
--   We have plotted all the "core" shifts on the whole of the phylogenetic tree
--   Identifies lots of shift configurations, but all of them have low probability
--   Best model has at \~35 shifts
--   Have identified areas with a high density of potential shifts
-
-## Possibilities
-
--   Macroevolutionary cohort analysis. An introduction to this is [here](http://bamm-project.org/rateshifts.html#analysis-of-rate-shifts-in-the-bamm-framework) and explained in more detail [here](https://academic.oup.com/sysbio/article/63/4/610/2848733?login=false).
--   Do we need to re-run the model at different levels of sampled diversity to check if the results are robust?
+From the online documentation of BAMM, we are following [Section 8](http://bamm-project.org/postprocess.html#bammtools): Analysing BAMM Output with BAMMtools.
 
 ## Load in R packages
 
@@ -62,12 +50,13 @@ library(fastdivrate) # remotes::install_github("jonchang/fastdivrate")
 library(nlme)
 library(emmeans)
 library(tidyverse)
+library(magick)
 
 # set where I am in the project
 here::i_am('scripts/sequencing_rpoB/analyses/phylogenetics/post_bamm_analysis.qmd')
 
 # read in habitat preference
-d_habpref <- read.csv(here('data/sequencing_rpoB/phyloseq/myxococcus/habitat_preference/summary/habitat_preference_asv.csv'))
+d_habpref <- read.csv(here('data/sequencing_rpoB/phyloseq/myxococcus/habitat_preference/summary/habitat_preference_asv_new.csv'))
 
 # read in phyloseq object and grab tax table
 d_taxa <- readRDS(here('data/sequencing_rpoB/phyloseq/myxococcus/prevalence_filtered/ps_otu_asv_filt.rds')) %>%
@@ -77,7 +66,10 @@ d_taxa <- readRDS(here('data/sequencing_rpoB/phyloseq/myxococcus/prevalence_filt
   rownames_to_column('otu')
 
 # create d_meta
-d_meta <- left_join(select(d_habpref, otu, habitat_preference, num_present), dplyr::select(d_taxa, otu:family))
+d_meta <- left_join(select(d_habpref, otu, habitat_preference = habitat_preference3, num_present), dplyr::select(d_taxa, otu:family))
+
+# load in colours
+cols_hab <- readRDS(here('data/sequencing_rpoB/phyloseq/myxococcus/habitat_preference/summary/habitat_colours.rds'))
 
 ```
 
@@ -144,10 +136,10 @@ edata <- getEventData(tree, eventdata = here('data/sequencing_rpoB/bamm/bamm_asv
 shift_probs <- summary(edata)
 
 # plot these
-ggplot(shift_probs, aes(shifts, prob)) +
+plot_rateshifts <- ggplot(shift_probs, aes(shifts, prob)) +
   geom_col(col = 'black', fill = 'light grey') +
-  theme_bw(base_size = 14) +
-  labs(x = 'Number of shifts',
+  theme_bw(base_size = 10) +
+  labs(x = 'Number of rate shifts',
        y = 'Probability')
 
 # calculate 95% CIs for the number of shifts
@@ -155,6 +147,8 @@ n_shifts_ci <- tibble(mean_shifts = mean(postburn$N_shifts),
                       lower_ci = quantile(postburn$N_shifts, 0.025),
                       upper_ci = quantile(postburn$N_shifts, 0.975))
 n_shifts_ci
+
+plot_rateshifts
 
 ```
 
@@ -275,6 +269,7 @@ Here we also change the tip labels of our tree so they rematch with those from o
 
 # get the mean branch lengths from the best tree configuration as identified from maximumShiftCredibility 
 mbt2 <- getMeanBranchLengthTree(msc_config, rate = "ndr")
+#mbt2 <- getMeanBranchLengthTree(msc_config, rate = "speciation")
 
 # get shift nodes from "best model"
 shiftnodes <- getShiftNodesFromIndex(edata, index = msc_set$sampleindex)
@@ -312,7 +307,7 @@ Now we can plot the tree. We will try plot the family assignment around the edge
 # constrained families
 constrained_families <- c('Myxococcaceae', 'Vulgatibacteraceae', 'Anaeromyxobacteraceae', 'Polyangiaceae', 'Sandaracinaceae', 'Nannocystaceae', 'Haliangiaceae')
 
-# reorder d_meta so the tip labesl link to the order of the tips in the tree
+# reorder d_meta so the tip labels link to the order of the tips in the tree
 d_meta <- tibble(tip_label = tree_bamm$tip.label) %>%
   left_join(., rename(d_meta, tip_label = otu))
 
@@ -334,10 +329,6 @@ d_meta2 <- dplyr::select(d_meta2, family2 = family, mrca) %>%
 cols <- c(colorRampPalette(brewer.pal(11, "Spectral"))(nrow(d_meta2)))
 names(cols) <- sort(d_meta2$family2)
 
-# define colours for the different habitats
-cols_hab <- met.brewer('Austria', n = 7)
-names(cols_hab) <- c('marine_mud', 'freshwater', 'terrestrial', 'freshwater:terrestrial', 'generalist', 'marine_mud:terrestrial', 'freshwater:marine_mud')
-hab_labels <- c('marine mud', 'freshwater', 'terrestrial', 'freshwater + terrestrial', 'generalist', 'marine mud + terrestrial', 'freshwater + marine mud')
 
 # remove any tip labels not in our tree from d_meta
 d_meta <- filter(d_meta, tip_label %in% tree_bamm$tip.label)
@@ -348,19 +339,20 @@ d_meta <- mutate(d_meta, rare = ifelse(habitat_preference %in% c('generalist', '
 # plot tree using ggtree
 # first colour branches and add rate shifts
 p1 <- ggtree(tree_bamm, layout = 'circular', branch.length = 'none', aes(col = log_edge_length)) %<+% d_tree_bamm +
-scale_color_gradientn('Net diversification (branch colours)', colors = met.brewer(name='Hiroshige', direction=-1, override.order = F), breaks=c(min(d_tree_bamm$log_edge_length, na.rm = TRUE) + abs(min(d_tree_bamm$log_edge_length, na.rm = TRUE))*0.2, max(d_tree_bamm$log_edge_length, na.rm = TRUE) * 0.95), labels=c("Slow","Fast")) +
-geom_point2(aes(subset=(node %in% shiftnodes)), color="black",size=5)
+scale_color_gradientn('Net diversification (branch colours)', colors = met.brewer(name='Hiroshige', direction=-1, override.order = F), breaks=c(min(d_tree_bamm$log_edge_length, na.rm = TRUE) + abs(min(d_tree_bamm$edge_length, na.rm = TRUE))*0.2, max(d_tree_bamm$log_edge_length, na.rm = TRUE) * 0.95), labels=c("Slow","Fast")) +
+#geom_point2(aes(subset=(node %in% shiftnodes)), color="black",size=5)+
+  NULL
 
 # next add tip points
 p2 <- p1 %<+% d_meta +
   new_scale_color() +
   geom_tippoint(aes(x=x+5, col = habitat_preference, size = rare), position = position_jitter(width = 3, height = 0)) +
-  scale_color_manual('Habitat preference (tip points)', values = cols_hab, labels = hab_labels) +
+  scale_color_manual('Habitat preference (tip points)', values = cols_hab, labels = c('freshwater + land generalist', 'freshwater specialist', 'marine generalist', 'marine specialist', 'land specialist')) +
   scale_size_manual(values = c(0.6, 2)) +
   guides(color = guide_legend(override.aes = list(size = 5)),
          size = 'none')
 
-p2 +
+tree_plot <- p2 +
   new_scale_colour() +
   geom_cladelab(data = d_meta2,
                 mapping = aes(node = mrca,
@@ -371,7 +363,9 @@ p2 +
   scale_color_manual('Family (outer bar)', values = cols) +
   guides(color = guide_legend(override.aes = list(size = 0.1, shape = 1)))
 
-ggsave(here('plots/sequencing_rpoB/analyses/bamm_tree.png'), last_plot(), height = 9, width = 12)
+tree_plot
+
+ggsave(here('plots/sequencing_rpoB/analyses/bamm_tree.png'), p3, height = 9, width = 12)
 ```
 
 ## Rate variation through time
@@ -459,6 +453,17 @@ ggplot() +
 
 # save plot out
 ggsave(here('plots/sequencing_rpoB/analyses/bamm_rate_through_time.png'), last_plot(), height = 5, width = 12)
+
+# create a plot
+p_rtt <- ggplot() +
+  geom_line(aes(time, ave_rate, group = shift_node), filter(rtt_shift_means, process == 'net_div'), col = 'dark grey') +
+  geom_ribbon(aes(time, ymin = lower_ci, ymax = upper_ci, group = shift_node), alpha = 0.05, filter(rtt_shift_means, process == 'net_div'), fill = 'dark grey') +
+  geom_line(aes(time, ave_rate), filter(rtt_combine_means, process == 'net_div')) +
+  geom_ribbon(aes(time, ymin = lower_ci, ymax = upper_ci), alpha = 0.1, filter(rtt_combine_means, process == 'net_div')) +
+  theme_bw(base_size = 10) +
+  labs(x = 'Relative time',
+       y = 'Net diversification rate')
+
 ```
 
 You can see that after a shift node there is generally a rapid acceleration in diversification and speciation rate, after which we see a decline, whereas extinction rate rises quickly and then plateaus through time. The uncertainty around these node specific estimates is very high, but the general pattern appears to hold.
@@ -518,9 +523,44 @@ p1 + p2 + p3
 # save plot out
 ggsave(here('plots/sequencing_rpoB/analyses/bamm_tip_rates.png'), last_plot(), height = 5, width = 17)
 
+p_tiprates <- ggplot(tip_rates, aes(forcats::fct_reorder(hab_pref_axis, n), net_diversification)) +
+  MicrobioUoE::geom_pretty_boxplot(aes(col = habitat_preference, fill = habitat_preference), show.legend = FALSE) +
+  geom_point(shape = 21, fill = 'white', position = position_jitter(width = 0.2), size = 0.8, stroke = 0.6) +
+  theme_bw(base_size = 10) +
+  scale_x_discrete(labels = scales::label_wrap(13)) +
+  labs(x = 'Habitat preference',
+       y = 'Net diversification rate') +
+  scale_color_manual('Habitat preference', values = cols_hab, labels = c('freshwater + land generalist', 'freshwater specialist', 'marine generalist', 'marine specialist', 'land specialist')) +
+  scale_fill_manual('Habitat preference', values = cols_hab, labels = c('freshwater + land generalist', 'freshwater specialist', 'marine generalist', 'marine specialist', 'land specialist')) +
+  ylim(c(0, 10))
+
 ```
 
 There does not appear to be much variation between traits in their speciation and extinction rates. If we wanted to follow this further there are lots of papers we could look at. First and foremost would be to read Title & Rabosky's paper entitled ["Tip rates, phylogenies and diversification: What are we estimating, and how good are the estimates?"](https://besjournals.onlinelibrary.wiley.com/doi/10.1111/2041-210X.13153). They also share other papers that have used tip rate estimates to look at diversification rates across geographical and environmental gradients and across different traits.
+
+We can now assemble a figure of these results for the manuscript.
+
+```{r plot_for_paper}
+
+legend <- cowplot::get_legend(tree_plot)
+
+layout <- c(
+  'AAAABB
+   CCDDEE'
+)
+
+tree_plot2 <- tree_plot + theme(legend.position = 'none')
+ggsave(here('plots/sequencing_rpoB/analyses/bamm_tree.png'), tree_plot2, height = 8, width = 8)
+
+tree_plot2 <- image_read(here('plots/sequencing_rpoB/analyses/bamm_tree.png'), density = 300)
+tree_plot2 <- image_trim(tree_plot2)
+
+# make plot
+image_ggplot(tree_plot2) + legend + plot_rateshifts + p_rtt + p_tiprates + plot_layout(design = layout, heights = c(0.75, 0.25))
+
+ggsave(here('plots/manuscript_plots/Figure_3.png'), last_plot(), width = 13, height = 11)
+
+```
 
 We can calculate the DR statistic (also known as tip DR) which is an tip-level estimate of the speciation rate. This measure is non-model based, and incorporates the number of splitting events and the internode distances along the root-to-tip path of a phylogeny, while giving greater weight to branches closer to the present. This was first implemented by Jetz *et al.* (2012) in their Nature paper about bird diversity in space and time.
 
@@ -570,14 +610,14 @@ We will first do this using **nlme::lme()** as described in Liam Revell's and Lu
 cor_lambda <- corPagel(value = 1, phy = tree, form = ~tip_label)
 
 # fit phylogenetic generalised linear model
-mod <- gls(tip_dr ~ habitat_preference, data = d_tipdr, correlation = cor_lambda)
+mod <- gls(net_diversification ~ habitat_preference, data = tip_rates, correlation = cor_lambda)
 
 # do contrasts between habitat preferences
 contrasts <- emmeans(mod, pairwise ~ habitat_preference)
 
 # save out mean branch lengths
-saveRDS(mod, here('data/sequencing_rpoB/processed/tipDR_pgls.rds'))
-saveRDS(contrasts, here('data/sequencing_rpoB/processed/tipDR_pgls_contrasts.rds'))
+saveRDS(mod, here('data/sequencing_rpoB/processed/tipbamm_pgls.rds'))
+saveRDS(contrasts, here('data/sequencing_rpoB/processed/tipbamm_pgls_contrasts.rds'))
 ```
 
 ```{r pgls_nlme}

@@ -38,7 +38,7 @@ Load in the R packages I am going to use.
 # load packages - use librarian::shelf()
 # need to ensure BiocManager and Biobase are installed - BiocManager::install("Biobase")
 # can install packages from GitHub, Bioconductor, and CRAN all at once
-librarian::shelf(here, tidyverse, ggtree, ggnewscale, RColorBrewer, patchwork, ape, phytools, MetBrewer, flextable, officer)
+librarian::shelf(here, tidyverse, ggtree, ggnewscale, RColorBrewer, patchwork, ape, phytools, MetBrewer, flextable, officer, magick)
 ```
 
 ## Load in data and do some data wrangling
@@ -337,26 +337,10 @@ d_table <- group_by(d_habpref, habitat_preference2, habitat_preference) %>%
 
 head(d_table)
 
-# write function to add colour circle inside flextable
-# from here: https://stackoverflow.com/questions/71068389/add-coloured-dot-in-new-column-using-dplyr
-colour_choice = function(x){
-  if (x == 'freshwater specialist') {
-    "#16317d"
-  } else if (x =='freshwater + land generalist') {
-    "#ffcd12"
-  } else if (x == 'marine specialist'){
-    "#a40000"
-  }
-    else if (x == 'marine generalist'){
-    "#721b3e"
-  }
-    else('#007e2f')
-  }
-
-colour_choice <- Vectorize(colour_choice)
-
 d_table <- mutate(d_table, first_col = habitat_preference2) %>%
   select(first_col, everything())
+
+black_dot <- "\U2B24" 
 
 table <- flextable(d_table) %>%
   set_header_labels(first_col = '',
@@ -446,15 +430,26 @@ backbone <- read.tree(here('data/sequencing_rpoB/raxml/backbone.tre'))
 backbone_tree <- ggtree(backbone) +
   geom_tippoint() +
   geom_tiplab(offset = 0.1, size = MicrobioUoE::pts(10)) +
-  coord_cartesian(clip="off")
+  coord_cartesian(clip = "off") +
+  theme_tree(plot.margin=margin(6, 120, 6, 6))
 
 # make table with flex table
+legend <- cowplot::get_legend(tree_plot3)
 
-tree_plot4 <- tree_plot3 + inset_element(backbone_tree, -0.12, 0.0, 0.12,0.19)
+ggsave(here('plots/sequencing_rpoB/analyses/tree_with_constraints.png'), tree_plot3 + theme(legend.position = 'none'), height = 8, width = 8)
+
+tree_plot3 <- image_read(here('plots/sequencing_rpoB/analyses/tree_with_constraints.png'), density = 300)
+tree_plot3 <- image_trim(tree_plot3)
 
 table <- png::readPNG(here('plots/manuscript_plots/hab_pref_table.png'), native = TRUE)
 
-(tree_plot4) / (p2 + table) + plot_layout(ncol = 1, heights = c(0.8, 0.2), tag_level = 'new')
+layout <- c(
+  'AAAAAAAB
+   AAAAAAAC
+   DDDDEEEE'
+)
+
+image_ggplot(tree_plot3) + legend + backbone_tree + p2 + table + plot_layout(design = layout, heights = c(0.6, 0.2, 0.2), tag_level = 'new')
 
 # save out
 ggsave(here('plots/manuscript_plots/Figure_2.png'), last_plot(), height = 9.5, width = 11)
