@@ -306,9 +306,9 @@ fit_secsse <- function(list_inits_sampfrac){
     maxiter = max_iter,
     optimmethod = "simplex",
     num_cycles = 20,
-    num_threads = 2,
+    num_threads = 4,
     method = 'odeint::runge_kutta_cash_karp54'
-  )
+ )
   
   # create a list of the output
   output <- list(n_params = length(idparsopt),
@@ -330,8 +330,13 @@ fit_secsse <- function(list_inits_sampfrac){
 # just run the first 6
 all_combs <- all_combs[1:6]
 
+all_combs <- all_combs[c(2,3,5,6)]
+
 # Set a "plan" for how the code should run.
-plan(multisession, workers = 6)
+plan(multisession, workers = 4)
 
 # run future_walk
 furrr::future_walk(all_combs, fit_secsse)
+
+temp_samp_frac <- all_combs[[1]]$sampled_fractions
+temp_inits <- all_combs[[1]]$inits
