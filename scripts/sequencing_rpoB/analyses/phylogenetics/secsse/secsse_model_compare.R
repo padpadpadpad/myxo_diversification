@@ -4,7 +4,101 @@
 librarian::shelf(secsse, tidyverse)
 
 # list all model files
-files <- list.files('data/sequencing_rpoB/processed/secsse', full.names = TRUE)
+files <- list.files('data/sequencing_rpoB/processed/secsse/results/samp_frac_1', full.names = TRUE)
+
+# write function to extract logLik from the models and create a dataframe
+get_loglik <- function(secsse_file){
+  temp <- readRDS(secsse_file)
+  temp <- data.frame(model_name = basename(tools::file_path_sans_ext(secsse_file)),
+                     loglik = temp$mod$ML,
+                     n_params = temp$n_params)
+  return(temp)
+}
+
+# read in musse models ####
+fits_musse <- str_subset(files, 'musse') %>%
+  map(., get_loglik) %>%
+  list_rbind() %>%
+  mutate(., aic = (2*n_params) - 2*loglik)
+# best models are runs 1, 2, 3, 4, 5, 6 
+# AIC = 3450.519
+
+# read in muhisse full models ####
+fits_muhisse <- str_subset(files, 'muhisseSS') %>%
+  map(., get_loglik) %>%
+  list_rbind() %>%
+  mutate(., aic = (2*n_params) - 2*loglik)
+# best model is run 4, 5, 6
+# AIC = 2703.998
+
+# read in ctd2 ####
+fits_ctd2 <- str_subset(files, 'ctd2') %>%
+  map(., get_loglik) %>%
+  list_rbind() %>%
+  mutate(., aic = (2*n_params) - 2*loglik)
+# best models are runs all of them
+# AIC = 2761.405
+
+# read in ctd3 models
+fits_ctd3 <- str_subset(files, 'ctd3') %>%
+  map(., get_loglik) %>%
+  list_rbind() %>%
+  mutate(., aic = (2*n_params) - 2*loglik)
+# best model is run 1 and 4: AIC = 2647.111
+
+# read in those four models and do model comparison using AIC scores
+best_ctd2 <- readRDS('data/sequencing_rpoB/processed/secsse/results/samp_frac_1/seccse_muctd2_sampfrac1_run1.rds')
+best_muhisse <- readRDS('data/sequencing_rpoB/processed/secsse/results/samp_frac_1/seccse_muhisseSSonly_sampfrac1_run4.rds')
+best_ctd3 <- readRDS('data/sequencing_rpoB/processed/secsse/results/samp_frac_1/seccse_muctd3_sampfrac1_run1.rds')
+best_musse <- readRDS('data/sequencing_rpoB/processed/secsse/results/samp_frac_1/seccse_musse_sampfrac1_run5.rds')
+
+final_models <- c('data/sequencing_rpoB/processed/secsse/results/samp_frac_1/seccse_muctd2_sampfrac1_run1.rds', 
+                  'data/sequencing_rpoB/processed/secsse/results/samp_frac_1/seccse_muhisseSSonly_sampfrac1_run4.rds',
+                  'data/sequencing_rpoB/processed/secsse/results/samp_frac_1/seccse_muctd3_sampfrac1_run1.rds',
+                  'data/sequencing_rpoB/processed/secsse/results/samp_frac_1/seccse_musse_sampfrac1_run5.rds')
+
+best_ctd2$mod$ML
+best_muhisse$mod$ML
+best_ctd3$mod$ML
+best_musse$mod$ML
+
+model_table <- final_models %>%
+  map(., get_loglik) %>%
+  list_rbind() %>%
+  mutate(., aic = (2*n_params) - 2*loglik,
+         model = sub("^[^_]*_(.*?)_.*$", "\\1", model_name),
+         weights = MuMIn::Weights(aic) %>% round(2)) %>%
+  arrange(aic) %>%
+  mutate(model = case_when(model == 'muctd2' ~ 'CTD2',
+                           model == 'musse' ~ 'MuSSE',
+                           model == 'muhisseSSonly' ~ 'MuHiSSE',
+                           model == 'muctd3' ~ 'CTD3'))
+
+# make table
+table <- select(model_table, model, n_params, loglik, aic, weights) %>%
+  mutate(across(where(is.numeric), \(x) round(x,2))) %>%
+  flextable() %>%
+  align(align = 'center', part = 'all') %>%
+  set_header_labels(model = "Model",
+                    n_params = 'Number of estimated parameters',
+                    loglik = 'Log Likelihood',
+                    aic = 'AIC',
+                    weights = "AIC weight") %>%
+  font(fontname = 'Times', part = 'all') %>%
+  fontsize(size = 16, part = 'all') %>%
+  autofit() 
+
+table
+
+save_as_image(table, 'plots/manuscript_plots/secsse_table.png')
+
+# the best model is muhisse2
+
+# look at the parameters
+best_muhisse2$mod$MLpars
+
+best_ctd3$mod$MLpars
+
 
 # functions to clean model objects
 
