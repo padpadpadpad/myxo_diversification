@@ -4,11 +4,12 @@
 
 # what this script does ####
 
-# 1.
-# 2.
+# 1. Fits Mk models for discrete character evolution
+# 2. Does model selection on these models
+# 3. does bootstraps on the best model sampling 80% of tips and refitting the best model
 
 # load packages ####
-librarian::shelf(here, tidyverse, ggtree, ggnewscale, RColorBrewer, patchwork, phytools, ggpp, castor, diversitree, tidygraph, igraph, ggraph, GGally, ggrepel, flextable, ggridges, hisse, padpadpadpad/MicrobioUoE)
+librarian::shelf(here, tidyverse, ggtree, ggnewscale, RColorBrewer, patchwork, phytools, ggpp, castor, diversitree, tidygraph, igraph, ggraph, GGally, ggrepel, flextable, ggridges, hisse, padpadpadpad/MicrobioUoE, cli)
 
 # read in datasets ####
 
@@ -577,6 +578,225 @@ table_rate <- select(d_source_sink_rate, habitat_preference, away, into, source_
 # save out
 save_as_image(table_rate, here('plots/sequencing_rpoB/analyses/discrete_character_evolution/source_sink_rate.png'), zoom = 3, webshot = 'webshot2')
 
+# bootstrap ####
+# bootstrap model by sampling 80% of the tips and refitting the best model
+
+num_boots <- 1000
+
+# set up empty tibble to store results
+d_boots <- tibble(boot = 1:num_boots, 
+                  rates = list(NA))
+
+to_sample <- length(tree$tip.label) * 0.8
+to_sample <- round(to_sample)
+
+# run for loop to do bootstrapping
+for(i in 1:num_boots){
+  
+  cat(i)
+  
+  # subset tree
+  temp_tree <- keep.tip(tree, sample(tree$tip.label, to_sample, replace = FALSE))
+  
+  # subset habitat preference vector
+  temp_hab_pref <- hab_pref_num[names(hab_pref_num) %in% temp_tree$tip.label]
+  
+  #sum(names(temp_hab_pref) == temp_tree$tip.label) == length(temp_tree$tip.label)
+  
+  # make model
+  temp_ard <- make.mkn(temp_tree, temp_hab_pref, k = max(temp_hab_pref))
+  
+  # make custom matrix model
+  temp_custom5 <- constrain(temp_ard, 
+                           q14~0, q24~0, q25~0, q41~0, q53~0,
+                           q42~0,
+                           q45~0,
+                           q54~0,
+                           q52~0)
+  
+  # make start parameters
+  inits_custom5 <- rep(1, length(argnames(temp_custom5)))
+  
+  # run model
+  temp_mod_custom5 <- find.mle(temp_custom5, inits_custom5, method = 'nlminb', control = list(maxit = 50000))
+  
+  # save out parameters
+  temp_output <- data.frame(temp_mod_custom5$par) %>%
+    rownames_to_column(var = 'transition') %>%
+    rename(rate = 2)
+  
+  d_boots$rates[[i]] <- temp_output
+  
+}
+
+d_boots2 <- unnest(d_boots, rates) %>%
+  group_by(transition) %>%
+  tidybayes::mean_qi(rate)
+
+d_custom5 <- data.frame(mod_custom5$par) %>%
+  rownames_to_column(var = 'transition') %>%
+  rename(rate = 2)
+
+head(diversitree_df)
+
+# parameters with uncertainty values
+d_boots3 <- rename(d_boots2, param = transition) %>%
+  select(-starts_with("boot")) %>%
+  left_join(., select(diversitree_df, param, state_1, state_2, transition_rate)) %>%
+  mutate(across(starts_with('state'), function(x) case_when(x == 'marine mud specialist' ~ 'marine specialist',
+                                              x == 'freshwater + terrestrial generalist' ~ 'freshwater + land generalist',
+                                              x == 'freshwater specialist' ~ 'freshwater specialist',
+                                              x == 'marine mud generalist' ~ 'marine generalist',
+                                              x == 'terrestrial specialist' ~ 'land specialist')),
+         transition = paste(state_1, state_2, sep = ' -> '))
+
+ggplot(d_boots3) +
+  geom_linerange(aes(x = forcats::fct_reorder(transition, rate), ymin = rate.lower, ymax = rate.upper)) +
+  geom_point(aes(forcats::fct_reorder(transition, rate), transition_rate), shape = 21, size = 5, fill = 'red') +
+  geom_point(aes(forcats::fct_reorder(transition, rate), rate), shape = 21, size = 3, fill = 'white') +
+  theme_bw() +
+  scale_x_discrete(labels = scales::label_wrap(25), guide = guide_axis(n.dodge = 2)) +
+  labs(x = 'Transition',
+       y = 'Transition rate')
+
+# make table of confidence intervals when sampling 80% of the tips of the tree
+
+d_table <- select(d_boots3, transition, transition_rate, rate, rate.lower, rate.upper) %>%
+  mutate(across(where(is.numeric), ~ round(.x, 2)),
+    ci = paste('(', rate.lower, '-', rate.upper, ')')) %>%
+  select(-rate.upper, -rate.lower) %>%
+  arrange(-transition_rate)
+
+flextable(d_table) %>%
+  bold(part = 'header') %>%
+  font(fontname = 'Times', part = 'all') %>%
+  fontsize(size = 12, part = 'all') %>%
+  autofit()
+  
+#-------------------------------------------------------------#
+# bootstrap tree to keep the same number of tips per group ####
+#-------------------------------------------------------------#
+
+# set number of bootstraps
+num_boots <- 1000
+
+# set up empty tibble to store results
+d_boots_v2 <- tibble(boot = 1:num_boots, 
+                     rates = list(NA))
+
+# calculate number of tips per group
+d_meta %>% 
+  group_by(habitat_preference) %>%
+  tally()
+
+# there are 123 marine generalists so only keep 123 tips from each group
+num_to_keep <- 123
+  
+# run for loop to do bootstrapping
+for(i in 1:num_boots){
+  
+  # print iteration - bit shit but needs must
+  cat(i)
+  
+  # choose tips to keep
+  d_temp <- group_by(d_meta, habitat_preference) %>%
+    sample_n(size = num_to_keep, replace = FALSE)
+  
+  # subset tree
+  temp_tree <- keep.tip(tree, d_temp$tip_label)
+  
+  # reorder metadata to match tip labels of tree
+  d_temp <- tibble(tip_label = temp_tree$tip.label) %>%
+    left_join(., d_meta, by = 'tip_label')
+  
+  sum(d_temp$tip_label == temp_tree$tip.label) == length(temp_tree$tip.label)
+  # SUCCESS if TRUE
+  
+  # create habitat preference vector
+  temp_habpref <- setNames(d_temp$habitat_preference, d_temp$tip_label)
+  temp_habpref <- as.numeric(as.factor(temp_habpref))
+  temp_habpref <- setNames(temp_habpref, d_temp$tip_label)
+  
+  # make model
+  temp_ard <- make.mkn(temp_tree, temp_habpref, k = max(temp_habpref))
+  
+  # make custom matrix model
+  temp_custom5 <- constrain(temp_ard, 
+                            q14~0, q24~0, q25~0, q41~0, q53~0,
+                            q42~0,
+                            q45~0,
+                            q54~0,
+                            q52~0)
+  
+  # make start parameters
+  inits_custom5 <- rep(1, length(argnames(temp_custom5)))
+  
+  # run model
+  temp_mod_custom5 <- find.mle(temp_custom5, inits_custom5, method = 'nlminb', control = list(maxit = 50000))
+  
+  # save out temp parameters
+  temp_output <- data.frame(temp_mod_custom5$par) %>%
+    rownames_to_column(var = 'transition') %>%
+    rename(rate = 2)
+  
+  d_boots_v2$rates[[i]] <- temp_output
+  
+}
+
+# create confidence intervals for each transition
+d_boots2 <- unnest(d_boots_v2, rates) %>%
+  group_by(transition) %>%
+  tidybayes::mean_qi(rate)
+
+# make dataframe of model with the whole dataset
+d_custom5 <- data.frame(mod_custom5$par) %>%
+  rownames_to_column(var = 'transition') %>%
+  rename(rate = 2)
+
+# combine with diversitree df to get proper names of states
+d_boots3 <- rename(d_boots2, param = transition) %>%
+  select(-starts_with("boot")) %>%
+  left_join(., select(diversitree_df, param, state_1, state_2, transition_rate)) %>%
+  mutate(across(starts_with('state'), function(x) case_when(x == 'marine mud specialist' ~ 'marine specialist',
+                                                            x == 'freshwater + terrestrial generalist' ~ 'freshwater + land generalist',
+                                                            x == 'freshwater specialist' ~ 'freshwater specialist',
+                                                            x == 'marine mud generalist' ~ 'marine generalist',
+                                                            x == 'terrestrial specialist' ~ 'land specialist')),
+         transition = paste(state_1, state_2, sep = ' -> '))
+
+# make plot
+ggplot(d_boots3) +
+  geom_linerange(aes(x = forcats::fct_reorder(transition, rate), ymin = rate.lower, ymax = rate.upper)) +
+  geom_point(aes(forcats::fct_reorder(transition, rate), transition_rate), shape = 21, size = 5, fill = 'red') +
+  geom_point(aes(forcats::fct_reorder(transition, rate), rate), shape = 21, size = 3, fill = 'white') +
+  theme_bw() +
+  scale_x_discrete(labels = scales::label_wrap(25), guide = guide_axis(n.dodge = 2)) +
+  labs(x = 'Transition',
+       y = 'Transition rate')
+
+# calculate source sink values
+d_source_sink_v2 <- unnest(d_boots_v2, rates) %>%
+  left_join(., select(diversitree_df, transition = param, state_1, state_2)) %>%
+  select(., boot, away = state_1, into = state_2, rate) %>%
+  pivot_longer(cols = c(away, into), names_to = 'direction', values_to = 'habitat_preference') %>%
+  mutate(habitat_preference = case_when(habitat_preference == 'marine mud specialist' ~ 'marine specialist',
+                                        habitat_preference == 'freshwater + terrestrial generalist' ~ 'freshwater + land generalist',
+                                        habitat_preference == 'freshwater specialist' ~ 'freshwater specialist',
+                                        habitat_preference == 'marine mud generalist' ~ 'marine generalist',
+                                        habitat_preference == 'terrestrial specialist' ~ 'land specialist')) %>%
+  group_by(habitat_preference, direction, boot) %>%
+  summarise(total_rate = sum(rate), .groups = 'drop') %>%
+  pivot_wider(names_from = direction, values_from = total_rate) %>%
+  mutate(source_sink1 = away / into) %>%
+  group_by(habitat_preference) %>%
+  ggdist::mean_qi(source_sink1)
+
+# make network plot and table for source sink dynamics underneath
+
+
+#-------------------------#
+# CODE NOT RAN ANYMORE ####
+#-------------------------#
 
 #-----------------------------------------------------------------#
 # look at uncertainty in these model estimates by running MCMC ####
@@ -647,10 +867,6 @@ d_mcmc %>%
 
 ggsave('plots/sequencing_rpoB/analyses/discrete_character_evolution/pairs_plot.png', last_plot(), height = 12, width = 14)
 
-
-#-------------------------#
-# CODE NOT RAN ANYMORE ####
-#-------------------------#
 
 #-------------------------------------#
 # run stochastic character mapping ####

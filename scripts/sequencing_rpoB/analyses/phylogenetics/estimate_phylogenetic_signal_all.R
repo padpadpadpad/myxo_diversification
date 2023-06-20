@@ -174,8 +174,8 @@ for(i in 1:length(otu_similarity)){
   # set up empty lambda dataframe
   temp_boot_lambda <- tibble(boot_num = 1:n_boots) %>%
     group_by(boot_num) %>%
-    tidyr::expand(habitat_preference = rep(c('all', 'freshwater', 'marine_mud', 'terrestrial'), each = 1),
-                  model = c('er', 'ard', 'ard', 'ard')) %>%
+    tidyr::expand(habitat_preference = rep(c('all', 'freshwater', 'marine_mud', 'terrestrial'), each = 1)) %>%
+    mutate(model = c('er', 'ard', 'ard', 'ard')) %>%
     ungroup() %>%
     mutate(similarity = temp_otu_similarity,
            estimated_lambda = NA) 
@@ -225,7 +225,7 @@ for(i in 1:length(otu_similarity)){
     names(freshwater_vec_sub) <- names(terrestrial_vec_sub) <- names(marine_mud_vec_sub) <- d_pref2_sub$otu
     
     # first fit for all traits - Use ER because otherwise this step is going take forever - especially for the bootstraps
-    mod_all <- fitDiscrete(phy = tree_sub, dat = hab_pref_vec_sub, model = 'ER', transform = 'lambda', ncores = n_cores, control = list(niter = 10))
+    mod_all <- fitDiscrete(phy = tree_sub, dat = hab_pref_vec_sub, model = 'ER', transform = 'lambda', ncores = n_cores, control = list(niter = 20))
     
     # second for all freshwater
     mod_freshwater <- fitDiscrete(phy = tree_sub, dat = freshwater_vec_sub, model = 'ARD', transform = 'lambda', ncores = n_cores, control = list(niter = n_iter))
