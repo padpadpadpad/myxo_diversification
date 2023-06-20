@@ -15,6 +15,7 @@ Icon?
 *.Rproj
 .DS_Store
 data/sequencing_rpoB/phyloseq/myxococcus/dist_matrix.rds
+data/sequencing_rpoB/phyloseq/ps_no_tree.rds
 data/sequencing_rpoB/processed/transition_rates/previous/*
 .httr-oauth
 scripts/to_ignore/*
