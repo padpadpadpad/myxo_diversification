@@ -1,5 +1,5 @@
 "","habitat_preference","estimated_lambda","model","similarity"
-"1","all",0.910603451151559,"er","95"
-"2","freshwater",0.703013648951186,"ard","95"
+"1","all",0.910629283176842,"er","95"
+"2","freshwater",0.70301758715144,"ard","95"
 "3","marine_mud",0.850224231590175,"ard","95"
-"4","terrestrial",0.661873746319159,"ard","95"
+"4","terrestrial",0.66187401717848,"ard","95"

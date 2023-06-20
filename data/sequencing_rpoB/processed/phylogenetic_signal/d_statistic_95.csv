@@ -1,4 +1,4 @@
 "","habitat_preference","estimated_d","prob_random","prob_brownian","similarity"
-"1","freshwater",0.349652567159262,0,0.001,"95"
-"2","marine_mud",-0.14302742377343,0,0.858,"95"
-"3","terrestrial",0.290272200318843,0,0.004,"95"
+"1","freshwater",0.359076368980581,0,0,"95"
+"2","marine_mud",-0.1417883750693,0,0.837,"95"
+"3","terrestrial",0.290067216529863,0,0.007,"95"
