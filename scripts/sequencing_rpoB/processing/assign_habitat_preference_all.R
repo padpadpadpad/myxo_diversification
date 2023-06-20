@@ -30,7 +30,7 @@ clusters <- read.csv('data/sequencing_16s/sample_cluster_assignments.csv') %>%
 
 # we will use medoid clustering
 clusters <- clusters %>%
-  select(., sample, medoid_nbclust) %>%
+  dplyr::select(., sample, medoid_nbclust) %>%
   mutate(clusters, clust = case_when(medoid_nbclust == '1' ~ 'terrestrial',
                                      medoid_nbclust == '2' ~ 'freshwater',
                                      medoid_nbclust == '3' ~ 'marine_mud'))
@@ -43,7 +43,7 @@ clusters <- mutate(clusters, clust = ifelse(sample == 'sample_s46', 'marine_mud'
 
 # look at availability of clusters
 d_habitats <- clusters %>% 
-  select(sample, clust) %>%
+  dplyr::select(sample, clust) %>%
   distinct() %>%
   group_by(clust) %>%
   tally() %>%

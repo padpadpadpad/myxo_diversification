@@ -339,7 +339,7 @@ d_meta <- mutate(d_meta, rare = ifelse(habitat_preference %in% c('generalist', '
 # plot tree using ggtree
 # first colour branches and add rate shifts
 p1 <- ggtree(tree_bamm, layout = 'circular', branch.length = 'none', aes(col = log_edge_length)) %<+% d_tree_bamm +
-scale_color_gradientn('Net diversification (branch colours)', colors = met.brewer(name='Hiroshige', direction=-1, override.order = F), breaks=c(min(d_tree_bamm$log_edge_length, na.rm = TRUE) + abs(min(d_tree_bamm$edge_length, na.rm = TRUE))*0.2, max(d_tree_bamm$log_edge_length, na.rm = TRUE) * 0.95), labels=c("Slow","Fast")) +
+scale_color_gradientn('Net diversification\n(branch colours)', colors = met.brewer(name='Hiroshige', direction=-1, override.order = F), breaks=c(min(d_tree_bamm$log_edge_length, na.rm = TRUE) + abs(min(d_tree_bamm$edge_length, na.rm = TRUE))*0.2, max(d_tree_bamm$log_edge_length, na.rm = TRUE) * 0.95), labels=c("Slow","Fast")) +
 #geom_point2(aes(subset=(node %in% shiftnodes)), color="black",size=5)+
   NULL
 
@@ -347,7 +347,7 @@ scale_color_gradientn('Net diversification (branch colours)', colors = met.brewe
 p2 <- p1 %<+% d_meta +
   new_scale_color() +
   geom_tippoint(aes(x=x+5, col = habitat_preference, size = rare), position = position_jitter(width = 3, height = 0)) +
-  scale_color_manual('Habitat preference (tip points)', values = cols_hab, labels = c('freshwater + land generalist', 'freshwater specialist', 'marine generalist', 'marine specialist', 'land specialist')) +
+  scale_color_manual('Habitat preference\n(tip points)', values = cols_hab, labels = c('freshwater + land generalist', 'freshwater specialist', 'marine generalist', 'marine specialist', 'land specialist')) +
   scale_size_manual(values = c(0.6, 2)) +
   guides(color = guide_legend(override.aes = list(size = 5)),
          size = 'none')
@@ -365,7 +365,7 @@ tree_plot <- p2 +
 
 tree_plot
 
-ggsave(here('plots/sequencing_rpoB/analyses/bamm_tree.png'), p3, height = 9, width = 12)
+ggsave(here('plots/sequencing_rpoB/analyses/bamm_tree.png'), tree_plot, height = 9, width = 12)
 ```
 
 ## Rate variation through time
@@ -545,7 +545,7 @@ We can now assemble a figure of these results for the manuscript.
 legend <- cowplot::get_legend(tree_plot)
 
 layout <- c(
-  'AAAABB
+  'AAAAAB
    CCDDEE'
 )
 
@@ -556,9 +556,9 @@ tree_plot2 <- image_read(here('plots/sequencing_rpoB/analyses/bamm_tree.png'), d
 tree_plot2 <- image_trim(tree_plot2)
 
 # make plot
-image_ggplot(tree_plot2) + legend + plot_rateshifts + p_rtt + p_tiprates + plot_layout(design = layout, heights = c(0.75, 0.25))
+image_ggplot(tree_plot2) + legend + plot_rateshifts + p_rtt + p_tiprates + plot_layout(design = layout, heights = c(0.8, 0.2))
 
-ggsave(here('plots/manuscript_plots/Figure_3.png'), last_plot(), width = 13, height = 11)
+ggsave(here('plots/manuscript_plots/Figure_3.png'), last_plot(), width = 12, height = 12)
 
 ```
 

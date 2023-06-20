@@ -102,5 +102,7 @@ best_muhisse2$mod$MLpars
 # BIG NUMBERS
 best_muhisse2$mod$MLpars 
 
+best_ctd2$mod$MLpars
+best_musse$mod$MLpars
 
 # look at the

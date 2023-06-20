@@ -47,6 +47,7 @@ d_samp <- mutate(d_samp, location_fac = as.factor(location),
   mutate(clust = case_when(medoid_nbclust == '2' ~ 'freshwater',
                            medoid_nbclust == '3' ~ 'mud_and_shore',
                            medoid_nbclust == '1' ~ 'terrestrial'),
+         clust = ifelse(sample == 'sample_s46', 'mud_and_shore', clust),
          clust_fac = as.factor(clust))
 
 # calculate distance matrix
@@ -81,15 +82,18 @@ correct_eigenvalues[1:2]
 
 # plot PCoA
 p1 <- ggplot() +
-  geom_point(aes(PCoA1, PCoA2, col = group),d_fig$eigenvector) +
-  geom_point(aes(PCoA1, PCoA2, col = group), d_fig$centroids, size = 5, show.legend = FALSE) +
-  geom_segment(aes(x = PCoA1.x, y = PCoA2.x, yend = PCoA2.y, xend = PCoA1.y, group = sample, col = group), betadisper_lines) +
-  #theme_bw(base_size = 14) +
-  theme(strip.background = element_blank(),
-        strip.text = element_text(hjust = 0, size = 12),
-        legend.position = 'right') +
+  geom_segment(aes(x = PCoA1.x, y = PCoA2.x, yend = PCoA2.y, xend = PCoA1.y, group = sample, col = group), betadisper_lines, show.legend = FALSE) +
+  geom_point(aes(PCoA1, PCoA2, fill = group),d_fig$eigenvector, shape = 21, col = 'white') +
+  geom_point(aes(PCoA1, PCoA2, fill = group), d_fig$centroids, size = 5, shape = 21, col = 'white', show.legend = FALSE) +
   labs(y = 'Axis 2 (10.58%)',
        x = 'Axis 1 (28.22%)') +
-  ggrepel::geom_label_repel(aes(PCoA1, PCoA2, col = group, label = sample),d_fig$eigenvector)
+  #ggrepel::geom_label_repel(aes(PCoA1, PCoA2, col = group, label = sample),d_fig$eigenvector) +
+  theme_bw(base_size = 14) +
+  theme(legend.position = c(0.8, 0.2)) +
+  scale_color_manual('Biome', values = c('#5ECAE2', '#3911EE', '#53C20A'), labels = c('Freshwater', 'Marine', 'Land')) +
+  scale_fill_manual('Biome', values = c('#5ECAE2', '#3911EE', '#53C20A'), labels = c('Freshwater', 'Marine', 'Land')) +
+  guides(colour = guide_legend(override.aes = list(size = 3)))
 
 p1
+
+ggsave('plots/manuscript_plots/myxo_pcoa.png', height = 5, width = 7)

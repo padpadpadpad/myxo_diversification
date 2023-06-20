@@ -142,6 +142,9 @@ ggplot(d_transitions, aes(rate_markov, rate_musse)) +
   xlim(c(0, 60)) +
   ylim(c(0, 65))
 
+# correlate transition rates markov and musse
+cor(d_transitions$rate_markov, d_transitions$rate_musse)
+
 # look at which transition rates correlate with each other from the Musse model
 select(musse_mcmc, i, starts_with('q')) %>%
   slice_sample(n = 250) %>%

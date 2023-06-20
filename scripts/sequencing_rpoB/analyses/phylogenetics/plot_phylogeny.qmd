@@ -449,10 +449,10 @@ layout <- c(
    DDDDEEEE'
 )
 
-image_ggplot(tree_plot3) + legend + backbone_tree + p2 + table + plot_layout(design = layout, heights = c(0.6, 0.2, 0.2), tag_level = 'new')
+image_ggplot(tree_plot3) + legend + backbone_tree + p2 + table + plot_layout(design = layout, heights = c(0.6, 0.25, 0.15), tag_level = 'new')
 
 # save out
-ggsave(here('plots/manuscript_plots/Figure_2.png'), last_plot(), height = 9.5, width = 11)
+ggsave(here('plots/manuscript_plots/Figure_2.png'), last_plot(), height = 12, width = 13)
 
 
 ```

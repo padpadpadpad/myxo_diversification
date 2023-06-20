@@ -1,7 +1,7 @@
 # lets look at which hidden model is best
 
 # load packages
-librarian::shelf(secsse, tidyverse)
+librarian::shelf(secsse, tidyverse, flextable)
 
 # list all model files
 files <- list.files('data/sequencing_rpoB/processed/secsse/results/samp_frac_1', full.names = TRUE)
@@ -62,6 +62,8 @@ best_muhisse$mod$ML
 best_ctd3$mod$ML
 best_musse$mod$ML
 
+best_ctd3$mod$MLpars[[1]] %>% unique()
+
 model_table <- final_models %>%
   map(., get_loglik) %>%
   list_rbind() %>%
@@ -91,6 +93,9 @@ table <- select(model_table, model, n_params, loglik, aic, weights) %>%
 table
 
 save_as_image(table, 'plots/manuscript_plots/secsse_table.png')
+
+
+
 
 # the best model is muhisse2
 

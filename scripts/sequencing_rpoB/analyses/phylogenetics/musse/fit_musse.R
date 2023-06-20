@@ -146,3 +146,13 @@ saveRDS(fit_musse_no_se, 'data/sequencing_rpoB/processed/transition_rates/asv_mu
 saveRDS(fit_musse_no_sse, 'data/sequencing_rpoB/processed/transition_rates/asv_musse_no_sse.rds')
 saveRDS(fit_musse_no_ss, 'data/sequencing_rpoB/processed/transition_rates/asv_musse_no_ss.rds')
 saveRDS(fit_mcmc3, 'data/sequencing_rpoB/processed/transition_rates/asv_mcmc_musse_no_se.rds')
+
+d_mcmc <- readRDS('data/sequencing_rpoB/processed/transition_rates/asv_mcmc_musse_no_se.rds')
+
+
+# find 95% CIs and bind with ML estimates
+d_mcmc_summary <- d_mcmc %>%
+  group_by(parameter, param, state_1, state_2) %>%
+  tidybayes::mean_qi(transition_rate) %>%
+  left_join(., select(diversitree_df, state_1, state_2, ml_estimate = transition_rate))
+

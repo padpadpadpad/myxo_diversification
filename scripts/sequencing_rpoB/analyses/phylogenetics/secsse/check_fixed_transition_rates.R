@@ -132,3 +132,10 @@ fit_musse_no_se2$par %>% round(2)
 fit_musse_no_se3$par %>% round(2)
 
 fit_musse_no_se2$lnLik
+
+# compare values 
+d_lambda <- data.frame(original = fit_musse_no_se$par[str_detect(names(fit_musse_no_se$par), 'lambda')],
+                       new = fit_musse_no_se2$par[str_detect(names(fit_musse_no_se$par), 'lambda')])
+
+d_lambda = mutate(d_lambda, diff = abs(original - new),
+                  diff/original * 100)

@@ -254,6 +254,37 @@ d_aic <- AIC(mod_sym, mod_ard, mod_er, mod_trans, mod_custom1, mod_custom2, mod_
   arrange(-aic_weight)
 # mod custom 5 is favoured pretty highly
 
+# make this into a table
+d_table <- select(d_aic, model, df, log_lik, aic, aic_weight) %>%
+  mutate(model = case_when(model == 'mod_er' ~ 'ER',
+                           model == 'mod_ard' ~ 'ARD',
+                           model == 'mod_sym' ~ 'SYM',
+                           model == 'mod_trans' ~ 'Transient',
+                           model == 'mod_custom1' ~ 'Simplified ARD 1',
+                           model == 'mod_custom2' ~ 'Simplified ARD 2',
+                           model == 'mod_custom3' ~ 'Simplified ARD 3',
+                           model == 'mod_custom4' ~ 'Simplified ARD 4',
+                           model == 'mod_custom5' ~ 'Simplified ARD 5',
+                           model == 'mod_custom6' ~ 'Simplified ARD 6'))
+
+# make table
+table <- d_table %>%
+  mutate(across(where(is.numeric), \(x) round(x,2))) %>%
+  flextable() %>%
+  align(align = 'center', part = 'all') %>%
+  set_header_labels(model = "Model",
+                    df = 'd.f.',
+                    loglik = 'Log Likelihood',
+                    aic = 'AIC',
+                    aic_weight = "AIC weight") %>%
+  italic(j = 2, part = 'header') %>%
+  font(fontname = 'Times', part = 'all') %>%
+  fontsize(size = 16, part = 'all') %>%
+  autofit() 
+
+save_as_image(table, 'plots/manuscript_plots/markov_model_table.png')
+
+
 # save out mcmc chains
 saveRDS(mod_custom5, 'data/sequencing_rpoB/processed/transition_rates/mod_custom_5.rds')
 
