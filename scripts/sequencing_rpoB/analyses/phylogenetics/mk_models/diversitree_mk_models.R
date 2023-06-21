@@ -629,29 +629,30 @@ for(i in 1:num_boots){
   
 }
 
+# create confidence intervals for each transition
 d_boots2 <- unnest(d_boots, rates) %>%
   group_by(transition) %>%
   tidybayes::mean_qi(rate)
 
+# make dataframe of model with the whole dataset
 d_custom5 <- data.frame(mod_custom5$par) %>%
   rownames_to_column(var = 'transition') %>%
   rename(rate = 2)
 
-head(diversitree_df)
-
-# parameters with uncertainty values
+# combine with diversitree df to get proper names of states
 d_boots3 <- rename(d_boots2, param = transition) %>%
   select(-starts_with("boot")) %>%
   left_join(., select(diversitree_df, param, state_1, state_2, transition_rate)) %>%
   mutate(across(starts_with('state'), function(x) case_when(x == 'marine mud specialist' ~ 'marine specialist',
-                                              x == 'freshwater + terrestrial generalist' ~ 'freshwater + land generalist',
-                                              x == 'freshwater specialist' ~ 'freshwater specialist',
-                                              x == 'marine mud generalist' ~ 'marine generalist',
-                                              x == 'terrestrial specialist' ~ 'land specialist')),
+                                                            x == 'freshwater + terrestrial generalist' ~ 'freshwater + land generalist',
+                                                            x == 'freshwater specialist' ~ 'freshwater specialist',
+                                                            x == 'marine mud generalist' ~ 'marine generalist',
+                                                            x == 'terrestrial specialist' ~ 'land specialist')),
          transition = paste(state_1, state_2, sep = ' -> '))
 
+# make plot
 ggplot(d_boots3) +
-  geom_linerange(aes(x = forcats::fct_reorder(transition, rate), ymin = rate.lower, ymax = rate.upper)) +
+  geom_linerange(aes(x = forcats::fct_reorder(transition, rate), ymin = .lower, ymax = .upper)) +
   geom_point(aes(forcats::fct_reorder(transition, rate), transition_rate), shape = 21, size = 5, fill = 'red') +
   geom_point(aes(forcats::fct_reorder(transition, rate), rate), shape = 21, size = 3, fill = 'white') +
   theme_bw() +
@@ -659,20 +660,92 @@ ggplot(d_boots3) +
   labs(x = 'Transition',
        y = 'Transition rate')
 
-# make table of confidence intervals when sampling 80% of the tips of the tree
+# make network plot and table for source sink dynamics underneath
+d_network <- rename(d_boots2, param = transition, transition_rate = rate) %>%
+  select(-starts_with("boot")) %>%
+  left_join(., select(diversitree_df, param, state_1, state_2)) %>%
+  mutate(across(transition_rate:.upper, ~round(.x, 2)),
+         rate = paste(transition_rate, ' (', .lower, '-', .upper, ')', sep = '')) %>%
+  select(., state_1, state_2, rate, transition_rate) %>%
+  as_tbl_graph() %>%
+  activate(edges) %>%
+  activate(nodes) %>%
+  left_join(., select(d_habpref_summary, name = habitat_preference, prop, n)) %>%
+  left_join(., tibble(name = names(cols_hab))) %>%
+  mutate(order = c(2, 1, 5, 4, 3)) %>%
+  arrange(order)
 
-d_table <- select(d_boots3, transition, transition_rate, rate, rate.lower, rate.upper) %>%
-  mutate(across(where(is.numeric), ~ round(.x, 2)),
-    ci = paste('(', rate.lower, '-', rate.upper, ')')) %>%
-  select(-rate.upper, -rate.lower) %>%
-  arrange(-transition_rate)
+p <- ggraph(d_network, layout = 'linear', circular = TRUE) + 
+  geom_edge_fan(aes(alpha = transition_rate, 
+                    width = transition_rate,
+                    label = rate),
+                arrow = arrow(length = unit(4, 'mm')),
+                end_cap = circle(10, 'mm'),
+                start_cap = circle(10, 'mm'),
+                angle_calc = 'along',
+                label_dodge = unit(2.5, 'mm'),
+                label_size = MicrobioUoE::pts(8),
+                strength = 1.3) + 
+  geom_node_point(aes(col = name, size = prop)) +
+  theme_void() +
+  #geom_node_label(aes(label = label, x=xmin), repel = TRUE) +
+  scale_edge_width(range = c(0.5, 2), guide = 'none') +
+  scale_color_manual('Habitat preference', values = cols_hab, labels = c('freshwater + land generalist', 'freshwater specialist', 'marine generalist', 'marine specialist', 'land specialist')) +
+  scale_size(range = c(5,20), guide = 'none') +
+  guides(edge_alpha = 'none',
+         color = guide_legend(override.aes = list(size = 3)))
 
-flextable(d_table) %>%
+# grab data for points
+point_data <- p$data %>%
+  select(x, y, name) %>%
+  mutate(nudge_x = ifelse(x < 0, -0.2, 0.2),
+         nudge_y = ifelse(y < 0, -0.2, 0.2))
+
+p_2 <- p + 
+  #geom_label(aes(nudge_x + x, nudge_y+y, label = label_wrap2(name, 15)), point_data, size = MicrobioUoE::pts(12)) +
+  #coord_cartesian(clip = "off") +
+  xlim(c(min(point_data$x) + min(point_data$nudge_x)), max(point_data$x) + max(point_data$nudge_x)) +
+  ylim(c(min(point_data$y) + min(point_data$nudge_y)), max(point_data$y) + max(point_data$nudge_y)) +
+  theme(panel.background = element_rect(fill = 'white', colour = 'white'))
+
+# make table for source sink values
+d_source_sink_v2 <- unnest(d_boots_v2, rates) %>%
+  left_join(., select(diversitree_df, transition = param, state_1, state_2)) %>%
+  select(., boot, away = state_1, into = state_2, rate) %>%
+  pivot_longer(cols = c(away, into), names_to = 'direction', values_to = 'habitat_preference') %>%
+  mutate(habitat_preference = case_when(habitat_preference == 'marine mud specialist' ~ 'marine specialist',
+                                        habitat_preference == 'freshwater + terrestrial generalist' ~ 'freshwater + land generalist',
+                                        habitat_preference == 'freshwater specialist' ~ 'freshwater specialist',
+                                        habitat_preference == 'marine mud generalist' ~ 'marine generalist',
+                                        habitat_preference == 'terrestrial specialist' ~ 'land specialist')) %>%
+  group_by(habitat_preference, direction, boot) %>%
+  summarise(total_rate = sum(rate), .groups = 'drop') %>%
+  pivot_wider(names_from = direction, values_from = total_rate) %>%
+  mutate(source_sink1 = away / into) %>%
+  group_by(habitat_preference) %>%
+  ggdist::mean_qi()
+
+table_2 <- d_source_sink_v2 %>%
+  mutate(across(where(is.numeric), ~round(.x, 2))) %>%
+  mutate(away = paste(away, ' (', away.lower, '-', away.upper, ')', sep = ''),
+         into = paste(into, ' (', into.lower, '-', into.upper, ')', sep = ''),
+         source_sink1 = paste(source_sink1, ' (', source_sink1.lower, '-', source_sink1.upper, ')', sep = '')) %>%
+  arrange(desc(parse_number(source_sink1))) %>%
+  select(habitat_preference, away, into, source_sink1) %>%
+  flextable(.) %>%
+  set_header_labels(habitat_preference = 'habitat preference',
+                    source_sink1 = 'source sink ratio') %>%
+  align(align = 'center', part = 'all') %>%
+  align(align = 'left', part = 'body', j = 1) %>%
   bold(part = 'header') %>%
   font(fontname = 'Times', part = 'all') %>%
   fontsize(size = 12, part = 'all') %>%
   autofit()
-  
+
+p_2 + gen_grob(table_2) + plot_layout(ncol = 1, heights = c(0.8, 0.2))
+
+ggsave('plots/manuscript_plots/bootstrap_transitions.png', height = 5, width = 7)
+
 #-------------------------------------------------------------#
 # bootstrap tree to keep the same number of tips per group ####
 #-------------------------------------------------------------#
@@ -766,7 +839,7 @@ d_boots3 <- rename(d_boots2, param = transition) %>%
 
 # make plot
 ggplot(d_boots3) +
-  geom_linerange(aes(x = forcats::fct_reorder(transition, rate), ymin = rate.lower, ymax = rate.upper)) +
+  geom_linerange(aes(x = forcats::fct_reorder(transition, rate), ymin = .lower, ymax = .upper)) +
   geom_point(aes(forcats::fct_reorder(transition, rate), transition_rate), shape = 21, size = 5, fill = 'red') +
   geom_point(aes(forcats::fct_reorder(transition, rate), rate), shape = 21, size = 3, fill = 'white') +
   theme_bw() +
@@ -774,7 +847,55 @@ ggplot(d_boots3) +
   labs(x = 'Transition',
        y = 'Transition rate')
 
-# calculate source sink values
+# make network plot and table for source sink dynamics underneath
+d_network <- rename(d_boots2, param = transition, transition_rate = rate) %>%
+  select(-starts_with("boot")) %>%
+  left_join(., select(diversitree_df, param, state_1, state_2)) %>%
+  mutate(across(transition_rate:.upper, ~round(.x, 2)),
+         rate = paste(transition_rate, ' (', .lower, '-', .upper, ')', sep = '')) %>%
+  select(., state_1, state_2, rate, transition_rate) %>%
+  as_tbl_graph() %>%
+  activate(edges) %>%
+  activate(nodes) %>%
+  #left_join(., select(d_habpref_summary, name = habitat_preference, prop, n)) %>%
+  left_join(., tibble(name = names(cols_hab))) %>%
+  mutate(order = c(2, 1, 5, 4, 3)) %>%
+  arrange(order)
+
+p <- ggraph(d_network, layout = 'linear', circular = TRUE) + 
+  geom_edge_fan(aes(alpha = transition_rate, 
+                    width = transition_rate,
+                    label = rate),
+                arrow = arrow(length = unit(4, 'mm')),
+                end_cap = circle(10, 'mm'),
+                start_cap = circle(10, 'mm'),
+                angle_calc = 'along',
+                label_dodge = unit(2.5, 'mm'),
+                label_size = MicrobioUoE::pts(8),
+                strength = 1.3) + 
+  geom_node_point(aes(col = name), size = 15) +
+  theme_void() +
+  #geom_node_label(aes(label = label, x=xmin), repel = TRUE) +
+  scale_edge_width(range = c(0.5, 2), guide = 'none') +
+  scale_color_manual('Habitat preference', values = cols_hab, labels = c('freshwater + land generalist', 'freshwater specialist', 'marine generalist', 'marine specialist', 'land specialist')) +
+  guides(edge_alpha = 'none',
+         color = guide_legend(override.aes = list(size = 3)))
+
+# grab data for points
+point_data <- p$data %>%
+  select(x, y, name) %>%
+  mutate(nudge_x = ifelse(x < 0, -0.2, 0.2),
+         nudge_y = ifelse(y < 0, -0.2, 0.2))
+
+p_2 <- p + 
+  #geom_label(aes(nudge_x + x, nudge_y+y, label = label_wrap2(name, 15)), point_data, size = MicrobioUoE::pts(12)) +
+  #coord_cartesian(clip = "off") +
+  xlim(c(min(point_data$x) + min(point_data$nudge_x)), max(point_data$x) + max(point_data$nudge_x)) +
+  ylim(c(min(point_data$y) + min(point_data$nudge_y)), max(point_data$y) + max(point_data$nudge_y)) +
+  theme(panel.background = element_rect(fill = 'white', colour = 'white'))
+
+
+# make table for source sink values
 d_source_sink_v2 <- unnest(d_boots_v2, rates) %>%
   left_join(., select(diversitree_df, transition = param, state_1, state_2)) %>%
   select(., boot, away = state_1, into = state_2, rate) %>%
@@ -789,10 +910,28 @@ d_source_sink_v2 <- unnest(d_boots_v2, rates) %>%
   pivot_wider(names_from = direction, values_from = total_rate) %>%
   mutate(source_sink1 = away / into) %>%
   group_by(habitat_preference) %>%
-  ggdist::mean_qi(source_sink1)
+  ggdist::mean_qi()
 
-# make network plot and table for source sink dynamics underneath
+table_2 <- d_source_sink_v2 %>%
+  mutate(across(where(is.numeric), ~round(.x, 2))) %>%
+  mutate(away = paste(away, ' (', away.lower, '-', away.upper, ')', sep = ''),
+         into = paste(into, ' (', into.lower, '-', into.upper, ')', sep = ''),
+         source_sink1 = paste(source_sink1, ' (', source_sink1.lower, '-', source_sink1.upper, ')', sep = '')) %>%
+  arrange(desc(parse_number(source_sink1))) %>%
+  select(habitat_preference, away, into, source_sink1) %>%
+  flextable(.) %>%
+  set_header_labels(habitat_preference = 'habitat preference',
+                    source_sink1 = 'source sink ratio') %>%
+  align(align = 'center', part = 'all') %>%
+  align(align = 'left', part = 'body', j = 1) %>%
+  bold(part = 'header') %>%
+  font(fontname = 'Times', part = 'all') %>%
+  fontsize(size = 12, part = 'all') %>%
+  autofit()
 
+p_2 + gen_grob(table_2) + plot_layout(ncol = 1, heights = c(0.8, 0.2))
+
+ggsave('plots/manuscript_plots/bootstrap_transitions_v2.png', height = 5, width = 7)
 
 #-------------------------#
 # CODE NOT RAN ANYMORE ####
