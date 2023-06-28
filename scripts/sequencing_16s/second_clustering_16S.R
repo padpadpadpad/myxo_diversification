@@ -134,14 +134,15 @@ ggsave(file.path(path_fig, 'ordination_axis_split.pdf'), last_plot(), width = 12
 
 # plot PCoA
 p1 <- ggplot() +
+  geom_segment(aes(x = PCoA1.x*-1, y = PCoA2.x, yend = PCoA2.y, xend = PCoA1.y*-1, group = sample, col = group), betadisper_lines, show.legend = FALSE) +
   geom_point(aes(PCoA1*-1, PCoA2, col = group, shape = location),d_fig$eigenvector) +
-  geom_point(aes(PCoA1*-1, PCoA2, col = group), d_fig$centroids, size = 5, show.legend = FALSE) +
-  geom_segment(aes(x = PCoA1.x*-1, y = PCoA2.x, yend = PCoA2.y, xend = PCoA1.y*-1, group = sample, col = group), betadisper_lines) +
+  geom_point(aes(PCoA1*-1, PCoA2, fill = group), d_fig$centroids, size = 5, col = 'white', shape = 21, show.legend = FALSE) +
   theme_bw(base_size = 14) +
   theme(strip.background = element_blank(),
         strip.text = element_text(hjust = 0, size = 12),
         legend.position = 'right') +
   scale_color_manual('Habitat', values = setNames(cols$col, cols$group), labels = function(x) gsub("_", " ", x)) +
+  scale_fill_manual('Habitat', values = setNames(cols$col, cols$group), labels = function(x) gsub("_", " ", x)) +
   scale_shape_discrete('Location') +
   labs(y = 'Axis 2 (14.24%)',
        x = 'Axis 1 (34.69%)')
@@ -408,13 +409,14 @@ d_lines <- merge(select(d_clustering, sample, medoid_nbclust, PCoA1, PCoA2), sel
 # make the plot
 
 ggplot() +
-  geom_point(aes(PCoA1*-1, PCoA2, col = medoid_nbclust), d_clustering) +
-  geom_point(aes(PCoA1*-1, PCoA2, col = medoid_nbclust), d_centroids, size = 5, show.legend = FALSE) +
-  geom_segment(aes(x = PCoA1.x*-1, y = PCoA2.x, yend = PCoA2.y, xend = PCoA1.y*-1, group = sample, col = medoid_nbclust), d_lines) +
+  geom_segment(aes(x = PCoA1.x*-1, y = PCoA2.x, yend = PCoA2.y, xend = PCoA1.y*-1, group = sample, col = medoid_nbclust), d_lines, show.legend = FALSE) +
+  geom_point(aes(PCoA1*-1, PCoA2, fill = medoid_nbclust), shape = 21, col = 'white', d_clustering) +
+  geom_point(aes(PCoA1*-1, PCoA2, fill = medoid_nbclust), shape = 21, col = 'white', d_centroids, size = 5, show.legend = FALSE) +
   theme_bw(base_size = 14) +
   theme(strip.background = element_blank(),
         strip.text = element_text(hjust = 0, size = 12),
         legend.position = 'right') +
+  scale_fill_manual('Biome', values = c('#53C20A', '#5ECAE2', '#3911EE'), labels = c('Land', 'Freshwater', 'Marine')) +
   scale_color_manual('Habitat cluster', values = c('#53C20A', '#5ECAE2', '#3911EE'), labels = c('Land', 'Freshwater', 'Marine')) +
   labs(y = 'Axis 2 (14.24%)',
        x = 'Axis 1 (34.69%)')

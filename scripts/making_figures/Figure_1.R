@@ -11,11 +11,14 @@ p1 <- readRDS('plots/map.rds') &
 p2 <- readRDS('plots/sequencing_16s/ordination_16S_clean.rds') +
   theme(legend.position = 'bottom') +
   guides(col = 'none',
-         shape = guide_legend(title.position="top", title.hjust = 0.5)) +
+         shape = guide_legend(title.position="top", title.hjust = 0.5,
+                              override.aes = list(size = 3))) +
   ggtitle('(b)')
 p3 <- readRDS('plots/sequencing_16s/cluster_pcoa.rds') +
   theme(legend.position = 'bottom') +
-  guides(colour = guide_legend(title.position="top", title.hjust = 0.5)) +
+  guides(fill = guide_legend(title.position="top", 
+                               title.hjust = 0.5,
+                               override.aes = list(size = 3))) +
   ggtitle('(c)')
 
 # grab legend from p1
@@ -27,9 +30,9 @@ p4 <- p1 &
 
 # create patchwork layout
 layout <- '
-AAD
-BCD
+AAAAD
+BBCCE
 '
-p4 + p2 + p3 + legend + plot_layout(design = layout, heights = c(0.7, 0.3))
+p4 + p2 + p3 + legend + plot_spacer() + plot_layout(design = layout, heights = c(0.67, 0.3))
 
-ggsave('plots/manuscript_plots/Figure_1.png', last_plot(), height = 10, width = 14)
+ggsave('plots/manuscript_plots/Figure_1.png', last_plot(), height = 12, width = 13.5)
