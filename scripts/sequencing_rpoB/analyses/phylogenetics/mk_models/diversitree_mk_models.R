@@ -336,7 +336,7 @@ cols_hab <- readRDS(here('data/sequencing_rpoB/phyloseq/myxococcus/habitat_prefe
 # make very simple plot to grab legend from
 p_legend <- ggplot(d_habpref_summary, aes(habitat_preference, prop, col = habitat_preference)) +
   geom_point() +
-  scale_color_manual('Habitat preference', values = cols_hab, labels = c('freshwater + land generalist', 'freshwater specialist', 'marine generalist', 'marine specialist', 'land specialist')) +
+  scale_color_manual('Biome preference', values = cols_hab, labels = c('freshwater + land generalist', 'freshwater specialist', 'marine generalist', 'marine specialist', 'land specialist')) +
   theme_bw() +
   guides(colour = guide_legend(override.aes = list(size=5)))
 p_legend <- cowplot::get_legend(p_legend)
@@ -367,8 +367,8 @@ p <- ggraph(d_network, layout = 'linear', circular = TRUE) +
   #geom_node_label(aes(label = label, x=xmin), repel = TRUE) +
   scale_size(range = c(5,20)) +
   scale_edge_width(range = c(0.5, 2)) +
-  scale_color_manual('Habitat preference', values = cols_hab) +
-  scale_fill_manual('Habitat preference', values = cols_hab)
+  scale_color_manual('Biome preference', values = cols_hab) +
+  scale_fill_manual('Biome preference', values = cols_hab)
 
 # grab data for points
 point_data <- p$data %>%
@@ -419,8 +419,8 @@ p <- ggraph(d_network, layout = 'linear', circular = TRUE) +
   #geom_node_label(aes(label = label, x=xmin), repel = TRUE) +
   scale_size(range = c(5,20)) +
   scale_edge_width(range = c(0.5, 2)) +
-  scale_color_manual('Habitat preference', values = cols_hab) +
-  scale_fill_manual('Habitat preference', values = cols_hab)
+  scale_color_manual('Biome preference', values = cols_hab) +
+  scale_fill_manual('Biome preference', values = cols_hab)
 
 # grab data for points
 point_data <- p$data %>%
@@ -466,8 +466,8 @@ p <- ggraph(d_network, layout = 'linear', circular = TRUE) +
   #geom_node_label(aes(label = label, x=xmin), repel = TRUE) +
   scale_size(range = c(5,20)) +
   scale_edge_width(range = c(0.5, 2)) +
-  scale_color_manual('Habitat preference', values = cols_hab) +
-  scale_fill_manual('Habitat preference', values = cols_hab)
+  scale_color_manual('Biome preference', values = cols_hab) +
+  scale_fill_manual('Biome preference', values = cols_hab)
 
 # grab data for points
 point_data <- p$data %>%
@@ -513,8 +513,8 @@ p <- ggraph(d_network, layout = 'linear', circular = TRUE) +
   #geom_node_label(aes(label = label, x=xmin), repel = TRUE) +
   scale_size(range = c(5,20)) +
   scale_edge_width(range = c(0.5, 2)) +
-  scale_color_manual('Habitat preference', values = cols_hab) +
-  scale_fill_manual('Habitat preference', values = cols_hab)
+  scale_color_manual('Biome preference', values = cols_hab) +
+  scale_fill_manual('Biome preference', values = cols_hab)
 
 # grab data for points
 point_data <- p$data %>%
@@ -529,7 +529,7 @@ p_4 <- p +
   ylim(c(min(point_data$y) + min(point_data$nudge_y)), max(point_data$y) + max(point_data$nudge_y)) +
   theme(legend.position = 'none',
         panel.background = element_rect(fill = 'white', colour = 'white')) +
-  labs(title = '(d) Transient model',
+  labs(title = '(d) Stepwise model',
        subtitle = 'AIC model weight = 0.14')
 
 # make layout
@@ -566,7 +566,7 @@ table_rate <- select(d_source_sink_rate, habitat_preference, away, into, source_
          habitat_preference = gsub('_', ' ', habitat_preference)) %>%
   arrange(desc(source_sink1)) %>%
   flextable(.) %>%
-  set_header_labels(habitat_preference = 'habitat preference',
+  set_header_labels(habitat_preference = 'biome preference',
                     source_sink1 = 'source sink ratio') %>%
   align(align = 'center', part = 'all') %>%
   align(align = 'left', part = 'body', j = 1) %>%
@@ -690,7 +690,7 @@ p <- ggraph(d_network, layout = 'linear', circular = TRUE) +
   theme_void() +
   #geom_node_label(aes(label = label, x=xmin), repel = TRUE) +
   scale_edge_width(range = c(0.5, 2), guide = 'none') +
-  scale_color_manual('Habitat preference', values = cols_hab, labels = c('freshwater + land generalist', 'freshwater specialist', 'marine generalist', 'marine specialist', 'land specialist')) +
+  scale_color_manual('Biome preference', values = cols_hab, labels = c('freshwater + land generalist', 'freshwater specialist', 'marine generalist', 'marine specialist', 'land specialist')) +
   scale_size(range = c(5,20), guide = 'none') +
   guides(edge_alpha = 'none',
          color = guide_legend(override.aes = list(size = 3)))
@@ -733,7 +733,7 @@ table_2 <- d_source_sink_v2 %>%
   arrange(desc(parse_number(source_sink1))) %>%
   select(habitat_preference, away, into, source_sink1) %>%
   flextable(.) %>%
-  set_header_labels(habitat_preference = 'habitat preference',
+  set_header_labels(habitat_preference = 'biome preference',
                     source_sink1 = 'source sink ratio') %>%
   align(align = 'center', part = 'all') %>%
   align(align = 'left', part = 'body', j = 1) %>%
@@ -877,7 +877,7 @@ p <- ggraph(d_network, layout = 'linear', circular = TRUE) +
   theme_void() +
   #geom_node_label(aes(label = label, x=xmin), repel = TRUE) +
   scale_edge_width(range = c(0.5, 2), guide = 'none') +
-  scale_color_manual('Habitat preference', values = cols_hab, labels = c('freshwater + land generalist', 'freshwater specialist', 'marine generalist', 'marine specialist', 'land specialist')) +
+  scale_color_manual('Biome preference', values = cols_hab, labels = c('freshwater + land generalist', 'freshwater specialist', 'marine generalist', 'marine specialist', 'land specialist')) +
   guides(edge_alpha = 'none',
          color = guide_legend(override.aes = list(size = 3)))
 
@@ -920,7 +920,7 @@ table_2 <- d_source_sink_v2 %>%
   arrange(desc(parse_number(source_sink1))) %>%
   select(habitat_preference, away, into, source_sink1) %>%
   flextable(.) %>%
-  set_header_labels(habitat_preference = 'habitat preference',
+  set_header_labels(habitat_preference = 'biome preference',
                     source_sink1 = 'source sink ratio') %>%
   align(align = 'center', part = 'all') %>%
   align(align = 'left', part = 'body', j = 1) %>%
@@ -1140,7 +1140,7 @@ table_count <- select(d_source_sink_count, habitat_preference, away, into, sourc
          habitat_preference = gsub('_', ' ', habitat_preference)) %>%
   arrange(desc(source_sink1)) %>%
   flextable(.) %>%
-  set_header_labels(habitat_preference = 'habitat preference',
+  set_header_labels(habitat_preference = 'biome preference',
                     source_sink1 = 'source sink ratio') %>%
   align(align = 'center', part = 'all') %>%
   align(align = 'left', part = 'body', j = 1) %>%

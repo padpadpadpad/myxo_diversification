@@ -329,12 +329,11 @@ d_meta2 <- dplyr::select(d_meta2, family2 = family, mrca) %>%
 cols <- c(colorRampPalette(brewer.pal(11, "Spectral"))(nrow(d_meta2)))
 names(cols) <- sort(d_meta2$family2)
 
-
 # remove any tip labels not in our tree from d_meta
 d_meta <- filter(d_meta, tip_label %in% tree_bamm$tip.label)
 
 # make a separate column for the rare states to make their size bigger!
-d_meta <- mutate(d_meta, rare = ifelse(habitat_preference %in% c('generalist', 'marine_mud:terrestrial'), 'rare', 'common'))
+d_meta <- mutate(d_meta, rare = ifelse(habitat_preference %in% c('marine mud generalist'), 'rare', 'common'))
 
 # plot tree using ggtree
 # first colour branches and add rate shifts
@@ -347,13 +346,13 @@ scale_color_gradientn('Net diversification\n(branch colours)', colors = met.brew
 p2 <- p1 %<+% d_meta +
   new_scale_color() +
   geom_tippoint(aes(x=x+5, col = habitat_preference, size = rare), position = position_jitter(width = 3, height = 0)) +
-  scale_color_manual('Habitat preference\n(tip points)', values = cols_hab, labels = c('freshwater + land generalist', 'freshwater specialist', 'marine generalist', 'marine specialist', 'land specialist')) +
-  scale_size_manual(values = c(0.6, 2)) +
+  scale_color_manual('Biome preference\n(tip points)', values = cols_hab, labels = c('freshwater + land generalist', 'freshwater specialist', 'marine generalist', 'marine specialist', 'land specialist')) +
+  scale_size_manual(values = c(0.6, 3)) +
   guides(color = guide_legend(override.aes = list(size = 5)),
          size = 'none')
 
 tree_plot <- p2 +
-  new_scale_colour() +
+  new_scale_color() +
   geom_cladelab(data = d_meta2,
                 mapping = aes(node = mrca,
                               color = family2,
@@ -523,8 +522,6 @@ p1 + p2 + p3
 # save plot out
 ggsave(here('plots/sequencing_rpoB/analyses/bamm_tip_rates.png'), last_plot(), height = 5, width = 17)
 
-
-
 p_tiprates <- mutate(tip_rates, hab_pref_axis = case_when(hab_pref_axis == 'marine mud generalist' ~ 'marine generalist',
                                                           hab_pref_axis == 'freshwater + terrestrial generalist' ~ 'freshwater + land generalist',
                                                           hab_pref_axis == 'marine mud specialist' ~ 'marine specialist',
@@ -535,10 +532,10 @@ p_tiprates <- mutate(tip_rates, hab_pref_axis = case_when(hab_pref_axis == 'mari
   geom_point(shape = 21, fill = 'white', position = position_jitter(width = 0.2), size = 0.8, stroke = 0.6) +
   theme_bw(base_size = 10) +
   scale_x_discrete(labels = scales::label_wrap(13)) +
-  labs(x = 'Habitat preference',
+  labs(x = 'Biome preference',
        y = 'Net diversification rate') +
-  scale_color_manual('Habitat preference', values = cols_hab, labels = c('freshwater + land generalist', 'freshwater specialist', 'marine generalist', 'marine specialist', 'land specialist')) +
-  scale_fill_manual('Habitat preference', values = cols_hab, labels = c('freshwater + land generalist', 'freshwater specialist', 'marine generalist', 'marine specialist', 'land specialist')) +
+  scale_color_manual('Biome preference', values = cols_hab, labels = c('freshwater + land generalist', 'freshwater specialist', 'marine generalist', 'marine specialist', 'land specialist')) +
+  scale_fill_manual('Biome preference', values = cols_hab, labels = c('freshwater + land generalist', 'freshwater specialist', 'marine generalist', 'marine specialist', 'land specialist')) +
   ylim(c(0, 10))
 
 ```
@@ -563,7 +560,8 @@ tree_plot2 <- image_read(here('plots/sequencing_rpoB/analyses/bamm_tree.png'), d
 tree_plot2 <- image_trim(tree_plot2)
 
 # make plot
-image_ggplot(tree_plot2) + legend + plot_rateshifts + p_rtt + p_tiprates + plot_layout(design = layout, heights = c(0.8, 0.2))
+image_ggplot(tree_plot2) + legend + p_rtt + plot_rateshifts + p_tiprates + plot_layout(design = layout, heights = c(0.8, 0.2)) + plot_annotation(tag_levels = list(c('(a)', '', '(b)', '(c)', '(d)'))) &
+  theme(plot.tag = element_text(size = 14))
 
 ggsave(here('plots/manuscript_plots/Figure_3.png'), last_plot(), width = 12, height = 12)
 

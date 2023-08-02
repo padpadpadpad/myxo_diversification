@@ -344,7 +344,7 @@ black_dot <- "\U2B24"
 
 table <- flextable(d_table) %>%
   set_header_labels(first_col = '',
-                    habitat_preference2 = 'Habitat preference',
+                    habitat_preference2 = 'Biome preference',
                     habitat_preference = 'Original preference',
                     n = 'Number of ASVs') %>%
   font(fontname = 'Times', part = 'all') %>%
@@ -404,7 +404,7 @@ tree_plot3 <- tree_plot %<+% d_meta_new +
         axis.ticks = element_blank()) +
   new_scale_color() +
   geom_tippoint(aes(x=x+5, col = habitat_preference3, size = rare2), position = position_jitter(width = 3, height = 0)) +
-  scale_color_manual('Habitat preference (tip points)', values = cols_hab2, labels = c('freshwater + land generalist', 'freshwater specialist', 'marine generalist', 'marine specialist', 'land specialist')) +
+  scale_color_manual('Biome preference (tip points)', values = cols_hab2, labels = c('freshwater + land generalist', 'freshwater specialist', 'marine generalist', 'marine specialist', 'land specialist')) +
   scale_size_manual(values = c(0.6, 3)) +
   guides(color = guide_legend(override.aes = list(size = 5)),
          size = 'none')
@@ -419,10 +419,9 @@ d_ltt <-  ape::ltt.plot.coords(tree) %>%
 # create lineage through time plot
 p2 <- ggplot(d_ltt, aes(time2, N)) +
   geom_line() +
-  theme_bw(base_size = 14) +
+  theme_bw(base_size = 12) +
   labs(x = 'Relative time',
-       y = 'Number of lineages') +
-  theme(plot.margin = unit(c(0,0,0,0), 'mm'))
+       y = 'Number of lineages')
 
 # make constraint tree
 backbone <- read.tree(here('data/sequencing_rpoB/raxml/backbone.tre'))
@@ -449,7 +448,14 @@ layout <- c(
    DDDDEEEE'
 )
 
-image_ggplot(tree_plot3) + legend + backbone_tree + p2 + table + plot_layout(design = layout, heights = c(0.6, 0.25, 0.15), tag_level = 'new')
+image_ggplot(tree_plot3) + 
+  legend + 
+  backbone_tree + 
+  p2 + 
+  table + 
+  plot_layout(design = layout, heights = c(0.6, 0.25, 0.15)) +
+  plot_annotation(tag_levels = list(c('(a)', '','', '(b)', '(c)'))) &
+  theme(plot.tag = element_text(size = 14))
 
 # save out
 ggsave(here('plots/manuscript_plots/Figure_2.png'), last_plot(), height = 12, width = 13)
