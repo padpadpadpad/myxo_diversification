@@ -6,6 +6,7 @@
 library(tidyverse)
 library(ggmap)
 library(patchwork)
+library(flextable)
 
 # load in data
 d_locations <- readxl::read_excel('data/Supplemetal Table 1 - Sampling.xlsx') %>%
@@ -33,6 +34,45 @@ d <- left_join(d_meta, d_locations)
 # 73 - rock samphire - Helford
 # 13 - river - Helford
 # 48 - wheat field - Camel - does not look like its in the right place
+
+# make Table S1
+d_table <- separate(d, coordinates, c('lat', 'lon'), sep = ',') %>%
+  mutate(across(c(lat, lon), as.numeric),
+         predefined_habitat = case_when(habitat_group_16s == 'woodland_oak' ~ 'soil underneath oak',
+                                        habitat_group_16s == 'woodland_pine' ~ 'soil underneath monterey pine',
+                                        habitat_group_16s == 'field_wheat' ~ 'wheat field soil',
+                                        habitat_group_16s == 'river' ~ 'riverbed sediment',
+                                        habitat_group_16s == 'reservoir' ~ 'reservoir/lake sediment',
+                                        habitat_group_16s == 'pasture' ~ 'pasture soil',
+                                        habitat_group_16s == 'marine mud_full saline' ~ 'marine sediment',
+                                        habitat_group_16s == 'beach_seaweed' ~ 'beachcast seaweed',
+                                        habitat_group_16s == 'rock_samphire' ~ 'soil under coastal plants',
+                                        habitat_group_16s == 'woodland_oak' ~ 'low subtidal sand',
+                                        habitat_group_16s == 'estuarine mud_full saline' ~ 'estuarine sediment (close to full salinity)',
+                                        habitat_group_16s == 'estuarine mud_low polyhaline' ~ 'estuarine sediment (polyhaline/mesohaline)',
+                                        habitat_group_16s == 'estuarine mud_oligohaline' ~ 'estuarine sediment (oligohaline)',
+                                        habitat_group_16s == 'beach_subtidal' ~ 'low subtidal beach sand',
+                                        habitat_group_16s == 'beach_supratidal' ~ 'high supratidal beach sand',
+                                        habitat_group_16s == 'thrift_rhizosphere' ~ 'thrift rhizosphere'),
+         sequenced_16s = 'yes',
+         sequenced_rpob = ifelse(habitat_group_16s %in% c('beach_supratidal', 'thrift_rhizosphere', 'estuarine mud_low polyhaline'), 'no', 'yes'))
+
+table_1 <- select(d_table, id, site, location, lat, lon, predefined_habitat, sequenced_16s, sequenced_rpob) %>%
+  arrange(predefined_habitat, site) %>%
+  flextable() %>%
+  align(align = 'center', part = 'all') %>%
+  set_header_labels(id = "sample number",
+                    lat = 'latitude',
+                    lon = 'longitude',
+                    predefined_habitat = 'predefined habitat',
+                    sequenced_16s = "16s sequencing",
+                    sequenced_rpob = 'rpoB sequencing') %>%
+  hline(i = c(4, 9, 15, 20, 22, 27, 31, 37, 42, 48, 53, 58, 64, 67), border = fp_border_default()) %>%
+  font(fontname = 'Times', part = 'all') %>%
+  fontsize(size = 10, part = 'all') %>%
+  autofit() 
+
+save_as_image(table_1, 'plots/manuscript_plots/table_s1.png')
 
 # remove sites that are currently not present
 d <- filter(d, !is.na(coordinates))
@@ -62,6 +102,8 @@ cols <- tibble(group = c("woodland_oak", "estuarine mud_low polyhaline", "woodla
                hab_order = c(1.1, 2.1, 1.2, 3.1, 3.2, 2.2, 2.3, 2.4, 1.3, 2.5, 2.6, 2.7, 1.4, 1.5, 2.8))
 cols <- filter(cols, group %in% d$habitat_group_16s)
 cols <- mutate(cols, habitat_group_16s = group) %>% arrange(hab_order)
+cols <- left_join(cols, select(d_table, group = habitat_group_16s, predefined_habitat) %>% distinct()) %>%
+  arrange(habitat_group_16s)
 
 # change colours names
 cols <- mutate(cols, group2 = gsub('_', ' ', group))
@@ -75,7 +117,7 @@ map1_base <- get_stamenmap(box, zoom = 11, maptype = "terrain") %>%
   labs(x = 'Longitude',
        y = 'Latitude',
        title = '(a)') +
-  scale_color_manual('Habitat', values = setNames(cols$col, cols$habitat_group_16s), labels = sort(cols$group2))
+  scale_color_manual('Predefined habitat', values = setNames(cols$col, cols$habitat_group_16s), labels = cols$predefined_habitat)
 
 map1 <- map1_base +
   ggforce::theme_no_axes() +
@@ -83,9 +125,6 @@ map1 <- map1_base +
   NULL
 
 map1
-
-legend <- cowplot::get_legend(map1)
-saveRDS(legend, file.path('plots', 'map_legend.rds'))
 
 map1 + 
   guides(colour = 'none')
@@ -109,7 +148,7 @@ map2 <- get_stamenmap(box2, zoom = 7, maptype = "terrain") %>%
   ggforce::theme_no_axes() +
   theme(plot.margin = unit(c(0,0,-1,-1), 'mm'))
   
-map3 <- map1 + inset_element(map2, 0.01, 0.6, 0.2, 0.95)
+map3 <- map1 + inset_element(map2, 0.05, 0.6, 0.25, 0.93, ignore_tag = TRUE)
 
 # save this plot 
 saveRDS(map3, file.path('plots', 'map.rds'))
@@ -139,7 +178,7 @@ map2 <- map2_base +
   geom_point(aes(lon, lat, fill = habitat_group), col = 'black', shape = 21, d_camel, size = 6, show.legend = FALSE) +
   ggforce::theme_no_axes() +
   annotate(y = box[2], x = box[3], label = 'Map made using ggmap, map tiles by Stamen Design, under CC BY 3.0', geom = 'label', size = MicrobioUoE::pts(8), vjust = -0.03, hjust = 1) +
-  scale_fill_manual(values = setNames(cols$col, cols$habitat_group)) +
+  scale_fill_manual('Predefined habitat', values = setNames(cols$col, cols$habitat_group)) +
   NULL
 
 map2

@@ -30,9 +30,9 @@ p4 <- p1 &
 
 # create patchwork layout
 layout <- '
-AAAAD
-BBCCE
+AAD
+BCE
 '
-p4 + p2 + p3 + legend + plot_spacer() + plot_layout(design = layout, heights = c(0.67, 0.3))
+p4 + p2 + p3 + legend + plot_spacer() + plot_layout(design = layout, heights = c(0.7, 0.3), widths = c(0.36,0.36, 0.28))
 
-ggsave('plots/manuscript_plots/Figure_1.png', last_plot(), height = 12, width = 13.5)
+ggsave('plots/manuscript_plots/Figure_1.png', last_plot(), height = 12, width = 15)
