@@ -709,7 +709,7 @@ p_2 <- p +
   theme(panel.background = element_rect(fill = 'white', colour = 'white'))
 
 # make table for source sink values
-d_source_sink_v2 <- unnest(d_boots_v2, rates) %>%
+d_source_sink_v2 <- unnest(d_boots, rates) %>%
   left_join(., select(diversitree_df, transition = param, state_1, state_2)) %>%
   select(., boot, away = state_1, into = state_2, rate) %>%
   pivot_longer(cols = c(away, into), names_to = 'direction', values_to = 'habitat_preference') %>%

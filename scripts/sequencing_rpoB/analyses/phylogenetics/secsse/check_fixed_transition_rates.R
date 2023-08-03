@@ -139,3 +139,9 @@ d_lambda <- data.frame(original = fit_musse_no_se$par[str_detect(names(fit_musse
 
 d_lambda = mutate(d_lambda, diff = abs(original - new),
                   diff/original * 100)
+
+cor(d_lambda$original, d_lambda$new)
+
+d_q <- data.frame(markov = fit_mk$par[str_detect(names(fit_mk$par), 'q')],
+                  musse = fit_musse_no_se$par[str_detect(names(fit_musse_no_se$par), 'q')])
+cor(d_q$markov, d_q$musse)

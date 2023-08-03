@@ -77,7 +77,7 @@ coding <- tibble(hab_pref = unname(hab_pref), hab_pref_num = unname(hab_pref_num
 coding
 
 # read in musse model
-fit_musse_no_se <- readRDS('data/sequencing_rpoB/processed/transition_rates/asv_musse_no_se.rds')
+#fit_musse_no_se <- readRDS('data/sequencing_rpoB/processed/transition_rates/asv_musse_no_se.rds')
 
 # try and run SecSSE which runs concealed state and speciation models
 # https://cran.r-project.org/web/packages/secsse/vignettes/Using_secsse.html
@@ -306,7 +306,7 @@ fit_secsse <- function(list_inits_sampfrac){
     maxiter = max_iter,
     optimmethod = "simplex",
     num_cycles = 20,
-    num_threads = 4,
+    num_threads = 1,
     method = 'odeint::runge_kutta_cash_karp54'
  )
   
@@ -328,15 +328,15 @@ fit_secsse <- function(list_inits_sampfrac){
 }
 
 # just run the first 6
-all_combs <- all_combs[1:6]
+all_combs <- all_combs[7:18]
 
-all_combs <- all_combs[c(2,3,5,6)]
+# test on a single start value
+temp_samp_frac <- all_combs[[1]]$sampled_fractions
+temp_inits <- all_combs[[1]]$inits
 
 # Set a "plan" for how the code should run.
-plan(multisession, workers = 4)
+plan(multisession, workers = 12)
 
 # run future_walk
 furrr::future_walk(all_combs, fit_secsse)
 
-temp_samp_frac <- all_combs[[1]]$sampled_fractions
-temp_inits <- all_combs[[1]]$inits
