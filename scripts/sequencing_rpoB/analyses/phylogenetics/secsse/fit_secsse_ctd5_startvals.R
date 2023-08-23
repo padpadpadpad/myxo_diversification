@@ -14,6 +14,10 @@ tidyverse_conflicts()
 # filename
 name <- 'muctd5'
 
+# all or just hidden transitions
+# can be "hidden" or "all"
+transitions <- 'all'
+
 # server - yes or no
 server <- FALSE
 
@@ -262,7 +266,9 @@ get_inits_matrix <- function(inits, idparsopt, idparsfix, parsfix){
 # name the start values
 inits_lambda <- rep(init_lambda, times = max(idparslist$lambdas))
 inits_mu <- rep(init_mu, times = length(unique(idparslist$mus)))
-inits_transition <- init_transition[init_transition$hidden == 'hidden',]$rate
+
+if(transitions == 'all'){inits_transition <- init_transition$rate}
+if(transitions == 'hidden'){inits_transition <- init_transition[init_transition$hidden == 'hidden',]$rate}
 
 # create multiplication factors for the initial values
 
@@ -309,7 +315,8 @@ for(i in 1:nrow(inits_ml)){
 }
 
 # save this out
-saveRDS(inits_ml, paste('data/sequencing_rpoB/processed/secsse/init_vals_ml/', name, '.rds', sep = ''))
+if(transitions == 'all'){saveRDS(inits_ml, paste('data/sequencing_rpoB/processed/secsse/init_vals_ml/', name, 'alltransitions.rds', sep = ''))}
+if(transitions == 'hidden'){saveRDS(inits_ml, paste('data/sequencing_rpoB/processed/secsse/init_vals_ml/', name, '.rds', sep = ''))}
 
 ggplot(inits_ml, aes(loglik)) +
   geom_histogram()
