@@ -4,7 +4,7 @@
 
 # make sure curl is installed
 library(curl)
-librarian::shelf(diversitree, rsetienne/secsse, DDD, apTreeshape, doParallel, foreach, doMC, tidyverse, here, furrr)
+librarian::shelf(diversitree, secsse, DDD, apTreeshape, doParallel, foreach, doMC, tidyverse, here, furrr)
 
 # identify conflicts in the tidyverse packages and other packages
 tidyverse_conflicts()
@@ -12,7 +12,7 @@ tidyverse_conflicts()
 # load in data ####
 
 # filename
-name <- 'muhissefull'
+name <- 'muctd4'
 
 # server - yes or no
 server <- TRUE
@@ -38,7 +38,6 @@ if(server == FALSE){
   # read in start value dataframe
   start_vals <- readRDS(paste('data/sequencing_rpoB/processed/secsse/init_vals_ml/', name, '.rds', sep = ''))
 }
-
 
 d_taxa <- d_taxa %>%
   phyloseq::tax_table() %>%
@@ -78,7 +77,6 @@ coding <- tibble(hab_pref = unname(hab_pref), hab_pref_num = unname(hab_pref_num
 
 coding
 
-
 # read in musse model
 fit_musse_no_se <- readRDS('data/sequencing_rpoB/processed/transition_rates/asv_musse_no_se.rds')
 
@@ -92,7 +90,7 @@ traits <- sortingtraits(trait, tree)
 # setup arguments to pass to secsse_ml
 
 # set number of concealed states
-num_concealed_states <- 2
+num_concealed_states <- 4
 
 # setup parameter list
 idparslist <- id_paramPos(traits, num_concealed_states = num_concealed_states)
@@ -101,11 +99,11 @@ idparslist
 
 # setup speciation rates ####
 # first make all speciation rates the same within hidden states
-idparslist$lambdas[] <- 1:10
+idparslist$lambdas[] <- rep(1:4, each = 5)
 
 # setup extinction rates ####
 # firstly make all extinction rates the same
-idparslist$mus[] <- 11
+idparslist$mus[] <- 5
 
 # setup transition rates ####
 
@@ -140,7 +138,6 @@ q_matrix <- mutate(q_matrix,
 q_matrix <- mutate(q_matrix,
                    new_id = ifelse(from_hidden != to_hidden & from_trait != to_trait, 0, new_id))
 
-
 # work out which parameters need to be the same
 # when the hidden transition is the same, give them the same value
 hidden_to_assign <- select(q_matrix, from_hidden, to_hidden) %>%
@@ -149,7 +146,7 @@ hidden_to_assign <- select(q_matrix, from_hidden, to_hidden) %>%
 
 # give all trait transitions different values 1A -> 2A != 1B -> 2B
 # do this by adding from_hidden to the select argument
-trait_to_assign <- select(q_matrix, from_trait, to_trait, from_hidden) %>%
+trait_to_assign <- select(q_matrix, from_trait, to_trait) %>%
   distinct() %>%
   mutate(trait_id = 1:n())
 
@@ -176,7 +173,7 @@ q_matrix <- mutate(q_matrix, new_id_final = case_when(new_id2 > 0 ~ as.character
                                                         TRUE ~ '0'),
                     new_id_final = as.numeric(as.factor(new_id_final)),
                     new_id_final = ifelse(new_id_final == 1, 0, new_id_final),
-                    new_id_final = new_id_final*100)
+                    new_id_final = -new_id_final)
 
 # run a for loop to replace each number in the initial q matrix
 q <- idparslist[[3]]
@@ -186,6 +183,15 @@ for(i in min(q,na.rm = TRUE):max(q, na.rm = TRUE)){
 }
 
 q
+
+#q[!is.na(q) & q %in% c(-14, -15, -16, -17, -18, -19, -20, -21, -22, -23, -24)] <- -13
+#q[!is.na(q) & q == -16] <- -13
+#q[!is.na(q) & q == -19] <- -14
+#q[!is.na(q) & q == -22] <- -15
+#q[!is.na(q) & q == -20] <- -17
+#q[!is.na(q) & q == -24] <- -21
+#q[!is.na(q) & q == -23] <- -18
+
 
 idparslist$Q <- q
 
@@ -227,25 +233,30 @@ init_transition <- data.frame(idparslist$Q) %>%
   select(id, transition) %>%
   distinct() %>%
   left_join(., data.frame(transition = names(mk_transitions), rate = unname(mk_transitions))) %>%
-  mutate(rate = replace_na(rate, mean(rate, na.rm = TRUE))) %>%
-  select(id, rate) %>%
-  distinct() %>%
-  pull(rate)
+  mutate(hidden = ifelse(is.na(rate), 'hidden', 'actual'),
+         rate = replace_na(rate, mean(rate, na.rm = TRUE))) %>%
+  select(id, rate, hidden) %>%
+  distinct()
 
-initparsopt <- c(rep(init_lambda, times = 10),
-                 rep(init_mu, times = 1),
-                 init_transition)
+initparsopt <- c(rep(init_lambda, times = max(idparslist$lambdas)),
+                 rep(init_mu, times = 1))
 
 # check number of estimated parameters is the same as number of initial values
 idparsopt <- c(1:max(idparslist$Q, na.rm=TRUE))
 
-length(initparsopt) == length(idparsopt)
-
 idparslist
 
 # set the ID and values for the fixed parameters
-idparsfix <- 0 # zeroes have the value of zero
-parsfix <- 0
+# fix the values of the transition rates we estimated from the Mk model
+idparsfix <- c(0, init_transition[init_transition$hidden =='actual',]$id) # zeroes have the value of zero
+parsfix <- c(0, init_transition[init_transition$hidden =='actual',]$rate)
+
+# remove any parameters from the idparsopt (to estimate) that are present in idparsfix (parameters with fixed values)
+idparsopt <- idparsopt[!idparsopt %in% idparsfix]
+
+length(initparsopt) == length(idparsopt)
+
+idparslist
 
 # set number of iterations
 max_iter <- 1000 * round((1.25)^length(idparsopt))
@@ -284,6 +295,9 @@ fit_secsse <- function(list_inits_sampfrac){
   # pick out inits
   temp_inits <- list_inits_sampfrac$inits
   
+  temp_inits[num_concealed_states + 1] <- 1e-15
+  temp_inits <- temp_inits[1:length(idparsopt)] 
+  
   # pick out sampled_fractions
   temp_samp_frac <- list_inits_sampfrac$sampled_fractions
   
@@ -305,7 +319,9 @@ fit_secsse <- function(list_inits_sampfrac){
     maxiter = max_iter,
     optimmethod = "simplex",
     num_cycles = 20,
-    num_threads = 2
+    num_threads = 2,
+    method = 'odeint::runge_kutta_cash_karp54',
+    loglik_penalty = 0.05
   )
   
   # create a list of the output
@@ -321,17 +337,13 @@ fit_secsse <- function(list_inits_sampfrac){
   # save out the list
   temp_name <- paste(name, '_', 'sampfrac', unique(temp_samp_frac), '_', 'run', list_inits_sampfrac$run,  sep = '')
   
-  saveRDS(output, paste('~/secsse/seccse_', temp_name, '.rds', sep =''))
+  saveRDS(output, paste('~/secsse/seccse_', temp_name, '_v2.rds', sep =''))
   
 }
 
-detectCores()
-
-# just run the first 6
-all_combs <- all_combs[1:6]
 
 # Set a "plan" for how the code should run.
-plan(multisession, workers = 6)
+plan(multisession, workers = 2)
 
 # run future_walk
 furrr::future_walk(all_combs, fit_secsse)

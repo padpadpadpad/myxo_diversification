@@ -15,7 +15,7 @@ tidyverse_conflicts()
 name <- 'muhissefull'
 
 # server - yes or no
-server <- FALSE
+server <- TRUE
 
 if(server == TRUE){
   d_habpref <- read.csv('~/secsse/habitat_preference_asv_new.csv')
@@ -304,7 +304,7 @@ fit_secsse <- function(list_inits_sampfrac){
     sampling_fraction = temp_samp_frac,
     maxiter = max_iter,
     optimmethod = "simplex",
-    num_cycles = 15,
+    num_cycles = 20,
     num_threads = 2
   )
   

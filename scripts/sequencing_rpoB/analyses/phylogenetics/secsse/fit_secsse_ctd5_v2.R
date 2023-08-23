@@ -3,7 +3,8 @@
 # load in packages ####
 
 # make sure curl is installed
-librarian::shelf(curl, diversitree, secsse, DDD, apTreeshape, doParallel, foreach, doMC, tidyverse, here, furrr)
+library(curl)
+librarian::shelf(diversitree, secsse, DDD, apTreeshape, doParallel, foreach, doMC, tidyverse, here, furrr)
 
 # identify conflicts in the tidyverse packages and other packages
 tidyverse_conflicts()
@@ -11,10 +12,10 @@ tidyverse_conflicts()
 # load in data ####
 
 # filename
-name <- 'muctd3'
+name <- 'muctd5'
 
 # server - yes or no
-server <- FALSE
+server <- TRUE
 
 if(server == TRUE){
   d_habpref <- read.csv('~/secsse/habitat_preference_asv_new.csv')
@@ -77,7 +78,7 @@ coding <- tibble(hab_pref = unname(hab_pref), hab_pref_num = unname(hab_pref_num
 coding
 
 # read in musse model
-#fit_musse_no_se <- readRDS('data/sequencing_rpoB/processed/transition_rates/asv_musse_no_se.rds')
+fit_musse_no_se <- readRDS('data/sequencing_rpoB/processed/transition_rates/asv_musse_no_se.rds')
 
 # try and run SecSSE which runs concealed state and speciation models
 # https://cran.r-project.org/web/packages/secsse/vignettes/Using_secsse.html
@@ -89,7 +90,7 @@ traits <- sortingtraits(trait, tree)
 # setup arguments to pass to secsse_ml
 
 # set number of concealed states
-num_concealed_states <- 3
+num_concealed_states <- 5
 
 # setup parameter list
 idparslist <- id_paramPos(traits, num_concealed_states = num_concealed_states)
@@ -98,11 +99,11 @@ idparslist
 
 # setup speciation rates ####
 # first make all speciation rates the same within hidden states
-idparslist$lambdas[] <- rep(1:3, each = 5)
+idparslist$lambdas[] <- rep(1:5, each = 5)
 
 # setup extinction rates ####
 # firstly make all extinction rates the same
-idparslist$mus[] <- 4
+idparslist$mus[] <- 6
 
 # setup transition rates ####
 
@@ -182,6 +183,8 @@ for(i in min(q,na.rm = TRUE):max(q, na.rm = TRUE)){
 }
 
 q
+
+#q[!is.na(q) & q %in% c(-14, -15, -16, -17, -18, -19, -20, -21, -22, -23, -24, -25, -26, -27, -28, -29, -30, -31, -32)] <- -13
 
 idparslist$Q <- q
 
@@ -285,6 +288,8 @@ fit_secsse <- function(list_inits_sampfrac){
   # pick out inits
   temp_inits <- list_inits_sampfrac$inits
   
+  #temp_inits <- temp_inits[1:7]
+  
   # pick out sampled_fractions
   temp_samp_frac <- list_inits_sampfrac$sampled_fractions
   
@@ -305,10 +310,11 @@ fit_secsse <- function(list_inits_sampfrac){
     sampling_fraction = temp_samp_frac,
     maxiter = max_iter,
     optimmethod = "simplex",
-    #method = 'odeint::runge_kutta_cash_karp54',
     num_cycles = 20,
-    num_threads = 1
- )
+    num_threads = 1,
+    method = 'odeint::runge_kutta_cash_karp54',
+    loglik_penalty = 0.05
+  )
   
   # create a list of the output
   output <- list(n_params = length(idparsopt),
@@ -323,23 +329,12 @@ fit_secsse <- function(list_inits_sampfrac){
   # save out the list
   temp_name <- paste(name, '_', 'sampfrac', unique(temp_samp_frac), '_', 'run', list_inits_sampfrac$run,  sep = '')
   
-  saveRDS(output, paste('~/secsse/seccse_', temp_name, '.rds', sep =''))
+  saveRDS(output, paste('~/secsse/seccse_', temp_name, '_v2.rds', sep =''))
   
 }
 
-# just run the first 6
-all_combs <- all_combs[7:18]
-
-# test on a single start value
-temp_samp_frac <- all_combs[[1]]$sampled_fractions
-temp_inits <- all_combs[[1]]$inits
-temp_inits[4] <- 1e-15
-
-
-
 # Set a "plan" for how the code should run.
-plan(multisession, workers = 12)
+plan(multisession, workers = 6)
 
 # run future_walk
 furrr::future_walk(all_combs, fit_secsse)
-

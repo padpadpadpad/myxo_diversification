@@ -185,6 +185,10 @@ for(i in min(q,na.rm = TRUE):max(q, na.rm = TRUE)){
 
 q
 
+# replace a few values to make them equivalent
+# i.e. A -> B = B -> A
+q[!is.na(q) & q %in% c(1400)] <- 1300
+
 idparslist$Q <- q
 
 # replace all values in q matrix that are not 0 or NA by next logical value
@@ -287,6 +291,9 @@ fit_secsse <- function(list_inits_sampfrac){
   # pick out inits
   temp_inits <- list_inits_sampfrac$inits
   
+  # limit initial start values as have made all hidden transitions the same
+  #temp_inits <- temp_inits[1:12]
+  
   # pick out sampled_fractions
   temp_samp_frac <- list_inits_sampfrac$sampled_fractions
   
@@ -309,7 +316,8 @@ fit_secsse <- function(list_inits_sampfrac){
     optimmethod = "simplex",
     num_cycles = 20,
     num_threads = 1,
-    method = 'odeint::runge_kutta_cash_karp54'
+    method = 'odeint::runge_kutta_cash_karp54',
+    loglik_penalty = 0.05
   )
   
   # create a list of the output
@@ -325,12 +333,9 @@ fit_secsse <- function(list_inits_sampfrac){
   # save out the list
   temp_name <- paste(name, '_', 'sampfrac', unique(temp_samp_frac), '_', 'run', list_inits_sampfrac$run,  sep = '')
   
-  saveRDS(output, paste('~/secsse/seccse_', temp_name, '.rds', sep =''))
+  saveRDS(output, paste('~/secsse/seccse_', temp_name, '_v2.rds', sep =''))
   
 }
-
-# just run the first 6
-all_combs <- all_combs[7:18]
 
 # Set a "plan" for how the code should run.
 plan(multisession, workers = 12)

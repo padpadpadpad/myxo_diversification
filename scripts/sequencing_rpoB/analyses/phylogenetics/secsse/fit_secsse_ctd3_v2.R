@@ -14,7 +14,7 @@ tidyverse_conflicts()
 name <- 'muctd3'
 
 # server - yes or no
-server <- FALSE
+server <- TRUE
 
 if(server == TRUE){
   d_habpref <- read.csv('~/secsse/habitat_preference_asv_new.csv')
@@ -23,6 +23,7 @@ if(server == TRUE){
   fit_mk <- readRDS('~/secsse/mod_custom5.rds')
   # read in start value dataframe
   start_vals <- readRDS(paste('~/secsse/start_vals/', name, '.rds', sep = ''))
+  output_path <- '~/secsse/seccse_'
 }
 
 if(server == FALSE){
@@ -36,6 +37,7 @@ if(server == FALSE){
   fit_mk <- readRDS('data/sequencing_rpoB/processed/transition_rates/mod_custom5.rds')
   # read in start value dataframe
   start_vals <- readRDS(paste('data/sequencing_rpoB/processed/secsse/init_vals_ml/', name, '.rds', sep = ''))
+  output_path <- '~/Desktop/secsse/seccse_'
 }
 
 d_taxa <- d_taxa %>%
@@ -183,6 +185,13 @@ for(i in min(q,na.rm = TRUE):max(q, na.rm = TRUE)){
 
 q
 
+# replace a few values to make them equivalent
+# i.e. A -> C = C -> A, A -> B = B -> A, B -> C = C -> B
+#q[!is.na(q) & q == -17] <- -14
+#q[!is.na(q) & q == -18] <- -16
+#q[!is.na(q) & q == -15] <- -13
+#q[!is.na(q) & q %in% c(-14, -15, -16, -17, -18)] <- -13
+
 idparslist$Q <- q
 
 # replace all values in q matrix that are not 0 or NA by next logical value
@@ -285,6 +294,10 @@ fit_secsse <- function(list_inits_sampfrac){
   # pick out inits
   temp_inits <- list_inits_sampfrac$inits
   
+  #temp_inits <- temp_inits[1:5] 
+  #temp_inits[4] <- 1e-15
+  #temp_inits <- temp_inits[1:7] 
+  
   # pick out sampled_fractions
   temp_samp_frac <- list_inits_sampfrac$sampled_fractions
   
@@ -305,9 +318,10 @@ fit_secsse <- function(list_inits_sampfrac){
     sampling_fraction = temp_samp_frac,
     maxiter = max_iter,
     optimmethod = "simplex",
-    #method = 'odeint::runge_kutta_cash_karp54',
+    method = 'odeint::runge_kutta_cash_karp54',
     num_cycles = 20,
-    num_threads = 1
+    num_threads = 2,
+    loglik_penalty = 0.05
  )
   
   # create a list of the output
@@ -323,22 +337,21 @@ fit_secsse <- function(list_inits_sampfrac){
   # save out the list
   temp_name <- paste(name, '_', 'sampfrac', unique(temp_samp_frac), '_', 'run', list_inits_sampfrac$run,  sep = '')
   
-  saveRDS(output, paste('~/secsse/seccse_', temp_name, '.rds', sep =''))
+  saveRDS(output, paste(output_path, temp_name, '_v2.rds', sep =''))
   
 }
 
 # just run the first 6
-all_combs <- all_combs[7:18]
+all_combs <- all_combs[1:18]
 
 # test on a single start value
-temp_samp_frac <- all_combs[[1]]$sampled_fractions
-temp_inits <- all_combs[[1]]$inits
+temp_samp_frac <- all_combs[[7]]$sampled_fractions
+temp_inits <- all_combs[[7]]$inits
 temp_inits[4] <- 1e-15
-
-
+#temp_inits <- temp_inits[1:7] 
 
 # Set a "plan" for how the code should run.
-plan(multisession, workers = 12)
+plan(multisession, workers = 2)
 
 # run future_walk
 furrr::future_walk(all_combs, fit_secsse)
