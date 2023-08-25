@@ -271,10 +271,10 @@ inits_ml <- mutate(vals, inits = list(NA), loglik = NA,
                    id = 1:n())
 
 # set up for loop to run screen for initial values
-pb <- progress::progress_bar$new(total = nrow(inits_ml))
+#pb <- progress::progress_bar$new(total = nrow(inits_ml))
 
 for(i in 1:nrow(inits_ml)){
-  pb$tick()
+  #pb$tick()
   
   # create inits
   temp_inits <- c((inits_lambda*inits_ml$lambda[i]),

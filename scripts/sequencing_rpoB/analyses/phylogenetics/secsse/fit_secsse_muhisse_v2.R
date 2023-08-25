@@ -187,7 +187,7 @@ q
 
 # replace a few values to make them equivalent
 # i.e. A -> B = B -> A
-q[!is.na(q) & q %in% c(1400)] <- 1300
+#q[!is.na(q) & q %in% c(1400)] <- 1300
 
 idparslist$Q <- q
 
@@ -315,7 +315,7 @@ fit_secsse <- function(list_inits_sampfrac){
     maxiter = max_iter,
     optimmethod = "simplex",
     num_cycles = 20,
-    num_threads = 1,
+    num_threads = 2,
     method = 'odeint::runge_kutta_cash_karp54',
     loglik_penalty = 0.05
   )
@@ -338,7 +338,7 @@ fit_secsse <- function(list_inits_sampfrac){
 }
 
 # Set a "plan" for how the code should run.
-plan(multisession, workers = 12)
+plan(multisession, workers = 6)
 
 # run future_walk
 furrr::future_walk(all_combs, fit_secsse)

@@ -14,7 +14,7 @@ tidyverse_conflicts()
 name <- 'muctd3'
 
 # server - yes or no
-server <- TRUE
+server <- FALSE
 
 if(server == TRUE){
   d_habpref <- read.csv('~/secsse/habitat_preference_asv_new.csv')
@@ -35,7 +35,7 @@ if(server == FALSE){
   # read in Mk model
   fit_mk <- readRDS('data/sequencing_rpoB/processed/transition_rates/mod_custom5.rds')
   # read in start value dataframe
-  start_vals <- readRDS(paste('data/sequencing_rpoB/processed/secsse/init_vals_ml/', name, '.rds', sep = ''))
+  start_vals <- readRDS(paste('data/sequencing_rpoB/processed/secsse/init_vals_ml/', name, 'alltransitions.rds', sep = ''))
 }
 
 d_taxa <- d_taxa %>%
@@ -301,7 +301,8 @@ fit_secsse <- function(list_inits_sampfrac){
     maxiter = max_iter,
     optimmethod = "simplex",
     num_cycles = 5,
-    num_threads = 4
+    num_threads = 2,
+    loglik_penalty = 0.05,
   )
   
   # create a list of the output
