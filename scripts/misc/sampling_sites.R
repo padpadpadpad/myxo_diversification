@@ -9,12 +9,12 @@ library(patchwork)
 library(flextable)
 
 # load in data
-d_locations <- readxl::read_excel('data/Supplemetal Table 1 - Sampling.xlsx') %>%
+d_locations <- readxl::read_excel('data/Supplemental Table 1 - Sampling.xlsx') %>%
   select(`sample nr`, location, coordinates, site) %>%
   mutate(id = gsub('\\.0', '', `sample nr`)) %>%
   select(-`sample nr`)
 
-d_samples <- readxl::read_excel('data/Supplemetal Table 1 - Sampling.xlsx') %>%
+d_samples <- readxl::read_excel('data/Supplemental Table 1 - Sampling.xlsx') %>%
   select(`sample type`) %>%
   group_by_all() %>%
   tally()
