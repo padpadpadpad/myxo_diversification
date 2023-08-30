@@ -201,7 +201,7 @@ fits_muhisse <- str_subset(files, 'muhisseSS') %>%
   map(., get_loglik) %>%
   list_rbind() %>%
   mutate(., aic = (2*n_params) - 2*loglik)
-# best models are runs 18
+# best models are runs 14, 15, 18
 # AIC = 2565.014
 
 # read in ctd2
