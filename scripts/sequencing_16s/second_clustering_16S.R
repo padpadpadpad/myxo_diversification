@@ -423,5 +423,3 @@ ggplot() +
 
 # save out object
 saveRDS(last_plot(), file.path(path_fig, 'cluster_pcoa.rds'))
-
-

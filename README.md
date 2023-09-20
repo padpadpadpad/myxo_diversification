@@ -1,32 +1,22 @@
 
 <!-- README.md is generated from README.Rmd. Please edit that file -->
 
-# Looking at adaptive diversification of Myxobacteria in natural environments
+# Processed data and analysis for the project exploring the macroevolution of Myxobacteria in natural environments.
 
 ## Summary
 
-This repository is a shared resource for us to play about with data and
-share methods in relation to the project looking at adaptive
-diversification of Myxobacteria in natural environments.
+This repository contains the processed data and scripts used to
+investigate the macroevolution of Myxobacteria in natural environments.
+The repository has evolved through the project and now contains the
+processed data and scripts used to recreate the analyses and figures in
+the manuscript (as it is now). In some instances where the code to run
+an analysis (e.g. for running BAMM) is not available here, we have tried
+our best to highlight that fact.
 
-## Where we are at
-
-- [x] Sampled different habitats and sites across Cornwall **(Autumn
-  2020)**
-- [x] DNA extracted from these samples
-- [x] Designed primers for amplifying Myxobacteria **(January 2021-June
-  2021)**
-  - [ ] Scripts uploaded
-  - [ ] Bought primers uploaded
-- [x] Samples 16S sequenced **(May 2021)**
-  - [x] Processed data uploaded
-  - [x] Analysis scripts uploaded
-  - [x] Clustering analysis to look at habitat separation and potential
-    definitions
-  - [ ] Data archived and backed up
-- [ ] Samples amplicon sequenced to amplify rpoB gene **(October 2021)**
-  - [ ] Processed data uploaded
-  - [ ] Exploratory analysis scripts
+**This repository contains a lot of previous code and scripts that are
+no longer used, but that we did not want to remove completely as they
+might be of use to somebody. They live in a variety of `previous`
+folders in their respective analysis folders.**
 
 ## To use
 
@@ -37,21 +27,58 @@ all of the analyses should be runnable without altering paths. Simply
 double-click on the `.Rproj` folder that is in the base folder of this
 repository and it should open the project in RStudio.
 
-I have avoided uploading overly large files to this repository for
-obvious reasons. The sequencing data is stored as
+I have avoided uploading overly large files to GitHub as there is a file
+size limit of 50MB. The processed sequencing data is stored as
 [phyloseq](https://joey711.github.io/phyloseq/) objects and should be
-easy to query.
+easy to read in. Raw sequencing files will be uploaded upon publishing
+of the manuscript.
 
 ## Folder structure
 
 ### data
 
 **data** includes the processed data from each part of the project.
-`sequencing_16s` contains the data for the 16s sequencing etc.
+
+- `sequencing_16s` contains the data for the 16s sequencing
+- `sequencing_rpoB` contains the data for the rpoB sequencing
+
+### scripts
+
+**scripts** includes the scripts to analyse the processed datasets.
+
+- `sequencing_16s` contains the scripts used to analyse the 16s data.
+  1.  `prevalence_filtering.R` - removes low prevalence ASVs
+  2.  `rarefy_data.R` - rarefies data and sets root to tree
+  3.  `first_clustering.R` - runs initial PCoA plot to look at
+      differences between habitats
+  4.  `second_clustering.R` - runs cleaned PCoA and clustering analysis
+      to identify habitat clusters in the data.
+- `sequencing_rpoB` contains the scripts used to analyse the rpoB data.
+- `misc` contains some miscellaneous scripts that are not used much in
+  the final analysis.
+  - **sampling_sites.R** makes **Table_S1** and saves a map out that is
+    used in **Figure_1.R** to make Figure 1.
+  - all other scripts are not used in the final analyses and are not of
+    particular importance.
+
+### plots
+
+**plots** contains figures and tables made during the project.
+
+- `manuscript_plots` contains the figures and tables used in the
+  manuscript
+
+- `sequencing_16s` contains figures and tables produced during the
+  analysis of the 16s data
+
+- `sequencing_rpoB` contains figures and tables produced during the
+  analysis of the rpoB data
 
 - **metadata.csv** - completed metadata for each sample
+
 - **sample_cluster_assignments.csv** - cluster assignments for each
   sample based on 16S clustering.
+
 - **sequencing 16s** - folder containing data from the 16s sequencing
 
 1.  `ps_16s_complete.rds` - the original phyloseq object from the

@@ -92,14 +92,6 @@ p1 <- ggplot() +
 ggsave(file.path(path_fig, 'ordination_16S.pdf'), p1, width = 10, height = 7)
 ggsave(file.path(path_fig, 'ordination_16S.png'), p1, width = 10, height = 7)
 
-p1 + MicrobioUoE::theme_black(base_size = 24) +
-  theme(plot.background = element_rect(fill = '#404040', color = '#404040'),
-        panel.background = element_rect(fill = '#404040'),
-        legend.position = "none",
-        panel.grid.major = element_blank())
-  
-ggsave(file.path(path_fig, 'ordination_16S_presentation.pdf'), last_plot(), width = 10, height = 7)
-
 #-----------------------------------------------------#
 # 2. look at pairwise differences between habitats ####
 #-----------------------------------------------------#
