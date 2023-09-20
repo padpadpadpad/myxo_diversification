@@ -25,16 +25,6 @@ d_meta <- read.csv('data/metadata.csv') %>%
 
 d <- left_join(d_meta, d_locations) 
 
-# ones that need checking by Mick
-# 70 - beachcast seaweed - Fal
-# 72 - beachcast seaweed - Helford
-# 65b - marine mud full saline - Fal
-# 66 - marine mud full saline - Fal
-# 67 - marine mud full saline - Fal
-# 73 - rock samphire - Helford
-# 13 - river - Helford
-# 48 - wheat field - Camel - does not look like its in the right place
-
 # make Table S1
 d_table <- separate(d, coordinates, c('lat', 'lon'), sep = ',') %>%
   mutate(across(c(lat, lon), as.numeric),
