@@ -176,7 +176,7 @@ tree_plot2 <- tree_plot +
 tree_plot2 
 
 # save tree out
-ggsave(here('plots/sequencing_rpoB/analyses/tree_all_taxonomy.png'), tree_plot2, height = 9, width = 12)
+ggsave(here('plots/sequencing_rpoB/tree_all_taxonomy.png'), tree_plot2, height = 9, width = 12)
 
 #-------------------------------------------#
 # plot tree after collapsing rare states ####
@@ -312,13 +312,13 @@ backbone_tree <- ggtree(backbone) +
 # make table with flex table
 legend <- cowplot::get_legend(tree_plot3)
 
-ggsave('plots/sequencing_rpoB/analyses/tree_with_constraints.png', tree_plot3 + theme(legend.position = 'none'), height = 8, width = 8)
+ggsave('plots/sequencing_rpoB/tree_with_constraints.png', tree_plot3 + theme(legend.position = 'none'), height = 8, width = 8)
 
 #----------------------#
 # assemble Figure 2 ####
 #----------------------#
 
-tree_plot3 <- image_read('plots/sequencing_rpoB/analyses/tree_with_constraints.png', density = 300)
+tree_plot3 <- image_read('plots/sequencing_rpoB/tree_with_constraints.png', density = 300)
 tree_plot3 <- image_trim(tree_plot3)
 
 table <- png::readPNG('plots/manuscript_plots/hab_pref_table.png', native = TRUE)
