@@ -30,7 +30,7 @@ d_taxa <- tax_table(ps) %>%
 
 # read in MMSeqs2 taxonomy dataset
 
-# need to add the bash script somewhere, but we ran these commands to come up with the taxonomic assignments using MMSeqs
+# we ran these commands to come up with the taxonomic assignments using MMSeqs2
 # mmseqs taxonomy seqTaxDB taxonomy/gtdb_r202_rpoB_mmseqs taxonomyResult_lca3_95 tmpFolder --search-type 3 --tax-lineage 1 --majority 0.95 --vote-mode 1 --lca-mode 3 --orf-filter 0
 # mmseqs createtsv seqTaxDB taxonomyResult_lca3_95 taxonomy_assignments_lca3_95.tsv
 

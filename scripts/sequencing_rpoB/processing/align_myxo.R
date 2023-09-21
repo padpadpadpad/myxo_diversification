@@ -5,7 +5,7 @@
 # what this script does ####
 #--------------------------#
 
-# for each phyloseq object in data/sequencing_rpoB/phyloseq/myxococcus/clustered
+# for each phyloseq object in data/sequencing_rpoB/phyloseq/myxococcus/prevalence_filtered
 # 1. reads in phyloseq object
 # 2. aligns these sequences
 # 3. creates a backbone tree

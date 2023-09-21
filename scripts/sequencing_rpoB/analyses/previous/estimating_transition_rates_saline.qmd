@@ -1,0 +1,391 @@
+---
+title: "Looking at transition rates between saline and non-saline environments"
+author: "Daniel Padfield"
+date: last-modified
+format:
+  html:
+    toc: true
+    toc-depth: 2
+    toc-title: 'Contents'
+    code-overflow: wrap
+    code-fold: true
+    code-tools: true
+    self-contained: true
+    self-contained-math: true
+    number-sections: true
+execute:
+  message: false
+  warning: false
+  fig.align: 'center'
+editor: visual
+---
+
+## Outline
+
+Using information on the tip states of a phylogenetic tree we can use evolutionary models to estimate the ancestral states of internal nodes and transitions between states.
+
+We fit an $Mk$ model of evolution to our tree and habitat preference data to understand how habitat preference evolved. For example does evolution readily allow transitions between specialist habitat preferences (i.e. from marine mud only to terrestrial only).
+
+We also try and fit an $Mk$ model of evolution when we combine two traits together (habitat preference and whether or not the species has high or low diversification rate as identified by BAMM).
+
+Ancestral state reconstructions can also be estimated from the MuSSE and HiSSE models we are aiming to fit later on. These models would have a lot of free parameters and we are unsure whether they can be fit with the dataset we have. We hope to reduce the number of free parameters in those models by estimating the transition matrix which best fits the data in the $Mk$ model. This would reduce the number of free parameters.
+
+## TL;DR
+
+Go to @sec-best_model for the best $Mk$ model and a discussion of the transition matrix.
+
+## Load in R packages
+
+First we will load in R packages used and the metadata file used and wrangled in a previous walk-through.
+
+We also load in the final phylogenetic tree, the colours used for habitat preferences, and the position of shift nodes.
+
+```{r load_packages}
+#| results: false
+# load packages
+library(here)
+library(tidyverse)
+library(ggtree)
+library(ggnewscale)
+library(RColorBrewer)
+library(patchwork)
+library(ape)
+library(phytools)
+library(BAMMtools)
+library(coda)
+library(MetBrewer)
+library(ggpp)
+library(castor)
+library(diversitree)
+library(tidygraph)
+library(igraph)
+library(ggraph)
+library(GGally)
+library(ggrepel)
+
+# set where I am in the project
+here::i_am('scripts/sequencing_rpoB/analyses/estimating_transition_rates.qmd')
+
+
+# read in metadata
+d_meta <- read.csv(here('data/sequencing_rpoB/processed/asv_metadata.csv'))
+
+# read in habitat trait colours
+cols_hab <- readRDS(here('data/sequencing_rpoB/processed/habitat_colours.rds'))
+
+# read in tree
+tree <- read.tree(here('data/sequencing_rpoB/bamm/rerooted-pruned-chronopl10.tre'))
+
+# edit tree labels
+d_labels <- data.frame(tip_label = tree$tip.label) %>%
+  separate(., tip_label, c('part1', 'part2', 'part3'), sep = '_', remove = FALSE) %>%
+  unite('tip_label_new', c(part1, part2), sep = '_')
+
+tree$tip.label <- d_labels$tip_label_new
+
+# read in shift nodes
+shiftnodes <- readRDS(here('data/sequencing_rpoB/processed/shiftnodes.rds'))
+
+# read in diversification classification
+div <- readRDS(here('data/sequencing_rpoB/processed/div_rate_bins.rds'))
+
+```
+
+## Custom function
+
+We will write a custom function for getting the transition matrix into a format that is easy to plot using **ggplot2**.
+
+```{r custom_functions}
+
+# get dataframe of transition rates
+ace_transition_df <- function(ace_object){
+  
+  temp_1 <- ace_object$index.matrix
+  colnames(temp_1) <- rownames(temp_1) <- colnames(ace_object$lik.anc)
+  
+  # turn into dataframe
+  temp_1 <- as_tibble(temp_1, rownames = 'state_1') %>%
+    # make long format, the column names become state 2
+    pivot_longer(c(everything(), -state_1), names_to = 'state_2', values_to = 'order') %>%
+    mutate(free_param = ifelse(is.na(order)|order==0, 'no', 'yes'),
+           num_params = length(ace_object$rates))
+  
+  temp_1$transition_rate <- NA
+  temp_1$transition_rate[temp_1$order == 0] = 0
+  
+  # run for loop to input estimated transition rates
+  for(i in 1:length(ace_object$rates)){
+    temp_1[temp_1$order %in% i,]$transition_rate <- ace_object$rates[i]
+  }
+  
+  return(select(temp_1, -order, state_1, state_2, transition_rate, free_param, num_params))
+  
+}
+
+```
+
+## Create a master dataframe for the trait states
+
+Different methods for estimating ancestral states take different values for the traits. Some only allow for numeric values, whereas others allow characters. Some do not allow colons in the name, and one ([MBASR](https://github.com/stevenheritage/MBASR) which uses Mr Bayes) needs the first trait value to be 0. To allow for us to semi-easily link across different methods, we will make a data frame of our unique tip states and then turn them into a numeric vector. The ordering is all done alphabetically.
+
+```{r tip_state_dataframe}
+d_meta <- tibble(tip_label = tree$tip.label) %>%
+  left_join(., d_meta) %>%
+  left_join(., div)
+
+# make sure order of habitat preference is the same in the trait vector as the tip labels
+sum(d_meta$tip_label == tree$tip.label) == length(tree$tip.label)
+# SUCCESS if TRUE
+
+# create new habitat preference vector that is just saline/non-saline
+d_meta <- mutate(d_meta, hab_pref_new = ifelse(str_detect(habitat_preference, 'generalist|mud_and_shore'), 'saline', 'non-saline'),
+                 new_trait = paste(hab_pref_new, div_rate, sep = '_'))
+
+group_by(d_meta, new_trait) %>%
+  tally()
+
+# replace NA of outgroup - make it freshwater:terrestrial - the most common state
+# phytools::make.simmap cannot take NAs
+hab_pref <- setNames(d_meta$new_trait, d_meta$tip_label)
+
+# make habitat preference vector numeric
+hab_pref_num <- as.numeric(as.factor(hab_pref)) -1
+hab_pref_num <- setNames(hab_pref_num, d_meta$tip_label)
+hab_pref_num2 <- hab_pref_num + 1
+
+# coding from numeric to character
+coding <- tibble(hab_pref = unname(hab_pref), hab_pref_num = unname(hab_pref_num)) %>%
+  distinct() %>%
+  mutate(hab_pref2 = gsub(':', '.', hab_pref),
+         hab_pref_num2 = hab_pref_num + 1) %>%
+  arrange(hab_pref) %>%
+  mutate(hab_pref_axis = gsub(':', '/ ', hab_pref),
+  hab_pref_axis = gsub('_', ' ', hab_pref_axis))
+
+coding
+
+# save out habitat preference vector
+saveRDS(hab_pref, here("data/sequencing_rpoB/processed/hab_pref_vec_saline.rds"))
+
+```
+
+This results in a dataframe which allows us to easily link between numeric and character values, and also gives us a vector - of the same length of tips in our tree - which we can use for estimating ancestral states.
+
+## Estimate ancestral states using ape::ace()
+
+First lets fit each of the models (ER, SYM, and ARD) using **ape::ace()**. We can compare these models using AIC and likelihood ratio tests to see which model fits the tree best.
+
+```{r ape_1_save}
+#| warnings: false
+#| message: false
+#| eval: false
+#| echo: false
+
+# with ape
+ancestral_states_ape <- ace(hab_pref, tree, model="ER", type="discrete")
+ancestral_states_ape1 <- ace(hab_pref, tree, model="SYM", type="discrete")
+ancestral_states_ape2 <- ace(hab_pref, tree, model="ARD", type="discrete")
+
+# save out files
+saveRDS(ancestral_states_ape, here('data/sequencing_rpoB/processed/transition_rates/ape_saline.rds'))
+saveRDS(ancestral_states_ape1, here('data/sequencing_rpoB/processed/transition_rates/ape_saline1.rds'))
+saveRDS(ancestral_states_ape2, here('data/sequencing_rpoB/processed/transition_rates/ape_saline2.rds'))
+```
+
+```{r ape_1_load}
+#| echo: false
+
+# read in files
+ancestral_states_ape <- readRDS(here('data/sequencing_rpoB/processed/transition_rates/ancestral_states_ape.rds'))
+ancestral_states_ape1 <- readRDS(here('data/sequencing_rpoB/processed/transition_rates/ancestral_states_ape1.rds'))
+ancestral_states_ape2 <- readRDS(here('data/sequencing_rpoB/processed/transition_rates/ancestral_states_ape2.rds'))
+```
+
+```{r ape_1_norun}
+#| eval: false
+
+# do ancestral reconstruction with ape
+ancestral_states_ape <- ace(hab_pref, tree, model="ER", type="discrete")
+ancestral_states_ape1 <- ace(hab_pref, tree, model="SYM", type="discrete")
+ancestral_states_ape2 <- ace(hab_pref, tree, model="ARD", type="discrete")
+
+```
+
+We can do model comparison using both AIC scores and likelihood ratio tests.
+
+```{r ape_1_compare}
+# compare models
+anova(ancestral_states_ape, ancestral_states_ape1)
+anova(ancestral_states_ape1, ancestral_states_ape2)
+
+# check AIC of each model
+mod_compare <- tibble(mod = c('ER', 'SYM', 'ARD'),
+               aic = c(AIC(ancestral_states_ape), AIC(ancestral_states_ape1), AIC(ancestral_states_ape2)))
+
+arrange(mod_compare, aic)
+```
+
+From these comparisons we can see that the ARD model, where all rates in the transition rate are allowed to be different, is the best model in terms of both doing likelihood ratio tests of nested models and AIC scores.
+
+### Do some rudimentary checks of ape::ace()
+
+We can grab the ancestral states from the output of **ace()**. We can do some checks which include checking whether any of the transition rates are negative or whether they have any standard errors that are `NaN`, and whether any of the node states have probabilities \> 1. This hints the model is too complex/has not converged/not doing a good job.
+
+We can format the transition matrix from the output of **ace::ape()** to look at the rates. As it is not stated in the **ape::ace()** directory, we assume the rates are entered as in **castor::asr_mk_model()**, where the \[r,c\]-th entry is the transition rate from state r to state c. This is confirmed on this [help page](https://www.r-phylo.org/wiki/HowTo/Ancestral_State_Reconstruction#Reconstructing_Ancestral_States_for_Discrete_Variables).
+
+```{r check_ape_ace}
+# see whether any of the SEs are NA. This hints that its not converged properly
+ancestral_states_ape$se
+ancestral_states_ape1$se
+ancestral_states_ape2$se
+# as you can see both the symmetric and all rates different models have NaNs for some/all of the transitions
+
+# get marginal likelihood of each ancestral state at each node
+d_acr_ape <- ancestral_states_ape2$lik.anc %>%
+  as_tibble(rownames = 'node') %>%
+  pivot_longer(cols = all_of(coding$hab_pref), values_to = 'probability_ape', names_to = 'habitat_preference')
+
+d_acr_ape_summary <- group_by(d_acr_ape, node) %>%
+  summarise(total = sum(probability_ape), .groups = 'drop') %>%
+  filter(total != 1)
+nrow(d_acr_ape_summary)
+# apparently 7 nodes that do not equal 1, but they are very close to 1.
+```
+
+Some of the standard errors for the ARD model are `NaN`, suggesting convergence problems. However, there are only seven internal nodes with probabilities different from 1, so these estimates are not completely crazy.
+
+### Plotting transition matrices
+
+We can plot the transition matrices to see what the estimated rates are. This uses our custom function **ace_transition_df()**.
+
+The transition matrices plotted here can be interpreted as follows:
+
+-   the transition rates are from state 1 (on the y axis) to state 2 (on the x axis)
+
+-   diagonal rates are when state 1 equals state 2 and are therefore not estimated
+
+-   Red boxes indicate rates which are estimated. This will be useful when we start using custom matrices.
+
+```{r plot_transition_matrices}
+#| fig.height: 5
+#| fig.width: 12
+
+# bind together the transition matrices from each of the standard models for the transition matrices
+d_models <- bind_rows(ace_transition_df(ancestral_states_ape) %>% mutate(model = 'equal rates'),
+  ace_transition_df(ancestral_states_ape1) %>% mutate(model = 'symmetric'),
+  ace_transition_df(ancestral_states_ape2) %>% mutate(model = 'all rates different')) %>%
+  # add in colums for reordering and naming of axes
+  left_join(., select(coding, state_1 = hab_pref, state_1_num = hab_pref_num2, state_1_label = hab_pref_axis)) %>%
+  left_join(., select(coding, state_2 = hab_pref, state_2_num = hab_pref_num2, state_2_label = hab_pref_axis)) %>%
+  mutate(transition_rate = round(transition_rate, 2))
+
+# plot transition matrices
+# make heatmap of changes
+ggplot(d_models, aes(forcats::fct_reorder(state_2_label, state_2_num), forcats::fct_reorder(state_1_label, desc(state_1_num)))) +
+  geom_tile(aes(alpha = transition_rate), col = 'black', width = 0.9, height = 0.9) +
+  geom_tile(aes(alpha = transition_rate), fill = NA, col = 'red', size = 1.1, filter(d_models, free_param == 'yes'), width = 0.9, height = 0.9) +
+  theme_bw(base_size = 14) +
+  theme(panel.grid.major = element_blank(),
+  legend.position = 'none',
+  axis.text.x.top = element_text(angle = 90, vjust = 0.5)) +
+  scale_alpha_continuous(range = c(0, 0.6)) +
+  geom_text(aes(label = transition_rate), size = MicrobioUoE::pts(10)) +
+  scale_x_discrete(position = 'top', labels = scales::label_wrap(13)) +
+  scale_y_discrete(position = 'left', labels = scales::label_wrap(13)) +
+  labs(y = 'state 1',
+  x = 'state 2') +
+  coord_fixed() +
+  facet_wrap(~model)
+```
+
+### Doing model simplification on the all rates different model
+
+So we have seen that the all rates different model is better than the SYM model, but we can also use the results of the ARD model to make some of the rates 0.
+
+We can view the all rates different transition matrix only.
+
+```{r ard_transition_matrix}
+#| fig.height: 5
+#| fig.width: 7
+
+# ARD transition matrix only
+filter(d_models, model == 'all rates different') %>%
+  ggplot(., aes(forcats::fct_reorder(state_2_label, state_2_num), forcats::fct_reorder(state_1_label, desc(state_1_num)))) +
+  geom_tile(aes(alpha = transition_rate), col = 'black', width = 0.9, height = 0.9) +
+  geom_tile(aes(alpha = transition_rate), fill = NA, col = 'red', size = 1.1, filter(d_models, free_param == 'yes' & model == 'all rates different'), width = 0.9, height = 0.9) +
+  theme_bw(base_size = 14) +
+  theme(panel.grid.major = element_blank(),
+  legend.position = 'none',
+  axis.text.x.top = element_text(angle = 90, vjust = 0.5),
+  plot.title.position = "plot") +
+  scale_alpha_continuous(range = c(0, 0.6)) +
+  geom_text(aes(label = transition_rate), size = MicrobioUoE::pts(10)) +
+  scale_x_discrete(position = 'top', labels = scales::label_wrap(13)) +
+  scale_y_discrete(position = 'left', labels = scales::label_wrap(13)) +
+  labs(y = 'state 1',
+  x = 'state 2') +
+  coord_fixed()
+
+ggsave(here('plots/sequencing_rpoB/analyses/transition_matrix_saline.png'), last_plot(), height = 6, width = 8)
+```
+
+```{r}
+num_states <- unique(hab_pref) %>% length()
+
+# we will set up the custom matrix, this has 49 numbers and then we have to set the correct numbers to 0
+custom_matrix <- matrix(1:num_states^2, nrow=num_states)
+
+# make all diagonal numbers NA
+for(i in 1:nrow(custom_matrix)){
+  custom_matrix[i,i] <- 0
+}
+
+# make specific transitions 0 based on the output of the ARD.
+custom_matrix[custom_matrix %in% c(4,5,7,10,13)] <- 0
+
+# replace values of non-zeroes with correct vector of 1:n parameters
+custom_matrix[custom_matrix != 0] <- 1:length(custom_matrix[custom_matrix != 0])
+
+custom_matrix
+
+ancestral_states_ape3 <- ace(hab_pref, tree, model=custom_matrix, type="discrete")
+
+# compare the less complicated model with the more complicated model
+anova(ancestral_states_ape3, ancestral_states_ape2)
+
+# check AIC of each model
+mod_compare <- tibble(mod = c('ER', 'SYM', 'ARD', 'ancestral_states_ape3'),
+               aic = c(AIC(ancestral_states_ape), AIC(ancestral_states_ape1), AIC(ancestral_states_ape2), AIC(ancestral_states_ape3)))
+
+arrange(mod_compare, aic)
+
+```
+
+```{r plot_transition_matrix}
+#| fig.height: 5
+#| fig.width: 7
+
+# plot transition matrix
+ace_transition_df(ancestral_states_ape3) %>%
+  left_join(., select(coding, state_1 = hab_pref, state_1_num = hab_pref_num2, state_1_label = hab_pref_axis)) %>%
+  left_join(., select(coding, state_2 = hab_pref, state_2_num = hab_pref_num2, state_2_label = hab_pref_axis)) %>%
+  mutate(transition_rate = round(transition_rate, 2)) %>%
+  ggplot(., aes(forcats::fct_reorder(state_2_label, state_2_num), forcats::fct_reorder(state_1_label, desc(state_1_num)))) +
+  geom_tile(aes(alpha = transition_rate, col = free_param), width = 0.9, height = 0.9, size = 1.1) +
+  theme_bw(base_size = 14) +
+  theme(panel.grid.major = element_blank(),
+  legend.position = 'none',
+  axis.text.x.top = element_text(angle = 90, vjust = 0.5),
+  plot.title.position = "plot") +
+  scale_alpha_continuous(range = c(0, 0.6)) +
+  geom_text(aes(label = transition_rate), size = MicrobioUoE::pts(10)) +
+  scale_x_discrete(position = 'top', labels = scales::label_wrap(13)) +
+  scale_y_discrete(position = 'left', labels = scales::label_wrap(13)) +
+  labs(y = 'state 1',
+  x = 'state 2',
+  title = paste('all rates different with', length(custom_matrix[custom_matrix != 0]), 'free parameters', sep = ' ')) +
+  coord_fixed() +
+  scale_color_manual(values = c('black', 'red'))
+
+ggsave(here('plots/sequencing_rpoB/analyses/transition_matrix_saline.png'), last_plot(), height = 6, width = 8)
+```

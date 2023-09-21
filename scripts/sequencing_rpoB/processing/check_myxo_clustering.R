@@ -4,8 +4,7 @@
 
 # what does this script do
 
-# 1. run PCoA on all prevalence filtered myxo samples based on habitat
-# 2. run pairwise permanovas on all habitats to see which are not significantly different
+# 1. run PCoA on all prevalence filtered myxo samples based on biomes
 
 # clean workspace
 rm(list = ls())
