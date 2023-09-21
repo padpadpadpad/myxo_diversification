@@ -20,5 +20,5 @@ data/sequencing_rpoB/phyloseq/ps_no_tree.rds
 scripts/to_ignore/*
 data/sriswasdi_data/*
 scripts/sriswasdi_data/*
-scripts/sequencing_16s/previous/*
-scripts/tree_building/previous/*
+scripts/sequencing_rpoB/tree_building/previous/*
+scripts/sequencing_rpoB/analyses/previous/*
