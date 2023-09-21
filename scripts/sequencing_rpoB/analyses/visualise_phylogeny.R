@@ -1,79 +1,43 @@
----
-title: "Exploring habitat preference and the phylogenetic tree of Myxococcota"
-author: "Daniel Padfield"
-date: last-modified
-format:
-  html:
-    toc: true
-    toc-title: 'Contents'
-    code-overflow: wrap
-    code-fold: true
-    code-tools: true
-    self-contained: true
-    self-contained-math: true
-execute:
-  message: false
-  warning: false
-  fig-align: center
-editor: visual
----
+# plot phylogenetic tree and visualise biome preference across the tree
 
-# Outline
+#--------------------------#
+# what this script does ####
+#--------------------------#
 
-This document plots the phylogenetic tree and visually examines the congruence between the tree and their taxonomic assignments. It then plots the habitat preference for each species/tip on the tree and we look at some simple descriptive statistics of the the habitat preferences.
+# reads in the best ultrametric ASV Myxobacteria tree
+# plots the tree
+# looks at the distribution of biome preference
 
-Finally some key files used in other walk-throughs are saved out in this analysis for easy reading in for other scripts.
-
-# Plot the tree with taxonomic information
-
-Firstly we will plot the tree and highlight the taxonomic information we have for each tip.
-
-## Load in R packages
-
-Load in the R packages I am going to use.
-
-```{r load_packages}
-#| results: false
+#------------------------------#
+# load in packages and data ####
+#------------------------------#
 
 # load packages - use librarian::shelf()
 # need to ensure BiocManager and Biobase are installed - BiocManager::install("Biobase")
 # can install packages from GitHub, Bioconductor, and CRAN all at once
 librarian::shelf(here, tidyverse, ggtree, ggnewscale, RColorBrewer, patchwork, ape, phytools, MetBrewer, flextable, officer, magick)
-```
-
-## Load in data and do some data wrangling
-
-There are three datasets that need aggregating for this analysis.
-
-1.  The ultrametric phylogenetic tree
-2.  The taxonomic information for each ASV
-3.  The information on habitat preferences for each ASV
-
-We can load each in and then do some data wrangling.
-
-```{r load_data}
-#| results: false
-
-# set where I am in the project
-here::i_am('scripts/sequencing_rpoB/analyses/phylogenetics/plot_phylogeny.qmd')
 
 # load in the tree
-tree <- ape::read.tree(here('data/sequencing_rpoB/raxml/trees/myxo_asv/myxo_asv_chronopl10.tre'))
+tree <- ape::read.tree('data/sequencing_rpoB/raxml/trees/myxo_asv/myxo_asv_chronopl10.tre')
 
 # read in habitat preference
-d_habpref <- read.csv(here('data/sequencing_rpoB/phyloseq/myxococcus/habitat_preference/summary/habitat_preference_asv.csv'))
+d_habpref <- read.csv('data/sequencing_rpoB/phyloseq/myxococcus/habitat_preference/summary/habitat_preference_asv.csv')
 
 # read in phyloseq object and grab tax table
-d_taxa <- readRDS(here('data/sequencing_rpoB/phyloseq/myxococcus/prevalence_filtered/ps_otu_asv_filt.rds')) %>%
+d_taxa <- readRDS('data/sequencing_rpoB/phyloseq/myxococcus/prevalence_filtered/ps_otu_asv_filt.rds') %>%
   phyloseq::tax_table() %>%
   data.frame() %>%
   janitor::clean_names() %>%
   rownames_to_column('otu')
 
+#----------------------#
+# do some wrangling ####
+#----------------------#
+
 # create d_meta
 d_meta <- left_join(select(d_habpref, otu, habitat_preference, num_present), select(d_taxa, otu:family)) %>%
   mutate(family2 = ifelse(is.na(family), 'uncertain', family))
-  
+
 # set habitat colours
 cols_hab <- met.brewer('Austria', n = 7) %>% as.character()
 cols_labels <- c('marine_mud', 'freshwater', 'terrestrial', 'freshwater:terrestrial', 'freshwater:marine_mud:terrestrial', 'marine_mud:terrestrial', 'freshwater:marine_mud')
@@ -88,67 +52,47 @@ names(hab_labels) <- cols_labels
 # sort the new labels to be in the correct order
 hab_labels <- hab_labels[sort(names(hab_labels))]
 
-```
+#------------------#
+# plot the tree ####
+#------------------#
 
-## Plot the tree with taxonomy
-
-We can now plot the taxonomic information on a plot with the habitat preferences to visualise the phylogenetic tree. This uses the R packages **ggtree** and **ggnewscale** to plot the tree and combine multiple colour scales respectively.
-
-We constrained our tree based on the phylogeny on a new consensus single marker phylogeny of all the delta proteobacteria (Waite *et al.* 2020), so we will colour by the families that were used in the constraint tree. These families we used to constrain the tree were those with common, established names in the GTDB database.
-
-```{r find_common_taxa}
 # constrained families
 constrained_families <- c('Myxococcaceae', 'Vulgatibacteraceae', 'Anaeromyxobacteraceae', 'Polyangiaceae', 'Sandaracinaceae', 'Nannocystaceae', 'Haliangiaceae')
 
-# find 9 most common families based on number of tips assigned to them
+# find proportion of tips assigned to these families
 d_common <- d_meta %>%
   group_by(family2) %>%
   tally() %>%
   ungroup() %>%
   mutate(., prop = n / sum(n)) %>%
   filter(., family2 %in% constrained_families)
-  
+
 sum(d_common$prop)
-```
 
-The families we used to constrain the tree represent 74% of all the tips.
-
-We can now add these into the meta dataframe as a new column. Anything that is not assigned to one of these families will be assigned "unconstrained", and any ASVs that were not assigned to the family level will be assigned "uncertain". To colour branches of the tree, we need to use **ggtree::groupOTU()**.
-
-```{r create_plot_data}
-# add in column for colouring branches
+# add in column for colouring branches according to family - add in uncertain (family = NA), and unconstrained values (family != NA but not one of the 7 families used to constrain the tree)
 d_meta <- mutate(d_meta, family_common = ifelse(family2 %in% c(constrained_families, 'uncertain'), family2, 'unconstrained')) %>%
   rename(tip_label = otu)
 
 # group tip labels together in terms of their order
 to_group <- split(d_meta$tip_label, d_meta$family_common)
 tree2 <- groupOTU(tree, to_group)
-```
 
-We can also find the MRCA ancestor node of each of our constrained families. This can then be used to find colour the outside of our plot with clade colours.
-
-```{r find_mrca}
 # find the mrca of each of the clades
+# this is used to colour the outerbars of the phylogeny
 d_meta2 <- filter(d_meta, family_common %in% constrained_families) %>%
   select(family, tip_label) %>%
   group_by(family) %>%
   nest() %>%
   ungroup()
 
+# run for loop to find MRCA of each set of tip labels
 for(i in 1:nrow(d_meta2)){
   d_meta2$mrca[i] <- findMRCA(tree2, tips = d_meta2$data[[i]]$tip_label)
 }
 
+# add blank label so family names are not printed onto the graph
 d_meta2 <- select(d_meta2, family2 = family, mrca) %>%
   mutate(blank_label = '')
-```
-
-We are now ready to plot the phylogenetic tree. We will plot the tree with different colours for each family, and then place the colours of the habitat preferences around the tips of the tree.
-
-```{r plot_tree}
-#| fig-height: 10
-#| fig-width: 6
-#| fig-align: center
 
 # create colour palettes
 
@@ -173,22 +117,7 @@ tree_plot <- ggtree(tree2, aes(col = group)) %<+% filter(d_meta) +
 
 tree_plot
 
-# save plot out
-#ggsave(here('sequencing_rpoB/plots/analyses/tree_all_taxonomy.pdf'), tree_plot2, height = 9, width = 12)
-ggsave(here('plots/sequencing_rpoB/analyses/tree_check_taxonomy.png'), tree_plot, height = 10, width = 5)
-
-```
-
-This shows that all of the families specified in our constraint tree are grouped together.
-
-We can now easily plot this as a circular tree.
-
-```{r plot_tree_circle}
-#| fig-height: 9
-#| fig-width: 12
-#| fig-align: center
-
-# first only plot taxonomy, also make non circular so we can see groupings properly
+# we can remake the tree in a circular fashion for all the other plots from now on
 tree_plot <- ggtree(tree2, layout = 'circular', branch.length = 'none', aes(col = group)) %<+% filter(d_meta) +
   scale_color_manual('Family (branch colours)', values = cols) +
   guides(color = guide_legend(override.aes = list(linewidth = 3))) +
@@ -201,41 +130,19 @@ tree_plot <- ggtree(tree2, layout = 'circular', branch.length = 'none', aes(col 
                 show.legend = FALSE)
 
 tree_plot
-```
 
-# Plot the tree with habitat preference information
+#----------------------------------------------#
+# plot the  tree with biome preference info ####
+#----------------------------------------------#
 
-We can now add information about the habitat preference of our ASVs to the dataset. But first lets describe our habitat preference trait.
-
-## What is our trait and what is its distribution?
-
-Our trait is our own definition of habitat preference for each myxococcota ASV. Briefly, for each ASV we:
-
--   Calculated proportions of occurrence in each of the three habitat clusters identified from the 16S data (broadly these were terrestrial, freshwater, and marine mud).
--   If you only turned up in a single cluster, you were assigned as being a specialist in that habitat.
--   If you turned up in more than one cluster, we used a bootstrapping approach to see assign habitat preference:
-    -   Bootstrapped a distribution of proportions of occurrences in each habitat by re-sampling 100 presences based on the actual used proportions 1000 times.
-    -   Compared these to the availability of each habitat cluster (different clusters had different total numbers of samples assigned to them)
-    -   If an ASV's use of a habitat was significantly less than expected from the cluster's availability (0.975 quantile of bootstrapped use was less than the proportion available) we defined that habitat as unfavourable.
-    -   Habitat preferences was defined as all the habitats you use at least as much as is expected by their availability.
--   Overall, an ASV could be assigned to be a specialist in freshwater, terrestrial, or marine mud, or be a generalist in any of these three habitats.
-
-We can look at the numbers of each of these and how many there are in each group.
-
-```{r plot_habitat_groups}
-# first lets look at how many are in each group
+# look at numbers in each biome preference
 group_by(d_meta, habitat_preference) %>%
   summarise(n = n(),
             ave_present = median(num_present)) %>%
   arrange(desc(n)) %>%
   mutate(prop = round(n/sum(n)*100, 2))
-```
 
-We only have 6 ASVs that have been classified as full generalists, and only 5 that are marine mud + terrestrial generalists. These are only 0.23% and 0.15% of all the ASVs. This will likely make them very, very difficult to include in our comparative phylogenetic analyses. The next smallest group of ASVs are freshwater + terrestrial generalists (4.4% of ASVs), so it makes sense to group all of these together as "marine mud generalists". We will have a look at doing this later on in the script.
-
-We can also see how many of our ASVs just turned up in a single cluster and which of those turned up in multiple.
-
-```{r wrangle1}
+# look at number that only turned up in single - or multiple - biomes
 d_habpref %>%
   group_by(habitats_present) %>%
   tally() %>%
@@ -247,23 +154,8 @@ d_habpref %>%
   group_by(habitat_preference) %>%
   mutate(prop = round(n/sum(n), 2)) %>%
   arrange(habitat_preference, habitats_present)
-```
 
-Firstly we can see that 50% of our ASVs are only ever present in one habitat, compared to 40% in two habitats, and 9/10% in all three habitats.
-
-Second we can see that within our freshwater specialists, 44% of them only occur in the freshwater cluster, and 56% of them occur in more than a single habitat, this is a much higher number than for marine mud specialists (30% also occur in other habitats) and terrestrial specialists (14% occur in other habitats).
-
-This may have something to do with freshwater having the lowest number of samples in their cluster, but I cannot work out why that would be right now.
-
-## Plot tree with habitat preference
-
-We can now add the habitat preference information round the outside of the phylogenetic tree. We will make the rare states (full generalist, marine mud + terrestrial generalist, and freshwater + marine mud generalist) larger so we can see how they are distributed on our tree.
-
-```{r plot_tree2}
-#| fig-width: 12
-#| fig-height: 9
-#| fig-align: center
-
+# remake tree and add in biome preference
 # reuse tree made above
 # now plot habitat preference around the tips
 tree_plot2 <- tree_plot +
@@ -283,23 +175,14 @@ tree_plot2 <- tree_plot +
 
 tree_plot2 
 
-# save plot out
-#ggsave(here('sequencing_rpoB/plots/analyses/tree_all_taxonomy.pdf'), tree_plot2, height = 9, width = 12)
+# save tree out
 ggsave(here('plots/sequencing_rpoB/analyses/tree_all_taxonomy.png'), tree_plot2, height = 9, width = 12)
 
-```
+#-------------------------------------------#
+# plot tree after collapsing rare states ####
+#-------------------------------------------#
 
-Ok this looks pretty darn amazing. There are a couple of things to take home from this.
-
--   Marine mud clades look very well conserved
--   The other states look less well conserved
--   The two rarest states (full generalist and marine mud + terrestrial generalist) do not really cluster together. This may make them very difficult to include in models.
-
-## Plot tree after collapsing our rare states into a single trait
-
-As a consequence of how rare it is to be a marine mud generalist, we will visualise how the tree looks if we add a column to collapse these into a single trait.
-
-```{r wrangle_2}
+# collapse full generalists, marine + terrestrial generalist, and freshwater + marine generalist into a single preference
 # create new habitat preference vector
 d_habpref <- mutate(d_habpref, habitat_preference2 = ifelse(habitat_preference %in% c('freshwater:marine_mud:terrestrial', 'freshwater:marine_mud', 'marine_mud:terrestrial'), 'marine_mud_generalist', habitat_preference),
                     # rename all habitat preference vectors for easy renaming
@@ -313,12 +196,7 @@ d_habpref %>% group_by(habitat_preference3) %>%
   tally() %>%
   arrange(-n)
 
-```
-
-We can make this into a super pretty table, allowing us to see the numbers in each group and how different groupings are made.
-
-```{r make_table}
-
+# make table used in Figure 2
 d_table <- group_by(d_habpref, habitat_preference2, habitat_preference) %>%
   tally() %>%
   mutate(habitat_preference = case_when(habitat_preference == 'freshwater' ~ 'freshwater specialist',
@@ -329,19 +207,21 @@ d_table <- group_by(d_habpref, habitat_preference2, habitat_preference) %>%
                                         habitat_preference == 'marine_mud'~ 'marine specialist',
                                         habitat_preference == 'terrestrial'~ 'land specialist'),
          habitat_preference2 = case_when(habitat_preference2 == 'freshwater' ~ 'freshwater specialist',
-                                        habitat_preference2 == 'marine_mud'~ 'marine specialist',
-                                        habitat_preference2 == 'terrestrial'~ 'land specialist',
-                                        habitat_preference2 == 'freshwater:terrestrial' ~ 'freshwater + land generalist',
-                                        habitat_preference2 == 'marine_mud_generalist' ~ 'marine generalist')) %>%
+                                         habitat_preference2 == 'marine_mud'~ 'marine specialist',
+                                         habitat_preference2 == 'terrestrial'~ 'land specialist',
+                                         habitat_preference2 == 'freshwater:terrestrial' ~ 'freshwater + land generalist',
+                                         habitat_preference2 == 'marine_mud_generalist' ~ 'marine generalist')) %>%
   ungroup()
 
 head(d_table)
 
+# rearrange table
 d_table <- mutate(d_table, first_col = habitat_preference2) %>%
   select(first_col, everything())
 
 black_dot <- "\U2B24" 
 
+# make table in flextable
 table <- flextable(d_table) %>%
   set_header_labels(first_col = '',
                     habitat_preference2 = 'Biome preference',
@@ -352,39 +232,31 @@ table <- flextable(d_table) %>%
   align(align = 'center', part = 'all') %>%
   compose(j = 'first_col', i=1,
           value = as_paragraph(as_chunk(black_dot, props = fp_text(color = '#16317d'))),
-           part = "body") %>%
+          part = "body") %>%
   compose(j = 'first_col', i=2,
           value = as_paragraph(as_chunk(black_dot, props = fp_text(color = '#ffcd12'))),
-           part = "body") %>%
+          part = "body") %>%
   compose(j = 'first_col', i=3,
           value = as_paragraph(as_chunk(black_dot, props = fp_text(color = '#a40000'))),
-           part = "body") %>%
+          part = "body") %>%
   compose(j = 'first_col', i=4,
           value = as_paragraph(as_chunk(black_dot, props = fp_text(color = '#721b3e'))),
-           part = "body") %>%
+          part = "body") %>%
   compose(j = 1:2, i=5,
           value = as_paragraph(as_chunk('')),
-           part = "body") %>%
+          part = "body") %>%
   compose(j = 1:2, i=6,
           value = as_paragraph(as_chunk('')),
-           part = "body") %>%
+          part = "body") %>%
   compose(j = 'first_col', i=7,
           value = as_paragraph(as_chunk(black_dot, props = fp_text(color = '#007e2f'))),
-           part = "body") %>%
+          part = "body") %>%
   hline(i = c(1,2,3,6), border = fp_border_default()) %>%
   autofit()
-  
 
-save_as_image(table, here('plots/manuscript_plots/hab_pref_table.png'))
-```
+save_as_image(table, 'plots/manuscript_plots/hab_pref_table.png')
 
-We can now replot this tree but we need to remake `d_meta` and also set the colour scheme up again, this time for five colours.
-
-```{r plot_tree3}
-#| fig-width: 12
-#| fig-height: 9
-#| fig-align: center
-
+# remake tree with collapsed biome preference
 # remake colour scheme
 cols_hab2 <- cols_hab[names(cols_hab) %in% c('marine_mud', 'freshwater', 'terrestrial', 'freshwater:terrestrial')]
 cols_hab2 <- c(cols_hab2, '#721b3e')
@@ -394,6 +266,7 @@ names(cols_hab2) <- c('marine mud specialist', 'freshwater specialist', 'terrest
 d_meta_new <- left_join(select(d_habpref, otu, habitat_preference3, num_present), select(d_taxa, otu:family)) %>%
   mutate(rare2 = ifelse(habitat_preference3 == "marine mud generalist", 'rare', "common"))
 
+# make plot again
 tree_plot3 <- tree_plot %<+% d_meta_new +
   theme_bw() +
   theme(panel.border = element_blank(),
@@ -410,6 +283,10 @@ tree_plot3 <- tree_plot %<+% d_meta_new +
          size = 'none')
 
 tree_plot3
+
+#----------------------------------#
+# make extra plots for Figure 2 ####
+#----------------------------------#
 
 # create lineage through time plot
 d_ltt <-  ape::ltt.plot.coords(tree) %>%
@@ -435,12 +312,16 @@ backbone_tree <- ggtree(backbone) +
 # make table with flex table
 legend <- cowplot::get_legend(tree_plot3)
 
-ggsave(here('plots/sequencing_rpoB/analyses/tree_with_constraints.png'), tree_plot3 + theme(legend.position = 'none'), height = 8, width = 8)
+ggsave('plots/sequencing_rpoB/analyses/tree_with_constraints.png', tree_plot3 + theme(legend.position = 'none'), height = 8, width = 8)
 
-tree_plot3 <- image_read(here('plots/sequencing_rpoB/analyses/tree_with_constraints.png'), density = 300)
+#----------------------#
+# assemble Figure 2 ####
+#----------------------#
+
+tree_plot3 <- image_read('plots/sequencing_rpoB/analyses/tree_with_constraints.png', density = 300)
 tree_plot3 <- image_trim(tree_plot3)
 
-table <- png::readPNG(here('plots/manuscript_plots/hab_pref_table.png'), native = TRUE)
+table <- png::readPNG('plots/manuscript_plots/hab_pref_table.png', native = TRUE)
 
 layout <- c(
   'AAAAAAAB
@@ -458,19 +339,12 @@ image_ggplot(tree_plot3) +
   theme(plot.tag = element_text(size = 14))
 
 # save out
-ggsave(here('plots/manuscript_plots/Figure_2.png'), last_plot(), height = 12, width = 13)
+ggsave('plots/manuscript_plots/Figure_2.png', last_plot(), height = 12, width = 13)
 
+#----------------------------------------------------#
+# save out objects used in other analysis scripts ####
+#----------------------------------------------------#
 
-```
-
-Finally we will save out the new habitat preference vector where we have combined the habitat preference states.
-
-```{r save_out}
 # save out habitat preference vector
-write.csv(d_habpref, here('data/sequencing_rpoB/phyloseq/myxococcus/habitat_preference/summary/habitat_preference_asv_new.csv'), row.names = FALSE)
-saveRDS(cols_hab2, here('data/sequencing_rpoB/phyloseq/myxococcus/habitat_preference/summary/habitat_colours.rds'))
-```
-
-## Useful links used
-
--   [Documentation](https://yulab-smu.top/treedata-book/) of the R package **ggtree** used for plotting phylogenies.
+write.csv(d_habpref, 'data/sequencing_rpoB/phyloseq/myxococcus/habitat_preference/summary/habitat_preference_asv_new.csv', row.names = FALSE)
+saveRDS(cols_hab2, 'data/sequencing_rpoB/phyloseq/myxococcus/habitat_preference/summary/habitat_colours.rds')
