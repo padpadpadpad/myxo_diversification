@@ -225,7 +225,7 @@ tree_plot <- p2 +
 tree_plot
 
 # save plot out
-ggsave('plots/sequencing_rpoB/analyses/bamm_tree.png', tree_plot, height = 9, width = 12)
+ggsave('plots/sequencing_rpoB/bamm_tree.png', tree_plot, height = 9, width = 12)
 
 #----------------------------------------#
 # look at rate variation through time ####
@@ -303,7 +303,7 @@ ggplot() +
        y = 'rate')
 
 # save plot out
-ggsave(here('plots/sequencing_rpoB/analyses/bamm_rate_through_time.png'), last_plot(), height = 5, width = 12)
+ggsave('plots/sequencing_rpoB/bamm_rate_through_time.png', last_plot(), height = 5, width = 12)
 
 # create a plot for just net diversification
 p_rtt <- ggplot() +
@@ -368,7 +368,7 @@ p3 <- ggplot(tip_rates, aes(forcats::fct_reorder(hab_pref_axis, n), net_diversif
 p1 + p2 + p3
 
 # save plot out
-ggsave('plots/sequencing_rpoB/analyses/bamm_tip_rates.png', last_plot(), height = 5, width = 17)
+ggsave('plots/sequencing_rpoB/bamm_tip_rates.png', last_plot(), height = 5, width = 17)
 
 # make plot of just net diversification rate
 p_tiprates <- mutate(tip_rates, hab_pref_axis = case_when(hab_pref_axis == 'marine mud generalist' ~ 'marine generalist',
@@ -399,9 +399,9 @@ layout <- c(
 )
 
 tree_plot2 <- tree_plot + theme(legend.position = 'none')
-ggsave('plots/sequencing_rpoB/analyses/bamm_tree.png', tree_plot2, height = 8, width = 8)
+ggsave('plots/sequencing_rpoB/bamm_tree.png', tree_plot2, height = 8, width = 8)
 
-tree_plot2 <- image_read('plots/sequencing_rpoB/analyses/bamm_tree.png', density = 300)
+tree_plot2 <- image_read('plots/sequencing_rpoB/bamm_tree.png', density = 300)
 tree_plot2 <- image_trim(tree_plot2)
 
 # make plot

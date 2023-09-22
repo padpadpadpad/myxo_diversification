@@ -30,7 +30,7 @@ d_meta <- left_join(select(d_habpref, otu, habitat_preference = habitat_preferen
 # read in tree
 tree <- read.tree(here('data/sequencing_rpoB/raxml/trees/myxo_asv/myxo_asv_chronopl10.tre'))
 
-#custom_function ####
+# custom_function ####
 
 # function for getting a data frame from a diversitree object
 get_diversitree_df <- function(div_obj, trait_vec, replace_vec){
@@ -285,8 +285,7 @@ table <- d_table %>%
 
 save_as_image(table, 'plots/manuscript_plots/markov_model_table.png')
 
-
-# save out mcmc chains
+# save out best markov model
 saveRDS(mod_custom5, 'data/sequencing_rpoB/processed/transition_rates/mod_custom_5.rds')
 
 # plot_transition_matrix
@@ -313,7 +312,7 @@ diversitree_df %>%
   coord_fixed() +
   scale_color_manual(values = c('red', 'black'))
 
-ggsave('plots/sequencing_rpoB/analyses/discrete_character_evolution/transition_matrix.png', last_plot(), height = 5, width = 7)
+ggsave('plots/sequencing_rpoB/analyses/transition_matrix.png', last_plot(), height = 5, width = 7)
 
 #------------------------------------#
 # plot best transition rate model ####
@@ -387,7 +386,7 @@ p_best <- p +
 p_best + (wrap_elements(p_legend)/plot_spacer()) + plot_layout(widths = c(0.8, 0.2))
 
 # save out model
-ggsave(here('plots/sequencing_rpoB/analyses/discrete_character_evolution/transition_plot_diversitree.png'), last_plot(), height = 5.5, width = 7)
+ggsave(here('plots/sequencing_rpoB/analyses/transition_plot_diversitree.png'), last_plot(), height = 5.5, width = 7)
 
 # plot other models based on AIC weights
 
@@ -547,7 +546,6 @@ p_best + p_2 + p_legend + p_3 + p_4 + plot_layout(design = design, widths = c(0.
 ggsave(here('plots/sequencing_rpoB/analyses/discrete_character_evolution/transition_plot_multiple.png'), last_plot(), height = 9, width = 12)
 ggsave(here('plots/manuscript_plots/Figure_4.png'), last_plot(), height = 9, width = 12)
 
-
 #------------------------------------------------#
 # look at whether states are a source or sink ####
 #------------------------------------------------#
@@ -579,6 +577,7 @@ table_rate <- select(d_source_sink_rate, habitat_preference, away, into, source_
 save_as_image(table_rate, here('plots/sequencing_rpoB/analyses/discrete_character_evolution/source_sink_rate.png'), zoom = 3, webshot = 'webshot2')
 
 # bootstrap ####
+
 # bootstrap model by sampling 80% of the tips and refitting the best model
 
 num_boots <- 1000
@@ -932,308 +931,3 @@ table_2 <- d_source_sink_v2 %>%
 p_2 + gen_grob(table_2) + plot_layout(ncol = 1, heights = c(0.8, 0.2))
 
 ggsave('plots/manuscript_plots/bootstrap_transitions_v2.png', height = 5, width = 7)
-
-#-------------------------#
-# CODE NOT RAN ANYMORE ####
-#-------------------------#
-
-#-----------------------------------------------------------------#
-# look at uncertainty in these model estimates by running MCMC ####
-#-----------------------------------------------------------------#
-
-# set up initial start values
-inits_mcmc <- mod_custom5$par
-
-## # set up upper and lower limits - limit the values to be <3 times the max value
-lower_mcmc <- rep(0, length(inits_mcmc))
-upper_mcmc <- rep(max(inits_mcmc)*10, length(inits_mcmc))
-
-# run first mcmc to tune w
-fit_mcmc <- mcmc(lik_custom5, inits_mcmc, nsteps = 10, w = 0.1, upper = upper_mcmc, lower = lower_mcmc)
-
-# tune w for each parameter
-w <- diff(sapply(fit_mcmc[2:(ncol(fit_mcmc)-1)], quantile, c(.05, .95)))
-
-# run second mcmc to tune w
-fit_mcmc2 <- mcmc(lik_custom5, inits_mcmc, nsteps=100, w=w, upper = upper_mcmc, lower = lower_mcmc)
-
-## # tune w for each parameter
-w <- diff(sapply(fit_mcmc2[2:(ncol(fit_mcmc2)-1)], quantile, c(.05, .95)))
-
-# run third mcmc for 1000 iter
-fit_mcmc3 <- mcmc(lik_custom5, inits_mcmc, nsteps=1000, w=w, upper = upper_mcmc, lower = lower_mcmc)
-
-# save out mcmc chains
-saveRDS(fit_mcmc3, 'data/sequencing_rpoB/processed/transition_rates/asv_mcmc_trans.rds')
-
-# make data long format
-d_mcmc <- pivot_longer(fit_mcmc3, names_to = 'param', values_to = 'transition_rate', cols = starts_with('q')) %>%
-  left_join(., select(diversitree_df, param, state_1, state_2)) %>%
-  left_join(., select(coding, state_1 = hab_pref, state_1_num = hab_pref_num, state_1_label = initials)) %>%
-  left_join(., select(coding, state_2 = hab_pref, state_2_num = hab_pref_num, state_2_label = initials)) %>%
-  mutate(parameter = paste(state_1_label, '->', state_2_label))
-
-# find 95% CIs and bind with ML estimates
-d_mcmc_summary <- d_mcmc %>%
-  group_by(parameter, param, state_1, state_2) %>%
-  tidybayes::mean_qi(transition_rate) %>%
-  left_join(., select(diversitree_df, state_1, state_2, ml_estimate = transition_rate))
-
-# plot ridge plot
-ggplot(d_mcmc, aes(transition_rate, forcats::fct_reorder(parameter, transition_rate))) +
-  geom_density_ridges() +
-  theme_bw(base_size = 14) +
-  labs(x = 'transition rate',
-       y = 'transition')
-
-ggplot(d_mcmc_summary, aes(transition_rate, forcats::fct_reorder(parameter, transition_rate))) +
-  geom_linerange(aes(xmin = .lower, xmax = .upper)) +
-  geom_point(size = 3) +
-  geom_point(aes(x = ml_estimate), size = 3, col = 'red') +
-  theme_bw(base_size = 14) +
-  labs(x = 'transition rate',
-       y = 'transition',
-       caption = 'red points are ML estimate\nblack points are MCMC average')
-
-# look at which rates correlate with each
-d_mcmc %>%
-  select(parameter, transition_rate, i) %>%
-  pivot_wider(names_from = parameter, values_from = transition_rate) %>%
-  slice_sample(n = 250) %>%
-  ggpairs(., columns = 2:ncol(.),
-          lower = list(continuous = wrap("points", alpha = 0.3))) +
-  theme_bw()
-
-ggsave('plots/sequencing_rpoB/analyses/discrete_character_evolution/pairs_plot.png', last_plot(), height = 12, width = 14)
-
-
-#-------------------------------------#
-# run stochastic character mapping ####
-#-------------------------------------#
-
-# create transition matrix
-num_states <- unique(hab_pref) %>% length()
-
-# we will set up the custom matrix, this has 49 numbers and then we have to set the correct numbers to 0
-best_matrix <- matrix(1:num_states^2, nrow=num_states)
-
-# make all diagonal numbers NA
-for(i in 1:nrow(best_matrix)){
-  best_matrix[i,i] <- 0
-}
-
-rownames(best_matrix) <- colnames(best_matrix) <- sort(coding$hab_pref)
-
-# populate matrix with estimated parameters from best diversitree model
-best_matrix[best_matrix != 0] <- arrange(diversitree_df, state_2, state_1) %>% pull(transition_rate)
-
-# make diagonal values make things sum to 0
-diag(best_matrix) <- -rowSums(best_matrix)
-
-# simmap_best <- make.simmap(tree, hab_pref, nsim = 1000, Q = best_matrix)
-
-# need to split this result up so that files are less than 50MB for GitHub
-# number of splits
-n_splits <- 10
-
-# find start of each split
-splits <- seq(from = 1, to = 1000, by = 1000/10)
-
-# save files out
-for(i in 1:length(splits)){
-  # save out every 100 sims
-  saveRDS(simmap_best[splits[i]:(splits[i]+99)], paste("data/sequencing_rpoB/processed/transition_rates/simmap/simmap_", i, '.rds', sep = ''))
-}
-
-# summarise_phytools
-
-## # summarise number of switches between states and time spent in each state
-simmap_summary <- describe.simmap(simmap_best, plot=FALSE)
-
-## # remove the tree element - this is the simmap_best
-simmap_summary$tree <- NULL
-
-saveRDS(simmap_summary, 'data/sequencing_rpoB/processed/transition_rates/simmap/simmap_summary.rds')
-
-# coerce transitions into dataframe
-d_transitions <- as.data.frame(simmap_summary$count, col.names = colnames(simmap_summary$count)) %>%
-  mutate(iter = 1:n()) %>%
-  pivot_longer(cols = c(everything(), -N, -iter), names_to = 'transition', values_to = 'n_transitions') %>%
-  separate(transition, c('state_1', 'state_2'), sep = ',', remove = FALSE) %>%
-  mutate(label = gsub(',', ' -> ', transition))
-
-# plot these
-group_by(d_transitions, transition) %>%
-  filter(max(n_transitions) > 0) %>%
-  mutate(average = mean(n_transitions)) %>%
-  ungroup() %>%
-  mutate(label = fct_reorder(label, desc(average))) %>%
-  ggplot() +
-  geom_histogram(aes(n_transitions), fill = 'white', col = 'black', binwidth = function(x) (max(x)-min(x))/nclass.FD(x)) +
-  facet_wrap(~ label, scales = 'free_x') +
-  theme_bw() +
-  labs(title = 'Distribution of number of transitions between states',
-       subtitle = 'Facets are ordered by common transitions',
-       x = 'Number of transitions',
-       y = 'Count')
-
-
-d_transitions_summary <- group_by(d_transitions, iter) %>%
-  mutate(prop = n_transitions/sum(n_transitions)) %>%
-  group_by(state_1, state_2) %>%
-  summarise(ave_num = mean(n_transitions),
-            ave_prop = mean(prop),
-            lower_ci = quantile(prop, 0.025),
-            upper_ci = quantile(prop, 0.975),
-            .groups = 'drop') %>%
-  arrange(desc(ave_prop)) %>%
-  filter(ave_num > 0)
-
-table <- select(d_transitions_summary, state_1, state_2, ave_num, ave_prop) %>%
-  mutate(across(starts_with('state'), function(x) gsub('mud_and_shore', 'marine mud', x)),
-         across(starts_with('state'), function(x) gsub(':', ' + ', x)),
-         ave_prop = round(ave_prop, 2),
-         ave_num = round(ave_num, 0))
-
-table_flex <- flextable(table) %>%
-  set_header_labels(state_1 = 'from',
-                    state_2 = 'to',
-                    ave_prop = 'proportion of all transitions',
-                    ave_num = 'number of transitions') %>%
-  align(align = 'center', part = 'header') %>%
-  bold(part = 'header') %>%
-  font(fontname = 'Times', part = 'all') %>%
-  fontsize(size = 12, part = 'all') %>%
-  autofit()
-
-# save out
-save_as_image(table_flex, here('plots/sequencing_rpoB/analyses/discrete_character_evolution/proportion_of_transitions.png'), zoom = 3, webshot = 'webshot2')
-
-table_flex
-
-# coerce time into dataframe
-d_time <- as.data.frame(simmap_summary$times, col.names = colnames(simmap_summary$times)) %>%
-  mutate(n = 1:n()) %>%
-  select(-total) %>%
-  pivot_longer(cols = c(everything(), -n), names_to = 'state', values_to = 'time') %>%
-  group_by(n) %>%
-  mutate(prop = time/sum(time)) %>%
-  ungroup()
-
-# calculate mean time spent in each state
-d_timespent <- group_by(d_time, state) %>%
-  summarise(mean = mean(prop), .groups = 'drop')
-
-
-# next with source sink dynamics using counts
-d_source_sink_count <- select(d_transitions_summary, away = state_1, into = state_2, ave_num) %>%
-  pivot_longer(cols = c(away, into), names_to = 'direction', values_to = 'habitat_preference') %>%
-  group_by(habitat_preference, direction) %>%
-  summarise(total_count = sum(ave_num), .groups = 'drop') %>%
-  pivot_wider(names_from = direction, values_from = total_count) %>%
-  mutate(source_sink1 = away / into,
-         source_sink2 = into - away)
-
-table_count <- select(d_source_sink_count, habitat_preference, away, into, source_sink1) %>%
-  mutate(across(away:source_sink1, ~round(.x, 2)),
-         habitat_preference = gsub(':', ' + ', habitat_preference),
-         habitat_preference = gsub('_', ' ', habitat_preference)) %>%
-  arrange(desc(source_sink1)) %>%
-  flextable(.) %>%
-  set_header_labels(habitat_preference = 'biome preference',
-                    source_sink1 = 'source sink ratio') %>%
-  align(align = 'center', part = 'all') %>%
-  align(align = 'left', part = 'body', j = 1) %>%
-  bold(part = 'header') %>%
-  font(fontname = 'Times', part = 'all') %>%
-  fontsize(size = 12, part = 'all') %>%
-  autofit()
-
-save_as_image(table_count, here('plots/sequencing_rpoB/analyses/discrete_character_evolution/source_sink_count.png'), zoom = 3, webshot = 'webshot2')
-
-
-# can we look at expected numbers of transitions if they were all equally likely? ####
-
-# work out proportion of tips are each habitat preference
-d_hab_pref <- group_by(d_meta, habitat_preference) %>%
-  tally() %>%
-  ungroup() %>%
-  mutate(prop = n/sum(n))
-
-# work out expectation
-d_expectation <- diversitree_df %>%
-  #filter(free_param == 'yes') %>%
-  select(state_1, state_2) %>%
-  left_join(., select(d_hab_pref, state_1 = habitat_preference, state_1_prop = prop)) %>%
-  left_join(., select(d_hab_pref, state_2 = habitat_preference, state_2_prop = prop)) %>%
-  mutate(expected_prop = state_1_prop * state_2_prop,
-         normalised_expectation = expected_prop/sum(expected_prop))
-
-# observed numbers of transitions
-d_expectation <- left_join(d_expectation, select(d_transitions_summary, state_1, state_2, ave_num)) %>%
-  mutate(ave_num = replace_na(ave_num, 0),
-         tot_transitions = sum(ave_num),
-         expected_num = tot_transitions*normalised_expectation,
-         ratio = ave_num/expected_num) %>%
-  select(state_1, state_2, ave_num, expected_num, ratio)
-
-# make this into a table
-table_expect <- mutate(d_expectation,
-                       across(ave_num:ratio, ~round(.x, 2)),
-                       state_1 = gsub(':', ' + ', state_1),
-                       state_1 = gsub('_', ' ', state_1),
-                       state_2 = gsub(':', ' + ', state_2),
-                       state_2 = gsub('_', ' ', state_2)) %>%
-  arrange(desc(ratio)) %>%
-  flextable(.) %>%
-  set_header_labels(state_1 = 'from',
-                    state_2 = 'to',
-                    ave_num = 'observed number of transitions',
-                    expected_num = 'expected number of transitions',
-                    ratio = 'ratio'
-  ) %>%
-  align(align = 'center', part = 'all') %>%
-  align(align = 'left', part = 'body', j = 1) %>%
-  bold(part = 'header') %>%
-  font(fontname = 'Times', part = 'all') %>%
-  fontsize(size = 12, part = 'all') %>%
-  autofit()
-
-# save out
-save_as_image(table_expect, here('plots/sequencing_rpoB/analyses/discrete_character_evolution/expected_transitions.png'), zoom = 3, webshot = 'webshot2')
-
-#--------------------------------------------------------------#
-# are extant generalists generally younger than specialists ####
-#--------------------------------------------------------------#
-
-# grab dataset for tree
-d_tree <- as_tibble(tree) %>%
-  filter(!is.na(label)) %>%
-  janitor::clean_names() %>%
-  rename(tip_label = label) %>%
-  left_join(., d_meta)
-
-ggplot(d_tree, aes(habitat_preference, branch_length)) +
-  geom_pretty_boxplot(aes(col = habitat_preference, fill = habitat_preference), show.legend = FALSE) +
-  geom_point(shape = 21, fill = 'white', col = 'black', position = position_jitter(width = 0.15), alpha = 0.8) +
-  theme_bw(base_size = 16) +
-  scale_x_discrete(labels = scales::label_wrap(15)) +
-  scale_color_manual(values = cols_hab) +
-  scale_fill_manual(values = cols_hab)
-
-# set up correlation matrix for the tree
-cor_lambda <- corPagel(value = 1, phy = tree, form = ~tip_label)
-
-d_tree <- tibble(tip_label = tree$tip.label) %>%
-  left_join(., d_tree)
-
-# fit phylogenetic generalised linear model
-d_tree <- data.frame(d_tree) %>%
-  select(tip_label, branch_length, habitat_preference)
-row.names(d_tree) <- d_tree$tip_label
-
-d_compare <- caper::comparative.data(phy=tree, data=d_tree, names.col = "tip_label", vcv = TRUE, warn.dropped=TRUE)
-
-mod <- caper::pgls(branch_length ~ habitat_preference, d_compare, lambda = "ML") 
-
-anova(mod)
