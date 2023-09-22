@@ -67,9 +67,9 @@ I have avoided uploading overly large files to GitHub as there is a file size li
         - The order of the analysis scripts is as follows:
             1. **estimate_phylogenetic_signal_all.R** estimates the phylogenetic signal of biome preference at each OTU similarity cut-off.
             2. **visualise_phylogenetic_signal.R** recreates **Figure S4**.
-            3. **plot_phylogeny.R** plots the phylogeny and groups some biome preferences together. Recreates **Figure 2**.
+            3. **visualise_phylogeny.R** plots the phylogeny and groups some biome preferences together. Recreates **Figure 2**.
             4. **diversitree_mk_models.R** fits the Markov models looking at biome preference transitions. Recreates **Figure 3**, **Table 1**, **Figure S5**, **Figure S6**, **Table S2**.
-            5. **post_bamm_analysis.R** analyses the output of BAMM. Recreates **Figure 4**.
+            5. **bamm_analysis.R** analyses the output of BAMM. Recreates **Figure 4**.
             6. **diversitree_musse_models.R** fits MuSSE models using diversitree.
             7. **check_fixed_transition_rates.R** looks at the impact on parameter estimates of fixing some transition rates in the fitting of models using secsse.
             6. **fit_secsse_*_start_vals** finds the maximum likelihood of potential start values for the musse, muhisse, ctd2, ctd3, and ctd4 models fit using secsse.
