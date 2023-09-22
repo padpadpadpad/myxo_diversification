@@ -117,23 +117,23 @@ of the manuscript to the European Nucleotide Archive.
           phylogenetic signal of biome preference at each OTU similarity
           cut-off.
       2.  **visualise_phylogenetic_signal.R** recreates **Figure S4**.
-      3.  **plot_phylogeny.R** plots the phylogeny and groups some biome
-          preferences together. Recreates **Figure 2**.
+      3.  **visualise_phylogeny.R** plots the phylogeny and groups some
+          biome preferences together. Recreates **Figure 2**.
       4.  **diversitree_mk_models.R** fits the Markov models looking at
           biome preference transitions. Recreates **Figure 3**, **Table
           1**, **Figure S5**, **Figure S6**, **Table S2**.
-      5.  **post_bamm_analysis.R** analyses the output of BAMM.
-          Recreates **Figure 4**.
+      5.  **bamm_analysis.R** analyses the output of BAMM. Recreates
+          **Figure 4**.
       6.  **diversitree_musse_models.R** fits MuSSE models using
           diversitree.
       7.  **check_fixed_transition_rates.R** looks at the impact on
           parameter estimates of fixing some transition rates in the
           fitting of models using secsse.
-      8.  \*\*fit_secsse\_\*\_start_vals\*\* finds the maximum
-          likelihood of potential start values for the musse, muhisse,
-          ctd2, ctd3, and ctd4 models fit using secsse.
-      9.  \*\*fit_secsse\_\*\_v2.R\*\* fits the musse, muhisse, ctd2,
-          ctd3, and ctd4 models using secsse.
+      8.  **fit_secsse\_\*\_start_vals** finds the maximum likelihood of
+          potential start values for the musse, muhisse, ctd2, ctd3, and
+          ctd4 models fit using secsse.
+      9.  **fit_secsse\_\*\_v2.R** fits the musse, muhisse, ctd2, ctd3,
+          and ctd4 models using secsse.
       10. **seccse_model_compare.R** compares the musse, muhisse, ctd2,
           ctd3, and ctd4 models fit with secsse. Recreates **Table 2**
           and **Table S3**.

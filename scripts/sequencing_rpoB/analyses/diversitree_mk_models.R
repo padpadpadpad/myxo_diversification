@@ -9,7 +9,7 @@
 # 3. does bootstraps on the best model sampling 80% of tips and refitting the best model
 
 # load packages ####
-librarian::shelf(here, tidyverse, ggtree, ggnewscale, RColorBrewer, patchwork, phytools, ggpp, castor, diversitree, tidygraph, igraph, ggraph, GGally, ggrepel, flextable, ggridges, hisse, padpadpadpad/MicrobioUoE, cli)
+librarian::shelf(here, tidyverse, ggtree, ggnewscale, RColorBrewer, patchwork, phytools, diversitree, tidygraph, igraph, ggraph, GGally, ggrepel, flextable, padpadpadpad/MicrobioUoE, cli)
 
 # read in datasets ####
 
@@ -312,7 +312,7 @@ diversitree_df %>%
   coord_fixed() +
   scale_color_manual(values = c('red', 'black'))
 
-ggsave('plots/sequencing_rpoB/analyses/transition_matrix.png', last_plot(), height = 5, width = 7)
+ggsave('plots/sequencing_rpoB/transition_matrix.png', last_plot(), height = 5, width = 7)
 
 #------------------------------------#
 # plot best transition rate model ####
@@ -386,7 +386,7 @@ p_best <- p +
 p_best + (wrap_elements(p_legend)/plot_spacer()) + plot_layout(widths = c(0.8, 0.2))
 
 # save out model
-ggsave(here('plots/sequencing_rpoB/analyses/transition_plot_diversitree.png'), last_plot(), height = 5.5, width = 7)
+ggsave(here('plots/sequencing_rpoB/transition_plot_diversitree.png'), last_plot(), height = 5.5, width = 7)
 
 # plot other models based on AIC weights
 
@@ -543,7 +543,7 @@ p_best <- p_best + labs(title = '(a) Simplified ARD model 5',
 p_best + p_2 + p_legend + p_3 + p_4 + plot_layout(design = design, widths = c(0.4, 0.4, 0.2))
 
 # save out model
-ggsave(here('plots/sequencing_rpoB/analyses/discrete_character_evolution/transition_plot_multiple.png'), last_plot(), height = 9, width = 12)
+ggsave(here('plots/sequencing_rpoB/transition_plot_multiple.png'), last_plot(), height = 9, width = 12)
 ggsave(here('plots/manuscript_plots/Figure_4.png'), last_plot(), height = 9, width = 12)
 
 #------------------------------------------------#
@@ -574,7 +574,7 @@ table_rate <- select(d_source_sink_rate, habitat_preference, away, into, source_
   autofit()
 
 # save out
-save_as_image(table_rate, here('plots/sequencing_rpoB/analyses/discrete_character_evolution/source_sink_rate.png'), zoom = 3, webshot = 'webshot2')
+save_as_image(table_rate, here('plots/sequencing_rpoB/source_sink_rate.png'), zoom = 3, webshot = 'webshot2')
 
 # bootstrap ####
 
