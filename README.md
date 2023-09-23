@@ -160,3 +160,7 @@ of the manuscript to the European Nucleotide Archive.
   - **map.rds** - saved plot used to create **Figure 1**.
   - **rough_manuscript_plots.ppt** - rough slides planning out the
     figures for the manuscript.
+
+### Software versions
+
+- These scripts were ran on R version 4.3.1 and MacOS Ventura 13.4.1.

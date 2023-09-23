@@ -90,3 +90,7 @@ I have avoided uploading overly large files to GitHub as there is a file size li
     -   **map_legend.rds** - saved legend used to create **Figure 1**.
     -   **map.rds** - saved plot used to create **Figure 1**.
     -   **rough_manuscript_plots.ppt** - rough slides planning out the figures for the manuscript.
+
+### Software versions
+
+- These scripts were ran on R version 4.3.1 and MacOS Ventura 13.4.1.
