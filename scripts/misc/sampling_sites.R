@@ -36,7 +36,7 @@ d_table <- separate(d, coordinates, c('lat', 'lon'), sep = ',') %>%
                                         habitat_group_16s == 'pasture' ~ 'pasture soil',
                                         habitat_group_16s == 'marine mud_full saline' ~ 'marine sediment',
                                         habitat_group_16s == 'beach_seaweed' ~ 'beachcast seaweed',
-                                        habitat_group_16s == 'rock_samphire' ~ 'soil under coastal plants',
+                                        habitat_group_16s == 'rock_samphire' ~ 'rock samphire rhizosphere',
                                         habitat_group_16s == 'woodland_oak' ~ 'low subtidal sand',
                                         habitat_group_16s == 'estuarine mud_full saline' ~ 'estuarine sediment (close to full salinity)',
                                         habitat_group_16s == 'estuarine mud_low polyhaline' ~ 'estuarine sediment (polyhaline/mesohaline)',

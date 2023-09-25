@@ -18,7 +18,7 @@ rm(list = ls())
 set.seed(42)
 
 # load packages ####
-library(microViz)
+library(microViz) # remotes::install_github("david-barnett/microViz")
 library(phyloseq)
 library(vegan)
 library(patchwork)
@@ -29,9 +29,9 @@ library(NbClust)
 library(fpc)
 library(dendextend)
 library(factoextra)
+remotes::install_github("leffj/mctoolsr")
 
-path_fig <- 'sequencing_16S/plots/analyses'
-
+path_fig <- 'sequencing_16S/plots'
 path_fig <- 'plots/sequencing_16s'
 
 # source extra functions
