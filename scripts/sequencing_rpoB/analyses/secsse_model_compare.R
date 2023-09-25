@@ -57,20 +57,12 @@ fits_ctd4 <- str_subset(files, 'ctd4') %>%
   mutate(., aic = (2*n_params) - 2*loglik)
 # best model are run 1 and run 4 - AIC = 2613.6
 
-# read in ctd5 models
-fits_ctd5 <- str_subset(files, 'ctd5') %>%
-  map(., get_loglik) %>%
-  list_rbind() %>%
-  mutate(., aic = (2*n_params) - 2*loglik)
-# best model is run all of them: AIC = 3083.513
-
 # read in those four models and do model comparison using AIC scores
 best_ctd2 <- readRDS('data/sequencing_rpoB/processed/secsse/results/samp_frac_1/v2/seccse_muctd2_sampfrac1_run1_v2.rds')
 best_muhisse <- readRDS('data/sequencing_rpoB/processed/secsse/results/samp_frac_1/v2/seccse_muhisseSSonly_sampfrac1_run4_v2.rds')
 best_ctd3 <- readRDS('data/sequencing_rpoB/processed/secsse/results/samp_frac_1/v2/seccse_muctd3_sampfrac1_run1_v2.rds')
 best_musse <- readRDS('data/sequencing_rpoB/processed/secsse/results/samp_frac_1/v2/seccse_musse_sampfrac1_run1v2.rds')
 best_ctd4 <- readRDS('data/sequencing_rpoB/processed/secsse/results/samp_frac_1/v2/seccse_muctd4_sampfrac1_run1_v2.rds')
-#best_ctd5 <- readRDS('data/sequencing_rpoB/processed/secsse/results/samp_frac_1/v2/seccse_muctd4_sampfrac1_run1_v2.rds')
 
 final_models <- c('data/sequencing_rpoB/processed/secsse/results/samp_frac_1/v2/seccse_muctd2_sampfrac1_run1_v2.rds',
                   'data/sequencing_rpoB/processed/secsse/results/samp_frac_1/v2/seccse_muhisseSSonly_sampfrac1_run4_v2.rds', 
@@ -82,7 +74,6 @@ best_muhisse$mod$ML
 best_ctd2$mod$ML
 best_ctd3$mod$ML
 best_ctd4$mod$ML
-best_ctd5$mod$ML
 
 best_ctd3$mod$MLpars[[1]]
 best_ctd4$mod$MLpars[[1]]
@@ -117,6 +108,7 @@ table <- select(model_table, model, n_params, loglik, aic, weights) %>%
 table
 
 save_as_image(table, 'plots/manuscript_plots/secsse_table.png')
+save_as_docx(table, path ='plots/manuscript_plots/secsse_table.docx')
 
 #-------------------------#
 # sample fraction 0.75 ####
@@ -171,7 +163,6 @@ best_muhisse <- readRDS('data/sequencing_rpoB/processed/secsse/results/samp_frac
 best_ctd2 <- readRDS('data/sequencing_rpoB/processed/secsse/results/samp_frac_0.75/v2/seccse_muctd2_sampfrac0.75_run7_v2.rds')
 best_ctd3 <- readRDS('data/sequencing_rpoB/processed/secsse/results/samp_frac_0.75/v2/seccse_muctd3_sampfrac0.75_run9_v2.rds')
 best_ctd4 <- readRDS('data/sequencing_rpoB/processed/secsse/results/samp_frac_0.75/v2/seccse_muctd4_sampfrac0.75_run12.rds')
-#best_ctd5 <- readRDS('data/sequencing_rpoB/processed/secsse/results/samp_frac_0.75/v2/seccse_muctd3_sampfrac1_run1.rds')
 
 final_models_0.75 <- c('data/sequencing_rpoB/processed/secsse/results/samp_frac_0.75/v2/seccse_musse_sampfrac0.75_run10v2.rds',
                   'data/sequencing_rpoB/processed/secsse/results/samp_frac_0.75/v2/seccse_muhisseSSonly_sampfrac0.75_run10_v2.rds', 
@@ -234,7 +225,6 @@ best_muhisse <- readRDS('data/sequencing_rpoB/processed/secsse/results/samp_frac
 best_ctd2 <- readRDS('data/sequencing_rpoB/processed/secsse/results/samp_frac_0.5/v2/seccse_muctd2_sampfrac0.5_run13_v2.rds')
 best_ctd3 <- readRDS('data/sequencing_rpoB/processed/secsse/results/samp_frac_0.5/v2/seccse_muctd3_sampfrac0.5_run18_v2.rds')
 best_ctd4 <- readRDS('data/sequencing_rpoB/processed/secsse/results/samp_frac_0.5/v2/seccse_muctd2_sampfrac0.5_run15_v2.rds')
-#best_ctd5 <- readRDS('data/sequencing_rpoB/processed/secsse/results/samp_frac_0.5/v2/seccse_muctd3_sampfrac1_run1.rds')
 
 final_models_0.5 <- c('data/sequencing_rpoB/processed/secsse/results/samp_frac_0.5/v2/seccse_musse_sampfrac0.5_run13v2.rds',
                   'data/sequencing_rpoB/processed/secsse/results/samp_frac_0.5/v2/seccse_muhisseSSonly_sampfrac0.5_run18_v2.rds', 

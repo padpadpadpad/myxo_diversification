@@ -284,6 +284,8 @@ table <- d_table %>%
   autofit() 
 
 save_as_image(table, 'plots/manuscript_plots/markov_model_table.png')
+save_as_docx(table, path = 'plots/manuscript_plots/markov_model_table.docx')
+
 
 # save out best markov model
 saveRDS(mod_custom5, 'data/sequencing_rpoB/processed/transition_rates/mod_custom_5.rds')
@@ -575,6 +577,8 @@ table_rate <- select(d_source_sink_rate, habitat_preference, away, into, source_
 
 # save out
 save_as_image(table_rate, here('plots/sequencing_rpoB/source_sink_rate.png'), zoom = 3, webshot = 'webshot2')
+save_as_docx(table_rate, path = here('plots/sequencing_rpoB/source_sink_rate.docx'))
+
 
 # bootstrap ####
 
