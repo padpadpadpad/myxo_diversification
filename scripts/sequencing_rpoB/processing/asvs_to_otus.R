@@ -29,8 +29,37 @@ tax_table <- tax_table(ps) %>%
   rownames_to_column(var = 'tip_label') %>%
   janitor::clean_names()
 
+# lets look at total abundance and total prevalence of each ASV
+d_ps <- psmelt(ps) %>%
+  janitor::clean_names() %>%
+  mutate(presence = ifelse(abundance > 0, 1, 0)) %>%
+  group_by(otu) %>%
+  summarise(abundance = sum(abundance),
+            prevalence = sum(presence),
+            .groups = 'drop')
+
+group_by(d_ps, prevalence) %>%
+  tally()
+
+ggplot(d_ps, aes(log10(abundance))) +
+  geom_histogram()
+
 # prevalence filter the raw ASV data
 ps_sub <- microViz::tax_filter(ps, min_prevalence = 4, min_total_abundance = 100)
+
+d_ps <- psmelt(ps_sub) %>%
+  janitor::clean_names() %>%
+  mutate(presence = ifelse(abundance > 0, 1, 0)) %>%
+  group_by(otu) %>%
+  summarise(abundance = sum(abundance),
+            prevalence = sum(presence),
+            .groups = 'drop')
+
+group_by(d_ps, prevalence) %>%
+  tally()
+
+ggplot(d_ps, aes(log10(abundance))) +
+  geom_histogram()
 
 # save this out
 saveRDS(ps_sub, here('data/sequencing_rpoB/phyloseq/myxococcus/prevalence_filtered/ps_otu_asv_filt.rds'))

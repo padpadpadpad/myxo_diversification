@@ -19,6 +19,16 @@ librarian::shelf(here, tidyverse, ggtree, ggnewscale, RColorBrewer, patchwork, a
 
 # load in the tree
 tree <- ape::read.tree('data/sequencing_rpoB/raxml/trees/myxo_asv/myxo_asv_chronopl10.tre')
+#tree <- ape::read.tree('~/Downloads/myxo_asv_treepl_cv.tre')
+#tree <- phytools::force.ultrametric(tree)
+
+is.ultrametric(tree)
+
+# alter tip labels to remove family as they will not link to the distance matrix
+# write function to remove family labels
+strsplit_mod <- function(x)(strsplit(x, split = '_') %>% unlist() %>% .[1:2] %>% paste0(., collapse = '_'))
+
+tree$tip.label <- purrr::map_chr(tree$tip.label, strsplit_mod)
 
 # read in habitat preference
 d_habpref <- read.csv('data/sequencing_rpoB/phyloseq/myxococcus/habitat_preference/summary/habitat_preference_asv.csv')
@@ -103,6 +113,8 @@ names(cols) <- c(sort(d_common$family2), 'uncertain', 'unconstrained')
 # make a separate column for the rare states to make their size bigger!
 d_meta <- mutate(d_meta, rare = ifelse(habitat_preference %in% c('freshwater:marine_mud:terrestrial', 'marine_mud:terrestrial', "freshwater:marine_mud"), 'rare', 'common'))
 
+castor::get_all_distances_to_root(tree2) %>% max()
+
 # first only plot taxonomy, also make non circular so we can see groupings properly
 tree_plot <- ggtree(tree2, aes(col = group)) %<+% filter(d_meta) +
   scale_color_manual('Family (branch colours)', values = cols) +
@@ -111,21 +123,21 @@ tree_plot <- ggtree(tree2, aes(col = group)) %<+% filter(d_meta) +
                 mapping = aes(node = mrca,
                               color = family2,
                               label = blank_label),
-                offset = 0.1,
+                offset = castor::get_all_distances_to_root(tree2) %>% max() * 0.03,
                 barsize = 2,
                 show.legend = FALSE)
 
 tree_plot
 
 # we can remake the tree in a circular fashion for all the other plots from now on
-tree_plot <- ggtree(tree2, layout = 'circular', branch.length = 'none', aes(col = group)) %<+% filter(d_meta) +
+tree_plot <- ggtree(tree2, layout = 'circular', aes(col = group)) %<+% filter(d_meta) +
   scale_color_manual('Family (branch colours)', values = cols) +
   guides(color = guide_legend(override.aes = list(linewidth = 3))) +
   geom_cladelab(data = d_meta2,
                 mapping = aes(node = mrca,
                               color = family2,
                               label = blank_label),
-                offset = 10,
+                offset = castor::get_all_distances_to_root(tree2) %>% max() * 0.08,
                 barsize = 2,
                 show.legend = FALSE)
 
@@ -167,7 +179,7 @@ tree_plot2 <- tree_plot +
         axis.text.y = element_blank(),
         axis.ticks = element_blank()) +
   new_scale_color() +
-  geom_tippoint(aes(x=x+5, col = habitat_preference, size = rare), position = position_jitter(width = 3, height = 0)) +
+  geom_tippoint(aes(x=x+x*0.04, col = habitat_preference, size = rare), position = position_jitter(width = 0.025, height = 0)) +
   scale_size_manual(values = c(0.6, 3)) +
   scale_color_manual('Habitat preference (tip points)', values = cols_hab, labels = hab_labels) +
   guides(color = guide_legend(override.aes = list(size = 5)),
@@ -276,7 +288,7 @@ tree_plot3 <- tree_plot %<+% d_meta_new +
         axis.text.y = element_blank(),
         axis.ticks = element_blank()) +
   new_scale_color() +
-  geom_tippoint(aes(x=x+5, col = habitat_preference3, size = rare2), position = position_jitter(width = 3, height = 0)) +
+  geom_tippoint(aes(x=x+x*0.04, col = habitat_preference3, size = rare2), position = position_jitter(width = 0.025, height = 0)) +
   scale_color_manual('Biome preference (tip points)', values = cols_hab2, labels = c('freshwater + land generalist', 'freshwater specialist', 'marine generalist', 'marine specialist', 'land specialist')) +
   scale_size_manual(values = c(0.6, 3)) +
   guides(color = guide_legend(override.aes = list(size = 5)),
@@ -294,7 +306,7 @@ d_ltt <-  ape::ltt.plot.coords(tree) %>%
   mutate(time2 = time + 1)
 
 # create lineage through time plot
-p2 <- ggplot(d_ltt, aes(time2, N)) +
+p2 <- ggplot(d_ltt, aes(time2, log(N))) +
   geom_line() +
   theme_bw(base_size = 12) +
   labs(x = 'Relative time',

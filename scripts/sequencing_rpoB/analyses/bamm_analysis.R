@@ -30,13 +30,23 @@ d_taxa <- readRDS('data/sequencing_rpoB/phyloseq/myxococcus/prevalence_filtered/
   rownames_to_column('otu')
 
 # create d_meta
-d_meta <- left_join(select(d_habpref, otu, habitat_preference = habitat_preference3, num_present), dplyr::select(d_taxa, otu:family))
+d_meta <- left_join(dplyr::select(d_habpref, otu, habitat_preference = habitat_preference3, num_present), dplyr::select(d_taxa, otu:family))
 
 # load in colours
 cols_hab <- readRDS('data/sequencing_rpoB/phyloseq/myxococcus/habitat_preference/summary/habitat_colours.rds')
 
 # load in tree
 tree <- ape::read.tree('data/sequencing_rpoB/raxml/trees/myxo_asv/myxo_asv_chronopl10.tre')
+#tree <- ape::read.tree('data/sequencing_rpoB/raxml/trees/myxo_asv/myxo_asv_treepl.tre')
+#tree <- phytools::force.ultrametric(tree)
+
+is.ultrametric(tree)
+
+# alter tip labels to remove family as they will not link to the distance matrix
+# write function to remove family labels
+strsplit_mod <- function(x)(strsplit(x, split = '_') %>% unlist() %>% .[1:2] %>% paste0(., collapse = '_'))
+
+tree$tip.label <- purrr::map_chr(tree$tip.label, strsplit_mod)
 
 # load in bamm run
 mcmcout <- read.csv('data/sequencing_rpoB/bamm/bamm_asv_mcmc_out.txt')
@@ -169,7 +179,7 @@ constrained_families <- c('Myxococcaceae', 'Vulgatibacteraceae', 'Anaeromyxobact
 
 # reorder d_meta so the tip labels link to the order of the tips in the tree
 d_meta <- tibble(tip_label = tree_bamm$tip.label) %>%
-  left_join(., rename(d_meta, tip_label = otu))
+  left_join(., dplyr::rename(d_meta, tip_label = otu))
 
 # find the mrca of each of the constrained families
 d_meta2 <- filter(d_meta, family %in% constrained_families) %>%
@@ -197,7 +207,7 @@ d_meta <- mutate(d_meta, rare = ifelse(habitat_preference %in% c('marine mud gen
 
 # plot tree using ggtree
 # first colour branches and add rate shifts
-p1 <- ggtree(tree_bamm, layout = 'circular', branch.length = 'none', aes(col = log_edge_length)) %<+% d_tree_bamm +
+p1 <- ggtree(tree, layout = 'circular', aes(col = log_edge_length)) %<+% d_tree_bamm +
   scale_color_gradientn('Net diversification\n(branch colours)', colors = met.brewer(name='Hiroshige', direction=-1, override.order = F), breaks=c(min(d_tree_bamm$log_edge_length, na.rm = TRUE) + abs(min(d_tree_bamm$edge_length, na.rm = TRUE))*0.2, max(d_tree_bamm$log_edge_length, na.rm = TRUE) * 0.95), labels=c("Slow","Fast")) +
   #geom_point2(aes(subset=(node %in% shiftnodes)), color="black",size=5)+
   NULL
@@ -205,7 +215,7 @@ p1 <- ggtree(tree_bamm, layout = 'circular', branch.length = 'none', aes(col = l
 # next add tip points
 p2 <- p1 %<+% d_meta +
   new_scale_color() +
-  geom_tippoint(aes(x=x+5, col = habitat_preference, size = rare), position = position_jitter(width = 3, height = 0)) +
+  geom_tippoint(aes(x=x+x*0.04, col = habitat_preference, size = rare), position = position_jitter(width = 0.025, height = 0)) +
   scale_color_manual('Biome preference\n(tip points)', values = cols_hab, labels = c('freshwater + land generalist', 'freshwater specialist', 'marine generalist', 'marine specialist', 'land specialist')) +
   scale_size_manual(values = c(0.6, 3)) +
   guides(color = guide_legend(override.aes = list(size = 5)),
@@ -217,7 +227,7 @@ tree_plot <- p2 +
                 mapping = aes(node = mrca,
                               color = family2,
                               label = blank_label),
-                offset = 10,
+                offset = castor::get_all_distances_to_root(tree2) %>% max() * 0.08,
                 barsize = 2) +
   scale_color_manual('Family (outer bar)', values = cols) +
   guides(color = guide_legend(override.aes = list(size = 0.1, shape = 1)))

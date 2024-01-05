@@ -14,7 +14,6 @@
 library(DECIPHER)
 library(phyloseq)
 library(tidyverse)
-library(here)
 
 here::i_am('scripts/sequencing_rpoB/processing/align_myxo.R')
 
