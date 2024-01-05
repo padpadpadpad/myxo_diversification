@@ -14,6 +14,9 @@
 library(DECIPHER)
 library(phyloseq)
 library(tidyverse)
+library(ggtree)
+library(RColorBrewer)
+library(ape)
 
 # set percent similarity - those used in asvs_to_otus.R
 percent_similarity <- c('asv')
@@ -95,25 +98,59 @@ system('fasttree -nt -constraints data/sequencing_rpoB/raxml/constraint_trees/co
 
 tree <- ape::read.tree('data/sequencing_rpoB/raxml/constraint_trees/start_tree_asv.tre')
 
-# add in taxa and plot as colour to check constraints
-
-
-plot(tree)
-ape::is.rooted(tree2)
+# drop any OTUs not in constrained families
+drop.tip(tree, tree$tip.label[!tree$tip.label %in% filter(tax_table_sub, family %in% constrained_families)$tip_label]) %>%
+  write.tree('data/sequencing_rpoB/raxml/constraint_trees/start_tree_asv_2.tre')
 
 # two OTUs on different sides of the tree
 # otu_3541 - Myxococcaceae
 # otu_160 - Nannocystaceae
 
+# check where the node is where the split is
 ape::getMRCA(tree, c('otu_3541', 'otu_160'))
 
-tree2 <- ape::root(tree, node = 122, resolve.root = TRUE)
-ape::write.tree(tree2, 'data/sequencing_rpoB/raxml/constraint_trees/start_tree_asv_rooted.tre')
-
-plot(tree)
-plot(tree2)
-
+# re root to that point
+tree2 <- ape::root(tree, node = 122)
 ape::is.rooted(tree2)
 
-tree_smooth <- ape::chronos(tree)
-plot(tree_smooth)
+# plot tree with taxonomic info
+constrained_families <- c('Myxococcaceae', 'Vulgatibacteraceae', 'Anaeromyxobacteraceae', 'Polyangiaceae', 'Sandaracinaceae', 'Nannocystaceae', 'Haliangiaceae')
+
+d_meta <- tibble(tip_label = tree2$tip.label) %>%
+  left_join(tax_table, by = 'tip_label') %>%
+  mutate(family = ifelse(family %in% constrained_families, family, 'other'))
+
+# find 9 most common families based on number of tips assigned to them
+d_common <- d_meta %>%
+  group_by(family) %>%
+  tally() %>%
+  ungroup() %>%
+  mutate(., prop = n / sum(n)) %>%
+  filter(., family %in% constrained_families)
+
+# group tip labels together in terms of their order
+to_group <- split(d_meta$tip_label, d_meta$family)
+tree3 <- groupOTU(tree2, to_group)
+
+# for different families - add in black and grey for uncertain and uncommon respectively
+cols <- c(colorRampPalette(brewer.pal(11, "Spectral"))(nrow(d_common)), 'grey')
+names(cols) <- c(sort(d_common$family), 'other')
+
+
+# first only plot taxonomy, also make non circular so we can see groupings properly
+tree_plot <- ggtree(tree3, aes(col = group)) %<+% filter(d_meta) +
+  scale_color_manual('Family (branch colours)', values = cols) +
+  guides(color = guide_legend(override.aes = list(linewidth = 3))) +
+  #geom_cladelab(data = d_meta2,
+  #mapping = aes(node = mrca,
+  #color = family2,
+  #label = blank_label),
+  #offset = 0.1,
+  #barsize = 2,
+  #show.legend = FALSE) +
+  NULL
+
+tree_plot
+
+ape::write.tree(tree2, 'data/sequencing_rpoB/raxml/constraint_trees/start_tree_asv_rooted.tre')
+
