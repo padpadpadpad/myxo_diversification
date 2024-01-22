@@ -24,6 +24,8 @@ tree1_tiplabels <- tibble(tree1_label = tree1$tip.label,
 tree_tiplabels <- tibble(tree2_label = tree2$tip.label) %>%
   left_join(., tree1_tiplabels)
 
+tree2$tip.label <- tree_tiplabels$tree1_label
+
 # save out tree
 write.tree(tree2, 'data/sequencing_rpoB/raxml/trees/myxo_asv/myxo_asv.raxml_tbe_v2.tree')
 
