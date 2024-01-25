@@ -28,7 +28,14 @@ d_taxa <- readRDS(here('data/sequencing_rpoB/phyloseq/myxococcus/prevalence_filt
 d_meta <- left_join(select(d_habpref, otu, habitat_preference = habitat_preference3, num_present), select(d_taxa, otu:family))
 
 # read in tree
-tree <- read.tree(here('data/sequencing_rpoB/raxml/trees/myxo_asv/myxo_asv_chronopl10.tre'))
+tree <- read.tree('data/sequencing_rpoB/raxml/trees/myxo_asv/myxo_asv_treepl_cv_node_labels.tre')
+
+tree <- force.ultrametric(tree)
+
+# write function to remove family labels
+strsplit_mod <- function(x)(strsplit(x, split = '_') %>% unlist() %>% .[1:2] %>% paste0(., collapse = '_'))
+
+tree$tip.label <- purrr::map_chr(tree$tip.label, strsplit_mod)
 
 # custom_function ####
 
@@ -116,11 +123,11 @@ inits_sym <- rep(1, length(argnames(lik_sym)))
 inits_er <- rep(1, length(argnames(lik_er)))
 inits_trans <- rep(1, length(argnames(lik_transient)))
 
-# run first three models
+# run first four models
 mod_er <- find.mle(lik_er, inits_er, method = 'subplex', control = list(maxit = 50000))
 mod_ard <- find.mle(lik_ard, inits_ard, method = 'subplex', control = list(maxit = 50000))
 mod_trans <- find.mle(lik_transient, inits_trans, method = 'subplex', control = list(maxit = 50000))
-mod_sym <- find.mle(lik_sym, inits_sym, method = 'subplex', control = list(maxit = 500))
+mod_sym <- find.mle(lik_sym, inits_sym, method = 'subplex', control = list(maxit = 50000))
 
 # compare models
 AIC(mod_sym, mod_ard, mod_er, mod_trans) %>% arrange(AIC)
@@ -133,7 +140,7 @@ mod_ard$par[mod_ard$par < 1e-03] %>% names(.)
 
 # make custom matrix model
 lik_custom1 <- constrain(lik_ard, 
-                     q14~0, q24~0, q25~0, q41~0, q53~0)
+                     q14~0, q24~0, q25~0, q35~0, q41~0, q42~0, q53~0)
 
 # make start parameters
 inits_custom1 <- rep(1, length(argnames(lik_custom1)))
@@ -152,8 +159,8 @@ mod_custom1$par %>% sort()
 
 # make custom matrix model again
 lik_custom2 <- constrain(lik_ard, 
-                         q14~0, q24~0, q25~0, q41~0, q53~0,
-                         q42~0)
+                         q14~0, q24~0, q25~0, q35~0, q41~0, q42~0, q53~0,
+                         q45~0)
 
 # make start parameters
 inits_custom2 <- rep(1, length(argnames(lik_custom2)))
@@ -169,9 +176,9 @@ mod_custom2$par %>% sort()
 
 # make custom matrix model
 lik_custom3 <- constrain(lik_ard, 
-                         q14~0, q24~0, q25~0, q41~0, q53~0,
-                         q42~0,
-                         q45~0)
+                         q14~0, q24~0, q25~0, q35~0, q41~0, q42~0, q53~0,
+                         q45~0,
+                         q54~0)
 
 # make start parameters
 inits_custom3 <- rep(1, length(argnames(lik_custom3)))
@@ -187,10 +194,10 @@ mod_custom3$par %>% sort()
 
 # make custom matrix model
 lik_custom4 <- constrain(lik_ard, 
-                         q14~0, q24~0, q25~0, q41~0, q53~0,
-                         q42~0,
+                         q14~0, q24~0, q25~0, q35~0, q41~0, q42~0, q53~0,
                          q45~0,
-                         q54~0)
+                         q54~0,
+                         q43~0)
 
 # make start parameters
 inits_custom4 <- rep(1, length(argnames(lik_custom4)))
@@ -204,48 +211,10 @@ AIC(mod_sym, mod_ard, mod_er, mod_trans, mod_custom1, mod_custom2, mod_custom3, 
 # sort parameter estimates
 mod_custom4$par %>% sort()
 
-# make custom matrix model
-lik_custom5 <- constrain(lik_ard, 
-                         q14~0, q24~0, q25~0, q41~0, q53~0,
-                         q42~0,
-                         q45~0,
-                         q54~0,
-                         q52~0)
-
-# make start parameters
-inits_custom5 <- rep(1, length(argnames(lik_custom5)))
-
-# run model
-mod_custom5 <- find.mle(lik_custom5, inits_custom5, method = 'subplex', control = list(maxit = 50000))
-
-# do AIC comparison
-AIC(mod_sym, mod_ard, mod_er, mod_trans, mod_custom1, mod_custom2, mod_custom3, mod_custom4, mod_custom5) %>% arrange(AIC)
-
-# sort parameter estimates
-mod_custom5$par %>% sort()
-
-# make custom matrix model
-lik_custom6 <- constrain(lik_ard, 
-                         q14~0, q24~0, q25~0, q41~0, q53~0,
-                         q42~0,
-                         q45~0,
-                         q54~0,
-                         q52~0,
-                         q43~0)
-
-# make start parameters
-inits_custom6 <- rep(1, length(argnames(lik_custom6)))
-
-# run model
-mod_custom6 <- find.mle(lik_custom6, inits_custom6, method = 'subplex', control = list(maxit = 50000))
-
-# do AIC comparison
-AIC(mod_sym, mod_ard, mod_er, mod_trans, mod_custom1, mod_custom2, mod_custom3, mod_custom4, mod_custom5, mod_custom6) %>% arrange(AIC)
-
 # lets look at model weights
-d_aic <- AIC(mod_sym, mod_ard, mod_er, mod_trans, mod_custom1, mod_custom2, mod_custom3, mod_custom4, mod_custom5, mod_custom6) %>%
+d_aic <- AIC(mod_sym, mod_ard, mod_er, mod_trans, mod_custom1, mod_custom2, mod_custom3, mod_custom4) %>%
   data.frame() %>%
-  mutate(log_lik = c(mod_sym$lnLik, mod_ard$lnLik, mod_er$lnLik, mod_trans$lnLik, mod_custom1$lnLik, mod_custom2$lnLik, mod_custom3$lnLik, mod_custom4$lnLik, mod_custom5$lnLik, mod_custom6$lnLik),
+  mutate(log_lik = c(mod_sym$lnLik, mod_ard$lnLik, mod_er$lnLik, mod_trans$lnLik, mod_custom1$lnLik, mod_custom2$lnLik, mod_custom3$lnLik, mod_custom4$lnLik),
          ntips = 2621) %>%
   janitor::clean_names() %>%
   rownames_to_column(var = 'model') %>%
@@ -253,20 +222,18 @@ d_aic <- AIC(mod_sym, mod_ard, mod_er, mod_trans, mod_custom1, mod_custom2, mod_
          aic_weight = round(MuMIn::Weights(aic), 2),
          aicc_weight = round(MuMIn::Weights(aicc), 2)) %>%
   arrange(-aic_weight)
-# mod custom 5 is favoured pretty highly
+# mod custom 3 is favoured pretty highly
 
 # make this into a table
 d_table <- select(d_aic, model, df, log_lik, aic, aic_weight) %>%
   mutate(model = case_when(model == 'mod_er' ~ 'ER',
                            model == 'mod_ard' ~ 'ARD',
                            model == 'mod_sym' ~ 'SYM',
-                           model == 'mod_trans' ~ 'Transient',
+                           model == 'mod_trans' ~ 'Stepwise',
                            model == 'mod_custom1' ~ 'Simplified ARD 1',
                            model == 'mod_custom2' ~ 'Simplified ARD 2',
                            model == 'mod_custom3' ~ 'Simplified ARD 3',
-                           model == 'mod_custom4' ~ 'Simplified ARD 4',
-                           model == 'mod_custom5' ~ 'Simplified ARD 5',
-                           model == 'mod_custom6' ~ 'Simplified ARD 6'))
+                           model == 'mod_custom4' ~ 'Simplified ARD 4'))
 
 # make table
 table <- d_table %>%
@@ -286,12 +253,11 @@ table <- d_table %>%
 save_as_image(table, 'plots/manuscript_plots/markov_model_table.png')
 save_as_docx(table, path = 'plots/manuscript_plots/markov_model_table.docx')
 
-
 # save out best markov model
-saveRDS(mod_custom5, 'data/sequencing_rpoB/processed/transition_rates/mod_custom_5.rds')
+saveRDS(mod_custom3, 'data/sequencing_rpoB/processed/transition_rates/mod_custom_3.rds')
 
 # plot_transition_matrix
-diversitree_df <- get_diversitree_df(mod_custom5, coding$hab_pref_num, coding$hab_pref)
+diversitree_df <- get_diversitree_df(mod_custom3, coding$hab_pref_num, coding$hab_pref)
 
 diversitree_df %>%
   left_join(., select(coding, state_1 = hab_pref, state_1_num = hab_pref_num, state_1_label = hab_pref_axis)) %>%
@@ -310,7 +276,7 @@ diversitree_df %>%
   scale_y_discrete(position = 'left', labels = scales::label_wrap(13)) +
   labs(y = 'From',
   x = 'To',
-  title = paste('all rates different with', length(mod_custom5$par), 'free parameters', sep = ' ')) +
+  title = paste('all rates different with', length(mod_custom3$par), 'free parameters', sep = ' ')) +
   coord_fixed() +
   scale_color_manual(values = c('red', 'black'))
 
@@ -393,7 +359,7 @@ ggsave(here('plots/sequencing_rpoB/transition_plot_diversitree.png'), last_plot(
 # plot other models based on AIC weights
 
 # turn transition matrix into network to plot
-d_network <- get_diversitree_df(mod_custom3, coding$hab_pref_num, coding$hab_pref) %>%
+d_network <- get_diversitree_df(mod_custom2, coding$hab_pref_num, coding$hab_pref) %>%
   select(., state_1, state_2, transition_rate) %>%
   as_tbl_graph() %>%
   activate(edges) %>%
@@ -436,11 +402,11 @@ p_2 <- p +
   ylim(c(min(point_data$y) + min(point_data$nudge_y)), max(point_data$y) + max(point_data$nudge_y)) +
   theme(legend.position = 'none',
         panel.background = element_rect(fill = 'white', colour = 'white')) +
-  labs(title = '(b) Simplified ARD model 3',
-       subtitle = 'AIC model weight = 0.19')
+  labs(title = '(b) Simplified ARD model 2',
+       subtitle = 'AIC model weight = 0.24')
 
 # turn transition matrix into network to plot
-d_network <- get_diversitree_df(mod_custom4, coding$hab_pref_num, coding$hab_pref) %>%
+d_network <- get_diversitree_df(mod_trans, coding$hab_pref_num, coding$hab_pref) %>%
   select(., state_1, state_2, transition_rate) %>%
   as_tbl_graph() %>%
   activate(edges) %>%
@@ -483,11 +449,11 @@ p_3 <- p +
   ylim(c(min(point_data$y) + min(point_data$nudge_y)), max(point_data$y) + max(point_data$nudge_y)) +
   theme(legend.position = 'none',
         panel.background = element_rect(fill = 'white', colour = 'white')) +
-  labs(title = '(c) Simplified ARD model 4',
-       subtitle = 'AIC model weight = 0.15')
+  labs(title = '(c) Stepwise model',
+       subtitle = 'AIC model weight = 0.14')
 
 # turn transition matrix into network to plot
-d_network <- get_diversitree_df(mod_trans, coding$hab_pref_num, coding$hab_pref) %>%
+d_network <- get_diversitree_df(mod_custom1, coding$hab_pref_num, coding$hab_pref) %>%
   select(., state_1, state_2, transition_rate) %>%
   as_tbl_graph() %>%
   activate(edges) %>%
@@ -530,8 +496,8 @@ p_4 <- p +
   ylim(c(min(point_data$y) + min(point_data$nudge_y)), max(point_data$y) + max(point_data$nudge_y)) +
   theme(legend.position = 'none',
         panel.background = element_rect(fill = 'white', colour = 'white')) +
-  labs(title = '(d) Stepwise model',
-       subtitle = 'AIC model weight = 0.14')
+  labs(title = '(d) Simplified ARD model 1',
+       subtitle = 'AIC model weight = 0.09')
 
 # make layout
 design <- "
@@ -539,8 +505,8 @@ design <- "
   453
 "
 
-p_best <- p_best + labs(title = '(a) Simplified ARD model 5',
-                        subtitle = 'AIC model weight = 0.4')
+p_best <- p_best + labs(title = '(a) Simplified ARD model 3',
+                        subtitle = 'AIC model weight = 0.53')
 
 p_best + p_2 + p_legend + p_3 + p_4 + plot_layout(design = design, widths = c(0.4, 0.4, 0.2))
 
@@ -610,21 +576,19 @@ for(i in 1:num_boots){
   temp_ard <- make.mkn(temp_tree, temp_hab_pref, k = max(temp_hab_pref))
   
   # make custom matrix model
-  temp_custom5 <- constrain(temp_ard, 
-                           q14~0, q24~0, q25~0, q41~0, q53~0,
-                           q42~0,
-                           q45~0,
-                           q54~0,
-                           q52~0)
+  temp_custom3 <- constrain(temp_ard, 
+                            q14~0, q24~0, q25~0, q35~0, q41~0, q42~0, q53~0,
+                            q45~0,
+                            q54~0)
   
   # make start parameters
-  inits_custom5 <- rep(1, length(argnames(temp_custom5)))
+  inits_custom3 <- rep(1, length(argnames(temp_custom3)))
   
   # run model
-  temp_mod_custom5 <- find.mle(temp_custom5, inits_custom5, method = 'nlminb', control = list(maxit = 50000))
+  temp_mod_custom3 <- find.mle(temp_custom3, inits_custom3, method = 'nlminb', control = list(maxit = 50000))
   
   # save out parameters
-  temp_output <- data.frame(temp_mod_custom5$par) %>%
+  temp_output <- data.frame(temp_mod_custom3$par) %>%
     rownames_to_column(var = 'transition') %>%
     rename(rate = 2)
   
@@ -638,7 +602,7 @@ d_boots2 <- unnest(d_boots, rates) %>%
   tidybayes::mean_qi(rate)
 
 # make dataframe of model with the whole dataset
-d_custom5 <- data.frame(mod_custom5$par) %>%
+d_custom3 <- data.frame(mod_custom3$par) %>%
   rownames_to_column(var = 'transition') %>%
   rename(rate = 2)
 
@@ -797,21 +761,19 @@ for(i in 1:num_boots){
   temp_ard <- make.mkn(temp_tree, temp_habpref, k = max(temp_habpref))
   
   # make custom matrix model
-  temp_custom5 <- constrain(temp_ard, 
-                            q14~0, q24~0, q25~0, q41~0, q53~0,
-                            q42~0,
+  temp_custom3 <- constrain(temp_ard, 
+                            q14~0, q24~0, q25~0, q35~0, q41~0, q42~0, q53~0,
                             q45~0,
-                            q54~0,
-                            q52~0)
+                            q54~0)
   
   # make start parameters
-  inits_custom5 <- rep(1, length(argnames(temp_custom5)))
+  inits_custom3 <- rep(1, length(argnames(temp_custom3)))
   
   # run model
-  temp_mod_custom5 <- find.mle(temp_custom5, inits_custom5, method = 'nlminb', control = list(maxit = 50000))
+  temp_mod_custom3 <- find.mle(temp_custom3, inits_custom3, method = 'nlminb', control = list(maxit = 50000))
   
   # save out temp parameters
-  temp_output <- data.frame(temp_mod_custom5$par) %>%
+  temp_output <- data.frame(temp_mod_custom3$par) %>%
     rownames_to_column(var = 'transition') %>%
     rename(rate = 2)
   
@@ -825,7 +787,7 @@ d_boots2 <- unnest(d_boots_v2, rates) %>%
   tidybayes::mean_qi(rate)
 
 # make dataframe of model with the whole dataset
-d_custom5 <- data.frame(mod_custom5$par) %>%
+d_custom3 <- data.frame(mod_custom3$par) %>%
   rownames_to_column(var = 'transition') %>%
   rename(rate = 2)
 

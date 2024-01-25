@@ -24,9 +24,13 @@ d_taxa <- readRDS(here('data/sequencing_rpoB/phyloseq/myxococcus/prevalence_filt
 d_meta <- left_join(select(d_habpref, otu, habitat_preference = habitat_preference3, num_present), select(d_taxa, otu:family))
 
 # read in tree
-tree <- read.tree(here('data/sequencing_rpoB/raxml/trees/myxo_asv/myxo_asv_chronopl10.tre'))
+tree <- ape::read.tree('data/sequencing_rpoB/raxml/trees/myxo_asv/myxo_asv_treepl_cv_node_labels.tre')
 
-# setup for analyses ####
+# alter tip labels to remove family as they will not link to the distance matrix
+# write function to remove family labels
+strsplit_mod <- function(x)(strsplit(x, split = '_') %>% unlist() %>% .[1:2] %>% paste0(., collapse = '_'))
+
+tree$tip.label <- purrr::map_chr(tree$tip.label, strsplit_mod)
 
 # reorder metadata to match tip labels of tree
 d_meta <- tibble(tip_label = tree$tip.label) %>%
@@ -55,7 +59,7 @@ coding <- tibble(hab_pref = unname(hab_pref), hab_pref_num = unname(hab_pref_num
 coding
 
 # read in best markov model
-best_model <- readRDS('data/sequencing_rpoB/processed/transition_rates/mod_custom5.rds')
+best_model <- readRDS('data/sequencing_rpoB/processed/transition_rates/mod_custom_3.rds')
 
 # set up sampling fractions, set them all to 1
 sampling_frac <- setNames(rep(1, times = 5), sort(unique(hab_pref_num)))
@@ -66,11 +70,9 @@ lik_musse <- make.musse(tree, hab_pref_num, k = max(hab_pref_num), sampling.f = 
 # set constraints for transitions that do not occur
 # these are taken from the 0s in best_model
 lik_musse <- constrain(lik_musse, 
-                       q14~0, q24~0, q25~0, q41~0, q53~0,
-                       q42~0,
+                       q14~0, q24~0, q25~0, q35~0, q41~0, q42~0, q53~0,
                        q45~0,
-                       q54~0,
-                       q52~0)
+                       q54~0)
 
 # we can estimate starting values using starting.point.musse()
 start_vals <- starting.point.musse(tree, k = max(hab_pref_num))
@@ -109,50 +111,8 @@ d_musse_aic <- data.frame(model = c('full_sse', 'no_se', 'no_ss', 'no_sse'), aic
 
 d_musse_aic
 
-# musse mcmc
-
-# set up initial start values
-inits_mcmc <- fit_musse_no_se$par
-
-# set up upper and lower limits - limit the values to be < 10 times the max value
-lower_mcmc <- rep(0, length(inits_mcmc))
-upper_mcmc <- rep(max(inits_mcmc)*5, length(inits_mcmc))
-
-# run first mcmc to tune w
-fit_mcmc <- mcmc(lik_null_no_se, inits_mcmc, nsteps = 10, w = 0.1, upper = upper_mcmc, lower = lower_mcmc)
-
-# tune w for each parameter
-w <- diff(sapply(fit_mcmc[2:(ncol(fit_mcmc)-1)], quantile, c(.05, .95)))
-
-# run second mcmc to tune w
-fit_mcmc2 <- mcmc(lik_null_no_se, inits_mcmc, nsteps=100, w=w, upper = upper_mcmc, lower = lower_mcmc)
-
-# tune w for each parameter
-w <- diff(sapply(fit_mcmc2[2:(ncol(fit_mcmc2)-1)], quantile, c(.05, .95)))
-
-# run third mcmc for 1000 iter
-fit_mcmc3 <- mcmc(lik_null_no_se, inits_mcmc, nsteps=1000, w=w, upper = upper_mcmc, lower = lower_mcmc)
-
-profiles.plot(fit_mcmc3["q51"], col.line="red")
-profiles.plot(fit_mcmc3["q15"], col.line="red")
-
-plot(q51 ~ p, fit_mcmc3)
-plot(q15 ~ p, fit_mcmc3)
-plot(lambda3 ~ p, fit_mcmc3)
-
 # save out MuSSE models and mcmc
 saveRDS(fit_musse, 'data/sequencing_rpoB/processed/transition_rates/asv_musse.rds')
 saveRDS(fit_musse_no_se, 'data/sequencing_rpoB/processed/transition_rates/asv_musse_no_se.rds')
 saveRDS(fit_musse_no_sse, 'data/sequencing_rpoB/processed/transition_rates/asv_musse_no_sse.rds')
 saveRDS(fit_musse_no_ss, 'data/sequencing_rpoB/processed/transition_rates/asv_musse_no_ss.rds')
-saveRDS(fit_mcmc3, 'data/sequencing_rpoB/processed/transition_rates/asv_mcmc_musse_no_se.rds')
-
-d_mcmc <- readRDS('data/sequencing_rpoB/processed/transition_rates/asv_mcmc_musse_no_se.rds')
-
-
-# find 95% CIs and bind with ML estimates
-d_mcmc_summary <- d_mcmc %>%
-  group_by(parameter, param, state_1, state_2) %>%
-  tidybayes::mean_qi(transition_rate) %>%
-  left_join(., select(diversitree_df, state_1, state_2, ml_estimate = transition_rate))
-

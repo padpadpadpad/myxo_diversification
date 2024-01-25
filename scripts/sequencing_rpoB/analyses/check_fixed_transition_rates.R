@@ -26,7 +26,13 @@ d_taxa <- readRDS(here('data/sequencing_rpoB/phyloseq/myxococcus/prevalence_filt
 d_meta <- left_join(select(d_habpref, otu, habitat_preference = habitat_preference3, num_present), select(d_taxa, otu:family))
 
 # read in tree
-tree <- read.tree(here('data/sequencing_rpoB/raxml/trees/myxo_asv/myxo_asv_chronopl10.tre'))
+tree <- ape::read.tree('data/sequencing_rpoB/raxml/trees/myxo_asv/myxo_asv_treepl_cv_node_labels.tre')
+
+# alter tip labels to remove family as they will not link to the distance matrix
+# write function to remove family labels
+strsplit_mod <- function(x)(strsplit(x, split = '_') %>% unlist() %>% .[1:2] %>% paste0(., collapse = '_'))
+
+tree$tip.label <- purrr::map_chr(tree$tip.label, strsplit_mod)
 
 # setup for analyses ####
 
@@ -60,7 +66,7 @@ coding
 sampling_frac <- setNames(rep(1, times = 5), sort(unique(hab_pref_num)))
 
 # read in best Mk model
-fit_mk <- readRDS('data/sequencing_rpoB/processed/transition_rates/mod_custom5.rds')
+fit_mk <- readRDS('data/sequencing_rpoB/processed/transition_rates/mod_custom_3.rds')
 
 fit_musse_no_se <- readRDS('data/sequencing_rpoB/processed/transition_rates/asv_musse_no_se.rds')
 
@@ -85,30 +91,28 @@ start_vals <- starting.point.musse(tree, k = max(hab_pref_num))
 # set constraints for transitions that do not occur
 # these are taken from the 0s in best_model
 lik_musse <- constrain(lik_musse,
-                        mu2 ~ mu1, mu3 ~ mu1, mu4 ~ mu1, mu5 ~ mu1,
-                        q14~0, q24~0, q25~0, q41~0, q53~0,
-                        q42~0,
-                        q45~0,
-                        q54~0,
-                        q52~0)
+                       mu2 ~ mu1, mu3 ~ mu1, mu4 ~ mu1, mu5 ~ mu1,
+                       q14~0, q24~0, q25~0, q35~0, q41~0, q42~0, q53~0,
+                       q45~0,
+                       q54~0)
 
 # set all q parameters to be that from the Mk model
 lik_musse2 <- constrain(lik_musse,
-                        q12~1.4452899,
-                        q13~1.4372485,
-                        q15~12.4165517,
-                        q21~0.3867756,
-                        q23~1.6808420,
-                        q31~5.0890002,
-                        q32~8.2505921,
-                        q34~2.4666607,
-                        q35~1.7432721,
-                        q43~0.2259779,
-                        q51~8.9171032)
+                        q12~1.2742403,
+                        q13~2.1371199,
+                        q15~25.3769010,
+                        q21~1.7189816,
+                        q23~3.9420235,
+                        q31~7.4760225,
+                        q32~20.7244840,
+                        q34~4.5038291,
+                        q43~0.2907249,
+                        q51~16.4972949,
+                        q52~1.0257041)
 
 fit_musse_no_se2 <- find.mle(lik_musse2, x.init = start_vals[argnames(lik_musse2)], method = 'subplex', control = list(maxit = 100000))
 
-# set all q parameters to be that from the Mk model
+# set all q parameters to be the same from the Mk model
 lik_musse3 <- constrain(lik_musse,
                         q13~q12,
                         q15~q12,
@@ -117,14 +121,13 @@ lik_musse3 <- constrain(lik_musse,
                         q31~q12,
                         q32~q12,
                         q34~q12,
-                        q35~q12,
                         q43~q12,
-                        q51~q12)
+                        q51~q12,
+                        q52~q12)
 
 fit_musse_no_se3 <- find.mle(lik_musse3, x.init = start_vals[argnames(lik_musse3)], method = 'subplex', control = list(maxit = 100000))
 
 data.frame(aic = c(AIC(fit_musse_no_se), AIC(fit_musse_no_se2), AIC(fit_musse_no_se3))) %>%
-  dplyr::arrange(., aic) %>%
   mutate(weights = round(MuMIn::Weights(aic), 3))
 
 fit_musse_no_se$par %>% round(2)
