@@ -8,6 +8,7 @@
 # plots the tree
 # looks at the distribution of biome preference
 
+
 #------------------------------#
 # load in packages and data ####
 #------------------------------#
@@ -18,9 +19,14 @@
 librarian::shelf(here, tidyverse, ggtree, ggnewscale, RColorBrewer, patchwork, ape, phytools, MetBrewer, flextable, officer, magick)
 
 # load in the tree
-tree <- ape::read.tree('data/sequencing_rpoB/raxml/trees/myxo_asv/myxo_asv_chronopl10.tre')
-#tree <- ape::read.tree('~/Downloads/myxo_asv_treepl_cv.tre')
-#tree <- phytools::force.ultrametric(tree)
+#tree <- ape::read.tree('data/sequencing_rpoB/raxml/trees/myxo_asv/myxo_asv_chronopl10.tre')
+tree <- ape::read.tree('data/sequencing_rpoB/raxml/trees/myxo_asv/myxo_asv_treepl_cv_node_labels.tre')
+tree <- phytools::force.ultrametric(tree)
+
+tree <- ape::write.tree(tree, 'data/sequencing_rpoB/raxml/trees/myxo_asv/myxo_asv_treepl_cv_node_labels.tre')
+
+# replace NA in node label with ""
+tree$node.label[is.na(tree$node.label)] <- ''
 
 is.ultrametric(tree)
 
@@ -39,6 +45,7 @@ d_taxa <- readRDS('data/sequencing_rpoB/phyloseq/myxococcus/prevalence_filtered/
   data.frame() %>%
   janitor::clean_names() %>%
   rownames_to_column('otu')
+
 
 #----------------------#
 # do some wrangling ####
@@ -306,7 +313,7 @@ d_ltt <-  ape::ltt.plot.coords(tree) %>%
   mutate(time2 = time + 1)
 
 # create lineage through time plot
-p2 <- ggplot(d_ltt, aes(time2, log(N))) +
+p2 <- ggplot(d_ltt, aes(time2, N)) +
   geom_line() +
   theme_bw(base_size = 12) +
   labs(x = 'Relative time',
@@ -360,3 +367,225 @@ ggsave('plots/manuscript_plots/Figure_2.png', last_plot(), height = 12, width = 
 # save out habitat preference vector
 write.csv(d_habpref, 'data/sequencing_rpoB/phyloseq/myxococcus/habitat_preference/summary/habitat_preference_asv_new.csv', row.names = FALSE)
 saveRDS(cols_hab2, 'data/sequencing_rpoB/phyloseq/myxococcus/habitat_preference/summary/habitat_colours.rds')
+
+#----------------------------------------------------#
+# create plot looking at phylogenetic uncertainty ####
+#----------------------------------------------------#
+
+# the big whole plot is a complete mess when looking at phylogenetic uncertainty - so try plot family specific trees
+
+# replace NA node label with ''
+tree$node.label <- ifelse(tree$node.label == 'NA', '', tree$node.label)
+tree$node.label <- substr(tree$node.label, 1, 4)
+tree2$node.label <- ifelse(tree$node.label == 'NA', '', tree$node.label)
+tree2$node.label <- substr(tree$node.label, 1, 4)
+
+tree$node.label[1:6]
+
+# first plot is to plot bootstrap values against distance from root
+# calculate distance from root to each internal node of the tree
+dist_to_root <- castor::get_all_distances_to_root(tree)
+dist_to_root <- dist_to_root[(Ntip(tree) + 1):(Ntip(tree) + Nnode(tree))]
+
+d_dist <- data.frame(dist_to_root = dist_to_root,
+                     bootstrap = as.numeric(tree$node.label))
+
+p1 <- ggplot(d_dist, aes(dist_to_root, bootstrap)) +
+  geom_point(alpha = 0.3) +
+  theme_bw(base_size = 12) +
+  labs(y = 'Bootstrap tbe value',
+       x = 'Distance from root',
+       title = '(a)')
+
+p2 <- ggplot(d_dist, aes(bootstrap)) +
+  geom_histogram(col = 'black', fill = 'light grey') +
+  theme_bw(base_size = 12) +
+  labs(y = 'Number of nodes',
+       x = 'Bootstrap tbe value',
+       title = '(b)')
+
+p1 + p2
+
+# save this plot out
+ggsave('plots/manuscript_plots/phylogeny_checks/bootstrap_vs_distance.png', last_plot(), height = 3, width = 8)
+
+tree_plot <- ggtree(tree2, layout = 'circular', aes(col = group))  %<+% filter(d_meta) +
+  scale_color_manual('Family (branch colours)', values = cols) +
+  guides(color = guide_legend(override.aes = list(linewidth = 3)))
+
+tree_plot + geom_label(aes(label = node), col = 'black', size = MicrobioUoE::pts(8))
+
+# HORRIBLE
+
+# grab legend though
+legend <- cowplot::get_legend(tree_plot)
+
+# so plot each family separately, then plot the nodes not in these for all the whole tree
+
+# identify MRCA of all Anaeromyxobacteraceae
+node_anaero <- getMRCA(tree, filter(d_meta, family == 'Anaeromyxobacteraceae')$tip_label)
+
+tree_anaeromyxobacteraceae <- extract.clade(tree, node_anaero)
+
+tree_anaeromyxobacteraceae_2 <- groupOTU(tree_anaeromyxobacteraceae, to_group)
+
+tree_plot_anaero <- ggtree(tree_anaeromyxobacteraceae_2, aes(col = group))  %<+% filter(d_meta, tip_label %in% tree_anaeromyxobacteraceae$tip.label) +
+  scale_color_manual('Family (branch colours)', values = cols) +
+  guides(color = guide_legend(override.aes = list(linewidth = 3)))
+
+tree_plot_anaero + ggnewscale::new_scale_color() +
+  geom_nodelab(aes(label = label), geom = 'text', col = 'black', size = MicrobioUoE::pts(6))
+
+ggsave('plots/manuscript_plots/phylogeny_checks/anaeromyxobacteraceae.jpeg',
+       last_plot(),
+       height = 10,
+       width = 8)
+
+# identify MRCA of all Haliangiaceae
+node_haliangiaceae <- getMRCA(tree, filter(d_meta, family == 'Haliangiaceae')$tip_label)
+
+tree_haliangiaceae <- extract.clade(tree, node_haliangiaceae)
+
+tree_haliangiaceae_2 <- groupOTU(tree_haliangiaceae, to_group)
+
+tree_plot_haliangiaceae <- ggtree(tree_haliangiaceae_2, aes(col = group))  %<+% filter(d_meta, tip_label %in% tree_haliangiaceae$tip.label) +
+  scale_color_manual('Family (branch colours)', values = cols) +
+  guides(color = guide_legend(override.aes = list(linewidth = 3)))
+
+tree_plot_haliangiaceae + ggnewscale::new_scale_color() +
+  geom_nodelab(aes(label = label), geom = 'text', col = 'black', size = MicrobioUoE::pts(6))
+
+ggsave('plots/manuscript_plots/phylogeny_checks/haliangiaceae.jpeg',
+       last_plot(),
+       height = 10,
+       width = 8)
+
+# identify MRCA of all Myxococcaceae
+node_myxo <- getMRCA(tree, filter(d_meta, family == 'Myxococcaceae')$tip_label)
+
+tree_myxo <- extract.clade(tree, node_myxo)
+
+tree_myxo_2 <- groupOTU(tree_myxo, to_group)
+
+tree_plot_myxo <- ggtree(tree_myxo_2, aes(col = group))  %<+% filter(d_meta, tip_label %in% tree_myxo$tip.label) +
+  scale_color_manual('Family (branch colours)', values = cols) +
+  guides(color = guide_legend(override.aes = list(linewidth = 3)))
+
+tree_plot_myxo + ggnewscale::new_scale_color() +
+  geom_nodelab(aes(label = label), geom = 'text', col = 'black', size = MicrobioUoE::pts(6))
+
+ggsave('plots/manuscript_plots/phylogeny_checks/myxo.jpeg',
+       last_plot(),
+       height = 10,
+       width = 8)
+
+# identify MRCA of all Nannocystaceae
+node_nanno <- getMRCA(tree, filter(d_meta, family == 'Nannocystaceae')$tip_label)
+
+tree_nanno <- extract.clade(tree, node_nanno)
+
+tree_nanno_2 <- groupOTU(tree_nanno, to_group)
+
+tree_plot_nanno <- ggtree(tree_nanno_2, aes(col = group))  %<+% filter(d_meta, tip_label %in% tree_nanno$tip.label) +
+  scale_color_manual('Family (branch colours)', values = cols) +
+  guides(color = guide_legend(override.aes = list(linewidth = 3)))
+
+tree_plot_nanno + ggnewscale::new_scale_color() +
+  geom_nodelab(aes(label = label), geom = 'text', col = 'black', size = MicrobioUoE::pts(6))
+
+ggsave('plots/manuscript_plots/phylogeny_checks/nanno.jpeg',
+       last_plot(),
+       height = 10,
+       width = 8)
+
+# identify MRCA of all Polyangiacaeae
+node_poly <- getMRCA(tree, filter(d_meta, family == 'Polyangiaceae')$tip_label)
+
+tree_poly <- extract.clade(tree, node_poly)
+
+tree_poly_2 <- groupOTU(tree_poly, to_group)
+
+tree_plot_poly <- ggtree(tree_poly_2, aes(col = group))  %<+% filter(d_meta, tip_label %in% tree_poly$tip.label) +
+  scale_color_manual('Family (branch colours)', values = cols) +
+  guides(color = guide_legend(override.aes = list(linewidth = 3)))
+
+tree_plot_poly + ggnewscale::new_scale_color() +
+  geom_nodelab(aes(label = label), geom = 'text', col = 'black', size = MicrobioUoE::pts(6))
+
+ggsave('plots/manuscript_plots/phylogeny_checks/poly.jpeg',
+       last_plot(),
+       height = 10,
+       width = 8)
+
+# identify MRCA of all Sandaracinaceae
+node_sanda <- getMRCA(tree, filter(d_meta, family == 'Sandaracinaceae')$tip_label)
+
+tree_sanda <- extract.clade(tree, node_sanda)
+
+tree_sanda_2 <- groupOTU(tree_sanda, to_group)
+
+tree_plot_sanda <- ggtree(tree_sanda_2, aes(col = group))  %<+% filter(d_meta, tip_label %in% tree_sanda$tip.label) +
+  scale_color_manual('Family (branch colours)', values = cols) +
+  guides(color = guide_legend(override.aes = list(linewidth = 3)))
+
+tree_plot_sanda + ggnewscale::new_scale_color() +
+  geom_nodelab(aes(label = label), geom = 'text', col = 'black', size = MicrobioUoE::pts(6))
+
+ggsave('plots/manuscript_plots/phylogeny_checks/sanda.jpeg',
+       last_plot(),
+       height = 10,
+       width = 8)
+
+# identify MRCA of all Vulgatibacteraceae
+node_vulga <- getMRCA(tree, filter(d_meta, family == 'Vulgatibacteraceae')$tip_label)
+
+tree_vulga <- extract.clade(tree, node_vulga)
+
+tree_vulga_2 <- groupOTU(tree_vulga, to_group)
+
+tree_plot_vulga <- ggtree(tree_vulga_2, aes(col = group))  %<+% filter(d_meta, tip_label %in% tree_vulga$tip.label) +
+  scale_color_manual('Family (branch colours)', values = cols) +
+  guides(color = guide_legend(override.aes = list(linewidth = 3)))
+
+tree_plot_vulga + ggnewscale::new_scale_color() +
+  geom_nodelab(aes(label = label), geom = 'text', col = 'black', size = MicrobioUoE::pts(6))
+
+ggsave('plots/manuscript_plots/phylogeny_checks/vulga.jpeg',
+       last_plot(),
+       height = 10,
+       width = 8)
+
+# plot tree with collapsed nodes
+
+# do not show legend
+tree_plot <- ggtree(tree2, aes(col = group), layout = 'circular')  %<+% filter(d_meta) +
+  scale_color_manual('Family (branch colours)', values = cols) +
+  # turn off legend
+  theme(legend.position = 'none') +
+  geom_text(aes(label = label), col = 'black', size = MicrobioUoE::pts(12))
+
+tree_plot <- tree_plot %>%
+  collapse(node_anaero, 'max', fill = cols[1], alpha = 0.5) %>% 
+  collapse(node_haliangiaceae, 'max', fill = cols[2], alpha = 0.5) %>%
+  collapse(node_myxo, 'max', fill = cols[3], alpha = 0.5) %>%
+  collapse(node_nanno, 'max', fill = cols[4], alpha = 0.5) %>%
+  collapse(node_poly, 'max', fill = cols[5], alpha = 0.5) %>%
+  collapse(node_sanda, 'max', fill = cols[6], alpha = 0.5) %>%
+  collapse(node_vulga, 'max', fill = cols[7], alpha = 0.5) 
+
+# save out tree plot
+ggsave('plots/manuscript_plots/phylogeny_checks/whole_tree.jpeg',
+       tree_plot,
+       height = 10,
+       width = 10)
+
+tree_plot <- image_read('plots/manuscript_plots/phylogeny_checks/whole_tree.jpeg', density = 300)
+tree_plot <- image_trim(tree_plot)
+
+image_ggplot(tree_plot) + 
+  legend +
+  plot_layout(widths = c(0.8, 0.2))
+
+# save out
+ggsave('plots/manuscript_plots/phylogeny_checks/whole_tree.jpeg', last_plot(), height = 10, width = 11)
+
