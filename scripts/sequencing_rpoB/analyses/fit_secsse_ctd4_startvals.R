@@ -27,10 +27,16 @@ if(server == FALSE){
   # read in phyloseq object and grab tax table
   d_taxa <- readRDS(here('data/sequencing_rpoB/phyloseq/myxococcus/prevalence_filtered/ps_otu_asv_filt.rds'))
   # read in tree
-  tree <- read.tree(here('data/sequencing_rpoB/raxml/trees/myxo_asv/myxo_asv_chronopl10.tre'))
+  tree <- read.tree(here('data/sequencing_rpoB/raxml/trees/myxo_asv/myxo_asv_treepl_cv_node_labels.tre'))
   # read in Mk model
-  fit_mk <- readRDS('data/sequencing_rpoB/processed/transition_rates/mod_custom5.rds')
+  fit_mk <- readRDS('data/sequencing_rpoB/processed/transition_rates/mod_custom_3.rds')
 }
+
+# alter tip labels to remove family as they will not link to the distance matrix
+# write function to remove family labels
+strsplit_mod <- function(x)(strsplit(x, split = '_') %>% unlist() %>% .[1:2] %>% paste0(., collapse = '_'))
+
+tree$tip.label <- purrr::map_chr(tree$tip.label, strsplit_mod)
 
 d_taxa <- d_taxa %>%
   phyloseq::tax_table() %>%
@@ -118,14 +124,12 @@ q_matrix <- data.frame(idparslist$Q) %>%
 
 colnames(q_matrix)
 
-# first make any of the transitions not possible in the Markov model 0
-# q14~0, q24~0, q25~0, q41~0, q53~0, q42~0, q45~0, q54~0, q52~0
-q_matrix <- mutate(q_matrix,
-                   new_id = ifelse(transition %in% c('q14', 'q24', 'q25', 'q41', 'q53', 'q42', 'q45', 'q54', 'q52'), 0, id))
+# impossible transitions
+zero_transitions <- fit_mk$par.full[fit_mk$par.full == 0] %>% names()
 
-# make transitions that are across hidden states AND trait states 0. i.e. 1A -> 2B
+# first make any of the transitions not possible in the Markov model 0
 q_matrix <- mutate(q_matrix,
-                   new_id = ifelse(from_hidden != to_hidden & from_trait != to_trait, 0, new_id))
+                   new_id = ifelse(transition %in% zero_transitions, 0, id))
 
 # make transitions that are across hidden states AND trait states 0. i.e. 1A -> 2B
 q_matrix <- mutate(q_matrix,
@@ -149,8 +153,6 @@ q_matrix <- left_join(q_matrix, hidden_to_assign) %>%
 
 # if the trait state changes, is not 0 or NA, create a column giving it the trait id
 q_matrix <- mutate(q_matrix, new_id2 = ifelse(from_trait != to_trait & new_id != 0 & !is.na(new_id), trait_id, new_id))
-# if the hidden state changes, is not 0 or NA, create a column giving it the hidden id
-q_matrix <- mutate(q_matrix, new_id3 = ifelse(from_hidden != to_hidden & new_id != 0 & !is.na(new_id), hidden_id, new_id))
 
 # when numbers and letters are not in the possible set (from trait and hidden ID) (make them 0)
 q_matrix <- mutate(q_matrix, new_id2 = ifelse(!new_id2 %in% trait_to_assign$trait_id, 0, new_id2),
