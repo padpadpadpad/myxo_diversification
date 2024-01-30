@@ -221,7 +221,7 @@ d_aic <- AIC(mod_sym, mod_ard, mod_er, mod_trans, mod_custom1, mod_custom2, mod_
   mutate(aicc = -2*log_lik + 2*df*(ntips/(ntips - df - 1)),
          aic_weight = round(MuMIn::Weights(aic), 2),
          aicc_weight = round(MuMIn::Weights(aicc), 2)) %>%
-  arrange(-aic_weight)
+  arrange(aic)
 # mod custom 3 is favoured pretty highly
 
 # make this into a table
