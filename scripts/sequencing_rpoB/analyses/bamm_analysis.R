@@ -36,23 +36,23 @@ d_meta <- left_join(dplyr::select(d_habpref, otu, habitat_preference = habitat_p
 cols_hab <- readRDS('data/sequencing_rpoB/phyloseq/myxococcus/habitat_preference/summary/habitat_colours.rds')
 
 # load in tree
-tree <- ape::read.tree('data/sequencing_rpoB/raxml/trees/myxo_asv/myxo_asv_chronopl10.tre')
-#tree <- ape::read.tree('data/sequencing_rpoB/raxml/trees/myxo_asv/myxo_asv_treepl.tre')
-#tree <- phytools::force.ultrametric(tree)
-
+#tree <- ape::read.tree('data/sequencing_rpoB/raxml/trees/myxo_asv/myxo_asv_chronopl10.tre')
+tree <- ape::read.tree('data/sequencing_rpoB/raxml/trees/myxo_asv/myxo_asv_treepl_cv_node_labels.tre')
+tree2 <- tree
 is.ultrametric(tree)
+
+
+# load in bamm run
+mcmcout <- read.csv('data/sequencing_rpoB/bamm/revision/asv/bamm_asv_SF0.5_mcmc_out.txt')
+
+# load in bamm event data
+edata <- getEventData(tree, eventdata = 'data/sequencing_rpoB/bamm/revision/asv/bamm_asv_SF0.5_event_data.txt', burnin = 0.3)
 
 # alter tip labels to remove family as they will not link to the distance matrix
 # write function to remove family labels
 strsplit_mod <- function(x)(strsplit(x, split = '_') %>% unlist() %>% .[1:2] %>% paste0(., collapse = '_'))
 
 tree$tip.label <- purrr::map_chr(tree$tip.label, strsplit_mod)
-
-# load in bamm run
-mcmcout <- read.csv('data/sequencing_rpoB/bamm/bamm_asv_mcmc_out.txt')
-
-# load in bamm event data
-edata <- getEventData(tree, eventdata = 'data/sequencing_rpoB/bamm/bamm_asv_event_data.txt', burnin = 0.3)
 
 #-----------------------------------#
 # assess convergence of BAMM run ####
@@ -76,13 +76,6 @@ d_prior <- plotPrior(mcmcout, expectedNumberOfShifts=500, burnin = 0.3) %>%
   janitor::clean_names() %>%
   pivot_longer(cols = contains('probs'), names_to = 'type', values_to = 'prob', names_pattern = "(.*)_probs")
 
-# plot these
-plot_rateshifts <- ggplot(shift_probs, aes(shifts, prob)) +
-  geom_col(col = 'black', fill = 'light grey') +
-  theme_bw(base_size = 10) +
-  labs(x = 'Number of rate shifts',
-       y = 'Probability')
-
 #------------------------------------------------------#
 # Look at number of rate shifts and model selection ####
 #------------------------------------------------------#
@@ -96,7 +89,7 @@ post_probs
 shift_probs <- summary(edata)
 
 # plot the probabilities
-ggplot(shift_probs, aes(shifts, prob)) +
+plot_rateshifts <- ggplot(shift_probs, aes(shifts, prob)) +
   geom_col(col = 'black', fill = 'light grey') +
   theme_bw(base_size = 14) +
   labs(x = 'Number of shifts',
@@ -107,11 +100,11 @@ n_shifts_ci <- tibble(mean_shifts = mean(postburn$N_shifts),
                       lower_ci = quantile(postburn$N_shifts, 0.025),
                       upper_ci = quantile(postburn$N_shifts, 0.975))
 n_shifts_ci
-# average number of shifts is 13, lower CI 9, upper CI 18.
+# average number of shifts is 31, lower CI 23, upper CI 40.
 
 # calculate Bayes factors for each number of shifts in rate
 # use 0 burnin to sample 0 shifts
-mcmc_file = 'data/sequencing_rpoB/bamm/bamm_asv_mcmc_out.txt'
+mcmc_file = 'data/sequencing_rpoB/bamm/revision/asv/bamm_asv_SF0.5_mcmc_out.txt'
 bayes_factors <- computeBayesFactors(mcmc_file, expectedNumberOfShifts=500, burnin=0)
 
 # grab the columns for pairwise comparisons between 0 shifts and number of shifts
@@ -126,7 +119,7 @@ d_bayes_factors <- arrange(d_bayes_factors, desc(bayes_factor)) %>%
          cum_diff = cumsum(diff))
 
 head(d_bayes_factors)
-# the model with 12 shifts is the best supported by a long way!
+# models withj 28-32 shifts within 20 shifts is the best supported by a long way!
 # Bayes factors greater than 20 generally imply strong evidence for one model over another; values greater than 50 are very strong evidence in favour of the numerator model. There is no definitive Bayes factor criterion for “significance”, but many researchers consider values greater than 12 to be consistent with at least some effect.
 
 #---------------------------------#
@@ -166,6 +159,8 @@ shiftnodes <- getShiftNodesFromIndex(edata, index = msc_set$sampleindex)
 
 # get tree
 tree_bamm <- mbt$phy
+
+tree_bamm$tip.label <- purrr::map_chr(tree$tip.label, strsplit_mod)
 
 # get the edge lengths in a dataframe
 d_tree_bamm <- data.frame(tree_bamm$edge, edge_num=1:nrow(tree_bamm$edge), edge_length = tree_bamm$edge.length)
@@ -209,7 +204,7 @@ d_meta <- mutate(d_meta, rare = ifelse(habitat_preference %in% c('marine mud gen
 # first colour branches and add rate shifts
 p1 <- ggtree(tree, layout = 'circular', aes(col = log_edge_length)) %<+% d_tree_bamm +
   scale_color_gradientn('Net diversification\n(branch colours)', colors = met.brewer(name='Hiroshige', direction=-1, override.order = F), breaks=c(min(d_tree_bamm$log_edge_length, na.rm = TRUE) + abs(min(d_tree_bamm$edge_length, na.rm = TRUE))*0.2, max(d_tree_bamm$log_edge_length, na.rm = TRUE) * 0.95), labels=c("Slow","Fast")) +
-  #geom_point2(aes(subset=(node %in% shiftnodes)), color="black",size=5)+
+  geom_point2(aes(subset=(node %in% shiftnodes)), color="black",size=5)+
   NULL
 
 # next add tip points
@@ -227,7 +222,7 @@ tree_plot <- p2 +
                 mapping = aes(node = mrca,
                               color = family2,
                               label = blank_label),
-                offset = castor::get_all_distances_to_root(tree2) %>% max() * 0.08,
+                offset = castor::get_all_distances_to_root(tree) %>% max() * 0.08,
                 barsize = 2) +
   scale_color_manual('Family (outer bar)', values = cols) +
   guides(color = guide_legend(override.aes = list(size = 0.1, shape = 1)))
@@ -330,9 +325,10 @@ p_rtt <- ggplot() +
 #--------------------------------------------#
 
 # grab out tip rates 
-tip_rates <- data.frame(tip_label = edata$tip.label,
+tip_rates <- data.frame(tip_label2 = edata$tip.label,
                         speciation = edata$meanTipLambda,
                         extinction = edata$meanTipMu) %>%
+  mutate(tip_label = purrr::map_chr(tip_label2, strsplit_mod)) %>%
   left_join(., dplyr::select(d_meta, tip_label, habitat_preference)) %>%
   filter(!is.na(habitat_preference)) %>%
   group_by(habitat_preference) %>%
@@ -343,7 +339,7 @@ tip_rates <- data.frame(tip_label = edata$tip.label,
          net_diversification = speciation - extinction)
 
 # set up correlation matrix for the tree
-cor_lambda <- corPagel(value = 1, phy = tree, form = ~tip_label)
+cor_lambda <- corPagel(value = 1, phy = tree2, form = ~tip_label2)
 
 # fit phylogenetic generalised linear model
 mod <- gls(net_diversification ~ habitat_preference, data = tip_rates, correlation = cor_lambda)
