@@ -14,9 +14,10 @@ tidyverse_conflicts()
 # filename
 name <- 'muctd2'
 
-# all or just hidden transitions
+# estimate all transition rates or just the hidden transitions
+# to reduce number of estimatable parameters we fixed the transition rates of transitions from the markov model
 # can be "hidden" or "all"
-transitions <- 'all'
+transitions <- 'hidden'
 
 # server - yes or no
 server <- FALSE
@@ -106,10 +107,6 @@ idparslist$mus[] <- 3
 
 # setup transition rates ####
 
-# make a bunch of transitions 0 
-# these transitions were not possible in the markov model
-# q14~0, q24~0, q25~0, q41~0, q42~0, q53~0, q45~0
-
 # make transition matrix a dataframe so I can set rules more easily
 q_matrix <- data.frame(idparslist$Q) %>%
   rownames_to_column(var = 'from') %>%
@@ -128,7 +125,6 @@ colnames(q_matrix)
 zero_transitions <- fit_mk$par.full[fit_mk$par.full == 0] %>% names()
 
 # first make any of the transitions not possible in the Markov model 0
-# q14~0, q24~0, q25~0, q41~0, q53~0, q42~0, q45~0, q54~0, q52~0
 q_matrix <- mutate(q_matrix,
                    new_id = ifelse(transition %in% zero_transitions, 0, id))
 

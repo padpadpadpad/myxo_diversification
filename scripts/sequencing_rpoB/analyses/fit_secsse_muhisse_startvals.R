@@ -14,9 +14,10 @@ tidyverse_conflicts()
 # filename
 name <- 'muhisseSSonly'
 
-# all or just hidden transitions
+# estimate all transition rates or just the hidden transitions
+# to reduce number of estimatable parameters we fixed the transition rates of transitions from the markov model
 # can be "hidden" or "all"
-transitions <- 'all'
+transitions <- 'hidden'
 
 # server - yes or no
 server <- FALSE

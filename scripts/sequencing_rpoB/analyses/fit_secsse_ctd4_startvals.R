@@ -14,9 +14,10 @@ tidyverse_conflicts()
 # filename
 name <- 'muctd4'
 
-# all or just hidden transitions
+# estimate all transition rates or just the hidden transitions
+# to reduce number of estimatable parameters we fixed the transition rates of transitions from the markov model
 # can be "hidden" or "all"
-transitions <- 'all'
+transitions <- 'hidden'
 
 # server - yes or no
 server <- FALSE
@@ -153,6 +154,8 @@ q_matrix <- left_join(q_matrix, hidden_to_assign) %>%
 
 # if the trait state changes, is not 0 or NA, create a column giving it the trait id
 q_matrix <- mutate(q_matrix, new_id2 = ifelse(from_trait != to_trait & new_id != 0 & !is.na(new_id), trait_id, new_id))
+# if the hidden state changes, is not 0 or NA, create a column giving it the hidden id
+q_matrix <- mutate(q_matrix, new_id3 = ifelse(from_hidden != to_hidden & new_id != 0 & !is.na(new_id), hidden_id, new_id))
 
 # when numbers and letters are not in the possible set (from trait and hidden ID) (make them 0)
 q_matrix <- mutate(q_matrix, new_id2 = ifelse(!new_id2 %in% trait_to_assign$trait_id, 0, new_id2),

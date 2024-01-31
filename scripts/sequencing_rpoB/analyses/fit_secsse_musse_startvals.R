@@ -235,11 +235,14 @@ inits_q <- init_transition
 vals <- c(0.5,1,2)
 
 # create full grid of start values
-vals <- expand.grid(lambda = vals, mu = vals, q = vals) %>%
+# add in q here if wanting to estimate the transition rates alongside speciation and extinction rates
+vals <- expand.grid(lambda = vals, mu = vals) %>%
   as.tibble()
 
 # create an empty dataframe
-inits_ml <- mutate(vals, inits = list(NA), loglik = NA,
+inits_ml <- mutate(vals, 
+                   inits = list(NA), 
+                   loglik = NA,
                    id = 1:n())
 
 # set up for loop to run screen for initial values

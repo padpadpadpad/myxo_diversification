@@ -15,14 +15,13 @@ tidyverse_conflicts()
 name <- 'musse'
 
 # server - yes or no
-server <- TRUE
+server <- FALSE
 
 if(server == TRUE){
   d_habpref <- read.csv('~/secsse/habitat_preference_asv_new.csv')
   d_taxa <- readRDS('~/secsse/ps_otu_asv_filt.rds')
-  tree <- read.tree('~/secsse/myxo_asv_chronopl10.tre')
-  fit_mk <- readRDS('~/secsse/mod_custom5.rds')
-  # read in start value dataframe
+  tree <- read.tree('~/secsse/myxo_asv_treepl_cv_node_labels.tre')
+  fit_mk <- readRDS('~/secsse/mod_custom_3.rds')
   start_vals <- readRDS(paste('~/secsse/start_vals/', name, '.rds', sep = ''))
 }
 
@@ -32,12 +31,18 @@ if(server == FALSE){
   # read in phyloseq object and grab tax table
   d_taxa <- readRDS(here('data/sequencing_rpoB/phyloseq/myxococcus/prevalence_filtered/ps_otu_asv_filt.rds'))
   # read in tree
-  tree <- read.tree(here('data/sequencing_rpoB/raxml/trees/myxo_asv/myxo_asv_chronopl10.tre'))
+  tree <- read.tree(here('data/sequencing_rpoB/raxml/trees/myxo_asv/myxo_asv_treepl_cv_node_labels.tre'))
   # read in Mk model
-  fit_mk <- readRDS('data/sequencing_rpoB/processed/transition_rates/mod_custom5.rds')
+  fit_mk <- readRDS('data/sequencing_rpoB/processed/transition_rates/mod_custom_3.rds')
   # read in start value dataframe
   start_vals <- readRDS(paste('data/sequencing_rpoB/processed/secsse/init_vals_ml/', name, '.rds', sep = ''))
 }
+
+# alter tip labels to remove family as they will not link to the distance matrix
+# write function to remove family labels
+strsplit_mod <- function(x)(strsplit(x, split = '_') %>% unlist() %>% .[1:2] %>% paste0(., collapse = '_'))
+
+tree$tip.label <- purrr::map_chr(tree$tip.label, strsplit_mod)
 
 d_taxa <- d_taxa %>%
   phyloseq::tax_table() %>%
@@ -77,10 +82,6 @@ coding <- tibble(hab_pref = unname(hab_pref), hab_pref_num = unname(hab_pref_num
 
 coding
 
-# read in musse model
-#fit_musse_no_se <- readRDS('data/sequencing_rpoB/processed/transition_rates/asv_musse_no_se.rds')
-#fit_musse_no_se <- readRDS('~/secsse/asv_musse_no_se.rds')
-
 # try and run SecSSE which runs concealed state and speciation models
 # https://cran.r-project.org/web/packages/secsse/vignettes/Using_secsse.html
 
@@ -95,7 +96,6 @@ num_concealed_states <- 1
 
 # setup parameter list
 idparslist <- id_paramPos(traits, num_concealed_states = num_concealed_states)
-
 idparslist
 
 # setup speciation rates ####
@@ -106,10 +106,6 @@ idparslist$lambdas[] <- c(1,2,3,4,5)
 idparslist$mus[] <- 6
 
 # setup transition rates ####
-
-# make a bunch of transitions 0 
-# these transitions were not possible in the markov model
-# q14~0, q24~0, q25~0, q41~0, q53~0, q42~0, q45~0, q54~0, q52~0
 
 # make transition matrix a dataframe so I can set rules more easily
 q_matrix <- data.frame(idparslist$Q) %>%
@@ -123,10 +119,12 @@ q_matrix <- data.frame(idparslist$Q) %>%
          transition = paste('q', from_trait, to_trait, sep = ''),
          id = -id) 
 
+# impossible transitions
+zero_transitions <- fit_mk$par.full[fit_mk$par.full == 0] %>% names()
+
 # first make any of the transitions not possible in the Markov model 0
-# q14~0, q24~0, q25~0, q41~0, q53~0, q42~0, q45~0, q54~0, q52~0
 q_matrix <- mutate(q_matrix,
-                   new_id = ifelse(transition %in% c('q14', 'q24', 'q25', 'q41', 'q53', 'q42', 'q45', 'q54', 'q52'), 0, id))
+                   new_id = ifelse(transition %in% zero_transitions, 0, id))
 
 # run a for loop to replace each number in the initial q matrix
 q <- idparslist[[3]]
@@ -203,6 +201,7 @@ length(initparsopt) == length(idparsopt)
 max_iter <- 1000 * round((1.25)^length(idparsopt))
 
 # setup different inits ####
+
 start_vals
 
 # filter out NaN and Inf
@@ -213,13 +212,16 @@ start_vals <- filter(start_vals, !is.nan(loglik) & !is.infinite(loglik) & !is.na
 inits <- start_vals$inits
 
 # also need to change the sample fractions ####
-# use 1, 0.75 and 0.5 to see how they change the fit
+# use 1, 0.5, 0.25, 0.125, 0.0625 to see how they change the fit
 
 sampled_fraction_1 <- rep(1, times = length(unique(traits)))
-sampled_fraction_0.75 <- rep(0.75, times = length(unique(traits)))
 sampled_fraction_0.5 <- rep(0.5, times = length(unique(traits)))
+sampled_fraction_0.25 <- rep(0.25, times = length(unique(traits)))
+sampled_fraction_0.125 <- rep(0.125, times = length(unique(traits)))
+sampled_fraction_0.0625 <- rep(0.0625, times = length(unique(traits)))
 
-sampled_fractions <- list(sampled_fraction_1, sampled_fraction_0.75, sampled_fraction_0.5)
+sampled_fractions <- list(sampled_fraction_1, sampled_fraction_0.5, sampled_fraction_0.25, sampled_fraction_0.125, sampled_fraction_0.0625)
+
 num_samp_frac <- length(sampled_fractions)
 
 # create all combinations of the two lists
@@ -274,10 +276,31 @@ fit_secsse <- function(list_inits_sampfrac){
   # save out the list
   temp_name <- paste(name, '_', 'sampfrac', unique(temp_samp_frac), '_', 'run', list_inits_sampfrac$run,  sep = '')
   
-  saveRDS(output, paste('~/secsse/seccse_', temp_name, 'v2.rds', sep =''))
+  saveRDS(output, paste('~/secsse/seccse_', temp_name, '.rds', sep =''))
   
 }
 
+# set a test
+secsse_ml(
+  tree,
+  traits,
+  num_concealed_states = num_concealed_states,
+  idparslist,
+  idparsopt,
+  initparsopt = all_combs[[1]]$inits,
+  idparsfix,
+  parsfix,
+  cond = "maddison_cond",
+  root_state_weight = "maddison_weights",
+  tol = c(1e-04, 1e-05, 1e-07),
+  sampling_fraction = all_combs[[1]]$sampled_fractions,
+  maxiter = max_iter,
+  optimmethod = "simplex",
+  num_cycles = 20,
+  num_threads = 2,
+  method = 'odeint::runge_kutta_cash_karp54',
+  loglik_penalty = 0.05
+)
 
 # Set a "plan" for how the code should run.
 plan(multisession, workers = 2)
