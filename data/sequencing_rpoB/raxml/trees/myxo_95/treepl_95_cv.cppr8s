@@ -1,0 +1,23 @@
+treefile = myxo_95.raxml_rooted.tre
+smooth = 10
+numsites = 246
+mrca = MYXO otu_569_Myxococcaceae otu_10151_Polyangiaceae
+min = MYXO 1
+max = MYXO 1
+outfile = myxo_95_treepl_cv.tre
+cv
+randomcv
+cvoutfile = myxo_95_cv.out
+[cvstart = .0001] [set where you want to start cross validation, default = 1000]
+[cvstop = 100][set where you want to stop cross validation, default = 0.1]
+[cvmultstep = 0.1]
+nthreads = 10 [number of threads]
+[log_pen] [rate penalty will use log instead of additive function]
+seed = 42 [seed for random number generator, default = clock]
+thorough
+[prime]
+opt = 1
+optad = 1
+optcvad = 3
+moredetail
+moredetailcvad
