@@ -37,27 +37,6 @@ strsplit_mod <- function(x)(strsplit(x, split = '_') %>% unlist() %>% .[1:2] %>%
 
 tree$tip.label <- purrr::map_chr(tree$tip.label, strsplit_mod)
 
-# custom_function ####
-
-# function for getting a data frame from a diversitree object
-get_diversitree_df <- function(div_obj, trait_vec, replace_vec){
-  
-  if(is.null(div_obj$par.full)){div_obj$par.full <- div_obj$par}
-  
-  temp <- tibble(param = names(div_obj$par.full)) %>%
-    mutate(state_1_num = as.numeric(substr(param, 2,2)),
-         state_2_num = as.numeric(substr(param, 3,3)),
-         transition_rate = unlist(div_obj$par.full),
-         state_1 = stringi::stri_replace_all_regex(state_1_num, pattern = trait_vec, replacement = replace_vec, vectorize=FALSE),
-         state_2 = stringi::stri_replace_all_regex(state_2_num, pattern = trait_vec, replacement = replace_vec, vectorize=FALSE)) %>%
-    select(param, state_1, state_2, state_1_num, state_2_num, transition_rate) %>%
-    mutate(free_param = ifelse(param %in% names(div_obj$par), 'yes', 'no'),
-           num_params = length(div_obj$par))
-  
-  return(temp)
-  
-}
-
 # setup for analyses ####
 
 # reorder metadata to match tip labels of tree
