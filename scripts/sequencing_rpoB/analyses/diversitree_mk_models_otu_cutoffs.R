@@ -10,30 +10,7 @@ librarian::shelf(here, tidyverse, ggtree, ggnewscale, RColorBrewer, patchwork, p
 
 # custom_function ####
 
-# function for getting a data frame from a diversitree object
-get_diversitree_df <- function(div_obj, trait_vec, replace_vec){
-  
-  if(is.null(div_obj$par.full)){div_obj$par.full <- div_obj$par}
-  
-  temp <- tibble(param = names(div_obj$par.full)) %>%
-    mutate(state_1_num = as.numeric(substr(param, 2,2)),
-           state_2_num = as.numeric(substr(param, 3,3)),
-           transition_rate = unlist(div_obj$par.full),
-           state_1 = stringi::stri_replace_all_regex(state_1_num, pattern = trait_vec, replacement = replace_vec, vectorize=FALSE),
-           state_2 = stringi::stri_replace_all_regex(state_2_num, pattern = trait_vec, replacement = replace_vec, vectorize=FALSE)) %>%
-    select(param, state_1, state_2, state_1_num, state_2_num, transition_rate) %>%
-    mutate(free_param = ifelse(param %in% names(div_obj$par), 'yes', 'no'),
-           num_params = length(div_obj$par))
-  
-  return(temp)
-  
-}
-
-
-label_wrap2 <- function(x, width){
-  unlist(lapply(strwrap(x, width = width, simplify = FALSE), 
-                paste0, collapse = "\n"))
-}
+source('scripts/sequencing_rpoB/analyses/diversitree_helper_functions.R')
 
 #------------------------------#
 # first for 95% ASV dataset ####
@@ -317,13 +294,13 @@ d_table <- select(d_aic, model, df, log_lik, aic, aic_weight) %>%
                            model == 'mod_custom7' ~ 'Simplified ARD 7'))
 
 # make table
-table <- d_table %>%
+table_aic <- d_table %>%
   mutate(across(where(is.numeric), \(x) round(x,2))) %>%
   flextable() %>%
   align(align = 'center', part = 'all') %>%
   set_header_labels(model = "Model",
                     df = 'd.f.',
-                    loglik = 'Log Likelihood',
+                    log_lik = 'Log Likelihood',
                     aic = 'AIC',
                     aic_weight = "AIC weight") %>%
   italic(j = 2, part = 'header') %>%
@@ -340,81 +317,39 @@ d_habpref_summary <- group_by(d_meta, habitat_preference) %>%
 # set colours
 cols_hab <- readRDS(here('data/sequencing_rpoB/phyloseq/myxococcus/habitat_preference/summary/habitat_colours.rds'))
 
-# make very simple plot to grab legend from
-p_legend <- ggplot(d_habpref_summary, aes(habitat_preference, prop, col = habitat_preference)) +
-  geom_point() +
-  scale_color_manual('Biome preference', values = cols_hab, labels = c('freshwater + land generalist', 'freshwater specialist', 'marine generalist', 'marine specialist', 'land specialist')) +
-  theme_bw() +
-  guides(colour = guide_legend(override.aes = list(size=5)))
-p_legend <- cowplot::get_legend(p_legend)
+# make very simple plot to grab legend from - see diversitree_helper_functions.R
+p_legend <- make_legend(d_habpref_summary, cols_hab)
 
-# turn transition matrix into network to plot
-d_network <- as_tbl_graph(select(get_diversitree_df(mod_custom6, coding$hab_pref_num, coding$hab_pref), state_1, state_2, transition_rate)) %>%
-  activate(edges) %>%
-  filter(!is.na(transition_rate) & transition_rate > 0) %>%
-  activate(nodes) %>%
-  left_join(., select(d_habpref_summary, name = habitat_preference, prop, n)) %>%
-  left_join(., tibble(name = names(cols_hab))) %>%
-  mutate(order = c(2, 1, 5, 4, 3)) %>%
-  arrange(order)
+# make matrix plot - see diversitree_helper_functions.R
+d_diversitree <- get_diversitree_df(mod_custom6, coding$hab_pref_num, coding$hab_pref)
 
-p <- ggraph(d_network, layout = 'linear', circular = TRUE) + 
-  geom_edge_fan(aes(alpha = transition_rate, 
-                    width = transition_rate,
-                    label = round(transition_rate, 2)),
-                arrow = arrow(length = unit(4, 'mm')),
-                end_cap = circle(10, 'mm'),
-                start_cap = circle(10, 'mm'),
-                angle_calc = 'along',
-                label_dodge = unit(2.5, 'mm'),
-                strength = 1.3) + 
-  geom_node_point(aes(size = prop,
-                      col = name)) +
-  theme_void() +
-  #geom_node_label(aes(label = label, x=xmin), repel = TRUE) +
-  scale_size(range = c(5,20)) +
-  scale_edge_width(range = c(0.5, 2)) +
-  scale_color_manual('Biome preference', values = cols_hab) +
-  scale_fill_manual('Biome preference', values = cols_hab)
+p <- make_network_diversitree(d_diversitree, d_habpref_summary, cols_hab) +
+  labs(title = 'Best model from OTU cut-off of 95% similarity',
+       subtitle = 'Tree contained 1023 tips')
 
-# grab data for points
-point_data <- p$data %>%
-  select(x, y, name) %>%
-  mutate(nudge_x = ifelse(x < 0, -0.2, 0.2),
-         nudge_y = ifelse(y < 0, -0.2, 0.2))
+# make source sink table - see diversitree_helper_functions.R
+table_rate <- make_source_sink_table(d_diversitree)
 
-p_best <- p + 
-  #geom_label(aes(nudge_x + x, nudge_y+y, label = label_wrap2(name, 15)), point_data, size = MicrobioUoE::pts(12)) +
-  #coord_cartesian(clip = "off") +
-  xlim(c(min(point_data$x) + min(point_data$nudge_x)), max(point_data$x) + max(point_data$nudge_x)) +
-  ylim(c(min(point_data$y) + min(point_data$nudge_y)), max(point_data$y) + max(point_data$nudge_y)) +
-  theme(legend.position = 'none',
-        panel.background = element_rect(fill = 'white', colour = 'white'))
+# make single plot summarising these results
 
-p_best + (wrap_elements(p_legend)/plot_spacer()) + plot_layout(widths = c(0.8, 0.2))
+# save out best model
+saveRDS(mod_custom6, 'data/sequencing_rpoB/processed/transition_rates/mod_custom_6_otu95.rds')
 
-d_source_sink_rate <- select(get_diversitree_df(mod_custom3, coding$hab_pref_num, coding$hab_pref), away = state_1, into = state_2, transition_rate) %>%
-  pivot_longer(cols = c(away, into), names_to = 'direction', values_to = 'habitat_preference') %>%
-  group_by(habitat_preference, direction) %>%
-  summarise(total_rate = sum(transition_rate), .groups = 'drop') %>%
-  pivot_wider(names_from = direction, values_from = total_rate) %>%
-  mutate(source_sink1 = away / into,
-         source_sink2 = into - away)
+# make a custom layout for the plot
+layout <- c(
+  'AAAAAB
+   AAAAA#
+   CCC#DD'
+)
 
-table_rate <- select(d_source_sink_rate, habitat_preference, away, into, source_sink1) %>%
-  mutate(across(away:source_sink1, ~round(.x, 2)),
-         habitat_preference = gsub(':', ' + ', habitat_preference),
-         habitat_preference = gsub('_', ' ', habitat_preference)) %>%
-  arrange(desc(source_sink1)) %>%
-  flextable(.) %>%
-  set_header_labels(habitat_preference = 'biome preference',
-                    source_sink1 = 'source sink ratio') %>%
-  align(align = 'center', part = 'all') %>%
-  align(align = 'left', part = 'body', j = 1) %>%
-  bold(part = 'header') %>%
-  font(fontname = 'Times', part = 'all') %>%
-  fontsize(size = 12, part = 'all') %>%
-  autofit()
+p + 
+  p_legend +
+  gen_grob(table_aic) + 
+  gen_grob(table_rate) +
+  plot_layout(design = layout, heights = c(0.4, 0.4, 0.2),
+              widths = c(0.2, 0.2, 0.2, 0.05, 0.2, 0.25))
+
+ggsave('plots/manuscript_plots/transitions_95.png', height = 6.5, width = 8.5)
 
 #-------------------------------#
 # next for 97.7% ASV dataset ####
@@ -652,7 +587,7 @@ d_table <- select(d_aic, model, df, log_lik, aic, aic_weight) %>%
                            model == 'mod_custom5' ~ 'Simplified ARD 5'))
 
 # make table
-table <- d_table %>%
+table_aic <- d_table %>%
   mutate(across(where(is.numeric), \(x) round(x,2))) %>%
   flextable() %>%
   align(align = 'center', part = 'all') %>%
@@ -675,79 +610,36 @@ d_habpref_summary <- group_by(d_meta, habitat_preference) %>%
 # set colours
 cols_hab <- readRDS(here('data/sequencing_rpoB/phyloseq/myxococcus/habitat_preference/summary/habitat_colours.rds'))
 
-# make very simple plot to grab legend from
-p_legend <- ggplot(d_habpref_summary, aes(habitat_preference, prop, col = habitat_preference)) +
-  geom_point() +
-  scale_color_manual('Biome preference', values = cols_hab, labels = c('freshwater + land generalist', 'freshwater specialist', 'marine generalist', 'marine specialist', 'land specialist')) +
-  theme_bw() +
-  guides(colour = guide_legend(override.aes = list(size=5)))
-p_legend <- cowplot::get_legend(p_legend)
+# make very simple plot to grab legend from - see diversitree_helper_functions.R
+p_legend <- make_legend(d_habpref_summary, cols_hab)
 
-# turn transition matrix into network to plot
-d_network <- as_tbl_graph(select(get_diversitree_df(mod_custom3, coding$hab_pref_num, coding$hab_pref), state_1, state_2, transition_rate)) %>%
-  activate(edges) %>%
-  filter(!is.na(transition_rate) & transition_rate > 0) %>%
-  activate(nodes) %>%
-  left_join(., select(d_habpref_summary, name = habitat_preference, prop, n)) %>%
-  left_join(., tibble(name = names(cols_hab))) %>%
-  mutate(order = c(2, 1, 5, 4, 3)) %>%
-  arrange(order)
+# make matrix plot - see diversitree_helper_functions.R
+d_diversitree <- get_diversitree_df(mod_custom3, coding$hab_pref_num, coding$hab_pref)
 
-p <- ggraph(d_network, layout = 'linear', circular = TRUE) + 
-  geom_edge_fan(aes(alpha = transition_rate, 
-                    width = transition_rate,
-                    label = round(transition_rate, 2)),
-                arrow = arrow(length = unit(4, 'mm')),
-                end_cap = circle(10, 'mm'),
-                start_cap = circle(10, 'mm'),
-                angle_calc = 'along',
-                label_dodge = unit(2.5, 'mm'),
-                strength = 1.3) + 
-  geom_node_point(aes(size = prop,
-                      col = name)) +
-  theme_void() +
-  #geom_node_label(aes(label = label, x=xmin), repel = TRUE) +
-  scale_size(range = c(5,20)) +
-  scale_edge_width(range = c(0.5, 2)) +
-  scale_color_manual('Biome preference', values = cols_hab) +
-  scale_fill_manual('Biome preference', values = cols_hab)
+p <- make_network_diversitree(d_diversitree, d_habpref_summary, cols_hab) +
+  labs(title = 'Best model from OTU cut-off of 97.7% similarity',
+       subtitle = 'Tree contained 1682 tips')
 
-# grab data for points
-point_data <- p$data %>%
-  select(x, y, name) %>%
-  mutate(nudge_x = ifelse(x < 0, -0.2, 0.2),
-         nudge_y = ifelse(y < 0, -0.2, 0.2))
+# make source sink table - see diversitree_helper_functions.R
+table_rate <- make_source_sink_table(d_diversitree)
 
-p_best <- p + 
-  #geom_label(aes(nudge_x + x, nudge_y+y, label = label_wrap2(name, 15)), point_data, size = MicrobioUoE::pts(12)) +
-  #coord_cartesian(clip = "off") +
-  xlim(c(min(point_data$x) + min(point_data$nudge_x)), max(point_data$x) + max(point_data$nudge_x)) +
-  ylim(c(min(point_data$y) + min(point_data$nudge_y)), max(point_data$y) + max(point_data$nudge_y)) +
-  theme(legend.position = 'none',
-        panel.background = element_rect(fill = 'white', colour = 'white'))
+# make single plot summarising these results
 
-p_best + (wrap_elements(p_legend)/plot_spacer()) + plot_layout(widths = c(0.8, 0.2))
+# save out best model
+saveRDS(mod_custom3, 'data/sequencing_rpoB/processed/transition_rates/mod_custom_3_otu97.7.rds')
 
-d_source_sink_rate <- select(get_diversitree_df(mod_custom3, coding$hab_pref_num, coding$hab_pref), away = state_1, into = state_2, transition_rate) %>%
-  pivot_longer(cols = c(away, into), names_to = 'direction', values_to = 'habitat_preference') %>%
-  group_by(habitat_preference, direction) %>%
-  summarise(total_rate = sum(transition_rate), .groups = 'drop') %>%
-  pivot_wider(names_from = direction, values_from = total_rate) %>%
-  mutate(source_sink1 = away / into,
-         source_sink2 = into - away)
+# make a custom layout for the plot
+layout <- c(
+  'AAAAAB
+   AAAAA#
+   CCC#DD'
+)
 
-table_rate <- select(d_source_sink_rate, habitat_preference, away, into, source_sink1) %>%
-  mutate(across(away:source_sink1, ~round(.x, 2)),
-         habitat_preference = gsub(':', ' + ', habitat_preference),
-         habitat_preference = gsub('_', ' ', habitat_preference)) %>%
-  arrange(desc(source_sink1)) %>%
-  flextable(.) %>%
-  set_header_labels(habitat_preference = 'biome preference',
-                    source_sink1 = 'source sink ratio') %>%
-  align(align = 'center', part = 'all') %>%
-  align(align = 'left', part = 'body', j = 1) %>%
-  bold(part = 'header') %>%
-  font(fontname = 'Times', part = 'all') %>%
-  fontsize(size = 12, part = 'all') %>%
-  autofit()
+p + 
+  p_legend +
+  gen_grob(table_aic) + 
+  gen_grob(table_rate) +
+  plot_layout(design = layout, heights = c(0.4, 0.4, 0.2),
+              widths = c(0.2, 0.2, 0.2, 0.05, 0.2, 0.25))
 
+ggsave('plots/manuscript_plots/transitions_97.7.png', height = 6.5, width = 8.5)
