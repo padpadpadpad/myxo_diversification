@@ -101,9 +101,36 @@ make_source_sink_table <- function(diversitree_df){
     align(align = 'center', part = 'all') %>%
     align(align = 'left', part = 'body', j = 1) %>%
     font(fontname = 'Times', part = 'all') %>%
-    fontsize(size = 12, part = 'all')
+    fontsize(size = 16, part = 'all')
   
   return(temp)
+}
+
+# function to make ggplot2 friendly ltt plot
+plot_ltt <- function(tree, log = 'N'){
+  
+  # create lineage through time plot
+  d_ltt <- ape::ltt.plot.coords(tree) %>%
+    data.frame() %>%
+    mutate(time2 = time + 1)
+  
+  # create lineage through time plot
+  # plot N or log(N) based on the argument log = Y or N
+  if(log == 'Y'){
+    p2 <- ggplot(d_ltt, aes(time2, log(N))) +
+      geom_line() +
+      theme_bw(base_size = 12) +
+      labs(x = 'Relative time',
+           y = 'Log number of lineages')
+  } else {
+    p2 <- ggplot(d_ltt, aes(time2, N)) +
+    geom_line() +
+    theme_bw(base_size = 12) +
+    labs(x = 'Relative time',
+         y = 'Number of lineages')
+  }
+  
+  return(p2)
 }
 
 # function for wrapping text in a label
