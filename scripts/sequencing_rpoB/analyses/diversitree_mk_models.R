@@ -65,6 +65,9 @@ coding <- tibble(hab_pref = unname(hab_pref), hab_pref_num = unname(hab_pref_num
 
 coding
 
+# save out coding
+write.csv(coding, 'data/sequencing_rpoB/processed/transition_rates/coding.csv', row.names = FALSE)
+
 #-------------------------------------------------------------#
 # run diversitree analysis of discrete character evolution ####
 #-------------------------------------------------------------#

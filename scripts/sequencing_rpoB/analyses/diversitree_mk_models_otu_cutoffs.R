@@ -330,6 +330,9 @@ p <- make_network_diversitree(d_diversitree, d_habpref_summary, cols_hab) +
 # make source sink table - see diversitree_helper_functions.R
 table_rate <- make_source_sink_table(d_diversitree)
 
+# make ltt plot
+p_ltt <- plot_ltt(tree, log = 'Y')
+
 # make single plot summarising these results
 
 # save out best model
@@ -337,17 +340,18 @@ saveRDS(mod_custom6, 'data/sequencing_rpoB/processed/transition_rates/mod_custom
 
 # make a custom layout for the plot
 layout <- c(
-  'AAAAAB
-   AAAAA#
-   CCC#DD'
+  'AAAAB
+   AAAAE
+   CCC#D'
 )
 
 p + 
   p_legend +
   gen_grob(table_aic) + 
   gen_grob(table_rate) +
+  p_ltt +
   plot_layout(design = layout, heights = c(0.4, 0.4, 0.2),
-              widths = c(0.2, 0.2, 0.2, 0.05, 0.2, 0.25))
+              widths = c(0.2, 0.2, 0.2, 0.05, 0.3))
 
 ggsave('plots/manuscript_plots/transitions_95.png', height = 6.5, width = 8.5)
 
@@ -623,6 +627,9 @@ p <- make_network_diversitree(d_diversitree, d_habpref_summary, cols_hab) +
 # make source sink table - see diversitree_helper_functions.R
 table_rate <- make_source_sink_table(d_diversitree)
 
+# make ltt plot
+p_ltt <- plot_ltt(tree, log = 'Y')
+
 # make single plot summarising these results
 
 # save out best model
@@ -630,16 +637,17 @@ saveRDS(mod_custom3, 'data/sequencing_rpoB/processed/transition_rates/mod_custom
 
 # make a custom layout for the plot
 layout <- c(
-  'AAAAAB
-   AAAAA#
-   CCC#DD'
+  'AAAAB
+   AAAAE
+   CCC#D'
 )
 
 p + 
   p_legend +
   gen_grob(table_aic) + 
   gen_grob(table_rate) +
+  p_ltt +
   plot_layout(design = layout, heights = c(0.4, 0.4, 0.2),
-              widths = c(0.2, 0.2, 0.2, 0.05, 0.2, 0.25))
+              widths = c(0.2, 0.2, 0.2, 0.05, 0.3))
 
 ggsave('plots/manuscript_plots/transitions_97.7.png', height = 6.5, width = 8.5)

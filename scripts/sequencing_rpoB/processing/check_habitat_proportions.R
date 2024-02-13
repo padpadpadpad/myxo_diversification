@@ -26,6 +26,8 @@ read_habpref <- function(x){
 files <- list.files('data/sequencing_rpoB/phyloseq/myxococcus/habitat_preference/summary', pattern = '.csv', full.names = TRUE)
 files <- files[! basename(files) %in% c('habitat_preference_asv_new.csv', 'habitat_preference_asv_check.csv')]
 
+files <- files[grepl('asv|95|97.7', files)]
+
 # read them all in
 d <- map_df(files, read_habpref)
 
@@ -62,4 +64,4 @@ ggplot(d_summary, aes(prop, forcats::fct_reorder(habitat_preference, n, .fun = m
         strip.text = element_text(hjust = 0))
 
 # save this plot out
-ggsave('plots/manuscript_plots/otu_similarity_diversity.png', last_plot(), height= 7, width =12)
+ggsave('plots/manuscript_plots/otu_similarity_diversity.png', last_plot(), height= 3, width =10)
