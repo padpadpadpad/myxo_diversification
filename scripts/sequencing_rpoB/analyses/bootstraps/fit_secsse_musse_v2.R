@@ -4,7 +4,7 @@
 
 # make sure curl is installed
 library(curl)
-librarian::shelf(diversitree, rsetienne/secsse, DDD, apTreeshape, doParallel, foreach, doMC, tidyverse, here, furrr)
+librarian::shelf(diversitree, rsetienne/secsse, DDD, doParallel, foreach, doMC, tidyverse, here, furrr)
 
 # identify conflicts in the tidyverse packages and other packages
 tidyverse_conflicts()
@@ -65,21 +65,19 @@ fit_secsse <- function(list_inits_sampfrac){
 name <- 'musse'
 
 # server - yes or no
-server <- FALSE
+server <- TRUE
 
 # list bootstrapped trees to loop over
 if(server == FALSE){
   trees <- list.files('data/sequencing_rpoB/raxml/trees/myxo_asv/bootstraps', full.names = TRUE, pattern = 'cv.tre$')
-  trees <- trees[!grepl('2', trees)]
   mk_models <- list.files('data/sequencing_rpoB/processed/transition_rates', full.names = TRUE, pattern = 'asvboot')
-  start_vals <- list.files('data/sequencing_rpoB/processed/secsse/init_vals_ml/bootstraps', full.names = TRUE)
+  start_vals_files <- list.files('data/sequencing_rpoB/processed/secsse/init_vals_ml/bootstraps', full.names = TRUE)
 }
 
 if(server == TRUE){
-  trees <- list.files('data/sequencing_rpoB/raxml/trees/myxo_asv/bootstraps', full.names = TRUE, pattern = 'cv.tre$')
-  trees <- trees[!grepl('2', trees)]
-  mk_models <- list.files('data/sequencing_rpoB/processed/transition_rates', full.names = TRUE, pattern = 'asvboot')
-  start_vals <- list.files('data/sequencing_rpoB/processed/secsse/init_vals_ml/bootstraps', full.names = TRUE)
+  trees <- list.files('~/secsse/bootstraps/trees', full.names = TRUE, pattern = 'cv.tre$')
+  mk_models <- list.files('~/secsse/bootstraps/mk_models', full.names = TRUE)
+  start_vals_files <- list.files('~/secsse/bootstraps/start_vals', full.names = TRUE)
 }
 
 
@@ -101,7 +99,7 @@ for(j in 1:length(trees)){
     # read in Mk model
     fit_mk <- readRDS(temp_mk)
     
-    start_vals <- readRDS('data/sequencing_rpoB/processed/transition_rates/start_vals.rds')
+    start_vals <- readRDS(start_vals_files[grepl(paste(name, '_', 'asvboot', num_tree, sep =''), start_vals_files)])
   }
   
   
@@ -120,7 +118,7 @@ for(j in 1:length(trees)){
     fit_mk <- readRDS(temp_mk)
     
     # start vals
-    start_vals <- readRDS('~/secsse/start_vals.rds')
+    start_vals <- readRDS(start_vals_files[grepl(paste(name, '_', 'asvboot', num_tree, sep =''), start_vals_files)])
     
   }
   

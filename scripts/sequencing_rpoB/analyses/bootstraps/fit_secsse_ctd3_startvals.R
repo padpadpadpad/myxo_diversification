@@ -16,7 +16,6 @@ name <- 'muctd3'
 # list bootstrapped trees to loop over
 if(server == FALSE){
   trees <- list.files('data/sequencing_rpoB/raxml/trees/myxo_asv/bootstraps', full.names = TRUE, pattern = 'cv.tre$')
-  trees <- trees[!grepl('2', trees)]
   mk_models <- list.files('data/sequencing_rpoB/processed/transition_rates', full.names = TRUE, pattern = 'asvboot')
 }
 
