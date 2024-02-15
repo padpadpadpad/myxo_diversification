@@ -309,7 +309,7 @@ fit_secsse <- function(list_inits_sampfrac){
     num_cycles = 20,
     num_threads = 1,
     method = 'odeint::runge_kutta_cash_karp54',
-    loglik_penalty = 0.05
+    loglik_penalty = 0.1
   )
   
   # create a list of the output
@@ -348,7 +348,7 @@ secsse_ml(
   num_cycles = 20,
   num_threads = 2,
   method = 'odeint::runge_kutta_cash_karp54',
-  loglik_penalty = 0.05
+  loglik_penalty = 0.1
 )
 
 

@@ -260,7 +260,7 @@ fit_secsse <- function(list_inits_sampfrac){
     num_cycles = 20,
     num_threads = 2,
     method = 'odeint::runge_kutta_cash_karp54',
-    loglik_penalty = 0.05
+    loglik_penalty = 0.1
   )
   
   # create a list of the output
@@ -287,19 +287,19 @@ secsse_ml(
   num_concealed_states = num_concealed_states,
   idparslist,
   idparsopt,
-  initparsopt = all_combs[[1]]$inits,
+  initparsopt = all_combs[[29]]$inits,
   idparsfix,
   parsfix,
   cond = "maddison_cond",
   root_state_weight = "maddison_weights",
   tol = c(1e-04, 1e-05, 1e-07),
-  sampling_fraction = all_combs[[1]]$sampled_fractions,
+  sampling_fraction = all_combs[[29]]$sampled_fractions,
   maxiter = max_iter,
   optimmethod = "simplex",
   num_cycles = 20,
   num_threads = 2,
   method = 'odeint::runge_kutta_cash_karp54',
-  loglik_penalty = 0.05
+  loglik_penalty = 0.1
 )
 
 # Set a "plan" for how the code should run.

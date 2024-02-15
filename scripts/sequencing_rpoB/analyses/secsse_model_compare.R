@@ -1,89 +1,106 @@
 # lets look at which hidden model is best
 
 # load packages
-librarian::shelf(secsse, tidyverse, flextable)
+librarian::shelf(secsse, tidyverse, flextable, patchwork)
 
 # write function to extract logLik from the models and create a dataframe
 get_loglik <- function(secsse_file){
   temp <- readRDS(secsse_file)
   temp <- data.frame(model_name = basename(tools::file_path_sans_ext(secsse_file)),
                      loglik = temp$mod$ML,
-                     n_params = temp$n_params)
+                     n_params = temp$n_params,
+                     conv = temp$mod$conv)
   return(temp)
 }
 
-#----------------------#
-# sample fraction 1 ####
-#----------------------#
+# write function to extract the parameters from the model
+get_pars <- function(secsse_file){
+  temp <- readRDS(secsse_file)
+  
+  temp_speciation <- data.frame(val = temp$mod$MLpars[[1]]) %>%
+    rownames_to_column(var = 'param') %>%
+    group_by(val) %>%
+    slice_head(n=1) %>%
+    mutate(param = paste('lambda', param, sep = '_'))
+    
+  temp_extinction <- data.frame(val = temp$mod$MLpars[[2]]) %>%
+    rownames_to_column(var = 'param') %>%
+    slice_head(n = 1) %>%
+    mutate(param = paste('mu', param, sep = '_'))
+  
+  temp_transition <- data.frame(temp$mod$MLpars[[3]]) %>% 
+    rownames_to_column(var = 'from') %>%
+    pivot_longer(cols = -from, names_to = 'to', values_to = 'val') %>%
+    mutate(to = gsub('X', '', to),
+           param = ifelse(substr(to, 2, 2) == substr(from, 2, 2), paste('q_', substr(from, 1, 1), substr(to, 1, 1), sep = ''), paste('q_', substr(from, 2, 2), substr(from, 2, 2), sep = ''))) %>%
+    filter(val > 0) %>%
+    select(param, val) %>%
+    distinct()
+  
+  temp <- bind_rows(temp_speciation, temp_extinction, temp_transition) %>%
+    mutate(model_name = basename(tools::file_path_sans_ext(secsse_file)))
 
-# list all model files
-files <- list.files('data/sequencing_rpoB/processed/secsse/results/samp_frac_1/v2', full.names = TRUE)
+  return(temp)
+  
+}
 
-# read in musse models
-fits_musse <- str_subset(files, 'musse') %>%
-  map(., get_loglik) %>%
-  list_rbind() %>%
-  mutate(., aic = (2*n_params) - 2*loglik)
-# best models are runs 1, 2, 3, 4, 5, 6 
-# AIC = 3451.294
+#--------------------------------#
+# first for the ASV best tree ####
+#--------------------------------#
 
-# read in muhisse full models
-fits_muhisse <- str_subset(files, 'muhisse') %>%
-  map(., get_loglik) %>%
-  list_rbind() %>%
-  mutate(., aic = (2*n_params) - 2*loglik)
-# best model is run 4, 5, 6
-# AIC = 2704.353
+# read in all the files
+files <- list.files('data/sequencing_rpoB/processed/secsse/results', full.names = TRUE)
 
-# read in ctd2
-fits_ctd2 <- str_subset(files, 'ctd2') %>%
-  map(., get_loglik) %>%
-  list_rbind() %>%
-  mutate(., aic = (2*n_params) - 2*loglik)
-# best models are runs all of them
-# AIC = 2762.069
-
-# read in ctd3 models
-fits_ctd3 <- str_subset(files, 'ctd3') %>%
-  map(., get_loglik) %>%
-  list_rbind() %>%
-  mutate(., aic = (2*n_params) - 2*loglik)
-# best model is runs 1, 2, 3, 4, 6 - AIC = 2647.654
-
-# read in ctd4 models
-fits_ctd4 <- str_subset(files, 'ctd4') %>%
-  map(., get_loglik) %>%
-  list_rbind() %>%
-  mutate(., aic = (2*n_params) - 2*loglik)
-# best model are run 1 and run 4 - AIC = 2613.6
-
-# read in those four models and do model comparison using AIC scores
-best_ctd2 <- readRDS('data/sequencing_rpoB/processed/secsse/results/samp_frac_1/v2/seccse_muctd2_sampfrac1_run1_v2.rds')
-best_muhisse <- readRDS('data/sequencing_rpoB/processed/secsse/results/samp_frac_1/v2/seccse_muhisseSSonly_sampfrac1_run4_v2.rds')
-best_ctd3 <- readRDS('data/sequencing_rpoB/processed/secsse/results/samp_frac_1/v2/seccse_muctd3_sampfrac1_run1_v2.rds')
-best_musse <- readRDS('data/sequencing_rpoB/processed/secsse/results/samp_frac_1/v2/seccse_musse_sampfrac1_run1v2.rds')
-best_ctd4 <- readRDS('data/sequencing_rpoB/processed/secsse/results/samp_frac_1/v2/seccse_muctd4_sampfrac1_run1_v2.rds')
-
-final_models <- c('data/sequencing_rpoB/processed/secsse/results/samp_frac_1/v2/seccse_muctd2_sampfrac1_run1_v2.rds',
-                  'data/sequencing_rpoB/processed/secsse/results/samp_frac_1/v2/seccse_muhisseSSonly_sampfrac1_run4_v2.rds', 
-                  'data/sequencing_rpoB/processed/secsse/results/samp_frac_1/v2/seccse_muctd3_sampfrac1_run1_v2.rds', 'data/sequencing_rpoB/processed/secsse/results/samp_frac_1/v2/seccse_musse_sampfrac1_run1v2.rds', 
-                  'data/sequencing_rpoB/processed/secsse/results/samp_frac_1/v2/seccse_muctd4_sampfrac1_run1_v2.rds')
-
-best_musse$mod$ML
-best_muhisse$mod$ML
-best_ctd2$mod$ML
-best_ctd3$mod$ML
-best_ctd4$mod$ML
-
-best_ctd3$mod$MLpars[[1]]
-best_ctd4$mod$MLpars[[1]]
-
-model_table <- final_models %>%
+# read in all files
+fits <- files %>%
   map(., get_loglik) %>%
   list_rbind() %>%
   mutate(., aic = (2*n_params) - 2*loglik,
+         aic = round(aic, 2),
+         # extract text between the first and second underscore
          model = sub("^[^_]*_(.*?)_.*$", "\\1", model_name),
-         weights = MuMIn::Weights(aic) %>% round(2)) %>%
+         # extract text between the second and third underscore
+         samp_frac = sub("^[^_]*_[^_]*_(.*?)_.*$", "\\1", model_name))
+
+# check the number of models per samp frac and model that have the same aic
+check <- fits %>%
+  group_by(samp_frac, model, aic) %>%
+  tally()
+
+# how often was the lowest AIC score found in each combination
+check2 <- slice_min(check, n = 1, order_by = aic) %>%
+  mutate(., best = 'yes')
+# some were only found once
+
+# filter the files to only keep the lowest aic score for each model
+best_models <- fits %>%
+  left_join(check2, by = c('samp_frac', 'model', 'aic')) %>%
+  filter(best == 'yes') %>%
+  group_by(samp_frac, model) %>%
+  slice_min(order_by = aic, n = 1, with_ties = FALSE) %>%
+  ungroup()
+
+# a few of the best models were only found one time in terms of the start values, but not sure what more can be done about that, this may indicate local optima, but we have followed the best practice approaches
+
+# find the files with the lowest aic per group and keep them to read back in
+files_best <- files[str_detect(files, paste(best_models$model_name, collapse = '|'))]
+
+# read in best files only
+fits <- files_best %>%
+  map(., get_loglik) %>%
+  list_rbind() %>%
+  mutate(., aic = (2*n_params) - 2*loglik,
+         aic = round(aic, 2),
+         # extract text between the first and second underscore
+         model = sub("^[^_]*_(.*?)_.*$", "\\1", model_name),
+         # extract text between the second and third underscore
+         samp_frac = sub("^[^_]*_[^_]*_(.*?)_.*$", "\\1", model_name),
+         samp_frac = parse_number(samp_frac))
+
+# make table for sampling fraction 0.5
+model_table <- fits %>%
+  filter(samp_frac == '0.5') %>%
+  mutate(., weights = MuMIn::Weights(aic) %>% round(2)) %>%
   arrange(aic) %>%
   mutate(model = case_when(model == 'muctd2' ~ 'CTD2',
                            model == 'musse' ~ 'MuSSE',
@@ -110,168 +127,25 @@ table
 save_as_image(table, 'plots/manuscript_plots/secsse_table.png')
 save_as_docx(table, path ='plots/manuscript_plots/secsse_table.docx')
 
-#-------------------------#
-# sample fraction 0.75 ####
-#-------------------------#
-
-# list all model files
-files <- list.files('data/sequencing_rpoB/processed/secsse/results/samp_frac_0.75/v2', full.names = TRUE)
-
-# read in musse models
-fits_musse <- str_subset(files, 'musse') %>%
-  map(., get_loglik) %>%
-  list_rbind() %>%
-  mutate(., aic = (2*n_params) - 2*loglik)
-# best models are runs 7, 8, 9, 10, 11, 12 
-# AIC = 3389.113
-
-# read in muhisse full models
-fits_muhisse <- str_subset(files, 'muhisseSS') %>%
-  map(., get_loglik) %>%
-  list_rbind() %>%
-  mutate(., aic = (2*n_params) - 2*loglik)
-# best models are runs 7, 8, 10, 11, 12 
-# AIC = 2642.122
-
-# read in ctd2
-fits_ctd2 <- str_subset(files, 'ctd2') %>%
-  map(., get_loglik) %>%
-  list_rbind() %>%
-  mutate(., aic = (2*n_params) - 2*loglik)
-# best models are runs 7, 8, 9, 10, 11, 12 
-# AIC = 2699.069
-
-# read in ctd3 models
-fits_ctd3 <- str_subset(files, 'ctd3') %>%
-  map(., get_loglik) %>%
-  list_rbind() %>%
-  mutate(., aic = (2*n_params) - 2*loglik)
-# best model is run 9
-# AIC = 2590.748
-
-# read in ctd4 models
-fits_ctd4 <- str_subset(files, 'ctd4') %>%
-  map(., get_loglik) %>%
-  list_rbind() %>%
-  mutate(., aic = (2*n_params) - 2*loglik)
-# best model is run 12
-# AIC = 2564.462
-
-# read in those four models and do model comparison using AIC scores
-best_musse <- readRDS('data/sequencing_rpoB/processed/secsse/results/samp_frac_0.75/v2/seccse_musse_sampfrac0.75_run10v2.rds')
-best_muhisse <- readRDS('data/sequencing_rpoB/processed/secsse/results/samp_frac_0.75/v2/seccse_muhisseSSonly_sampfrac0.75_run10_v2.rds')
-best_ctd2 <- readRDS('data/sequencing_rpoB/processed/secsse/results/samp_frac_0.75/v2/seccse_muctd2_sampfrac0.75_run7_v2.rds')
-best_ctd3 <- readRDS('data/sequencing_rpoB/processed/secsse/results/samp_frac_0.75/v2/seccse_muctd3_sampfrac0.75_run9_v2.rds')
-best_ctd4 <- readRDS('data/sequencing_rpoB/processed/secsse/results/samp_frac_0.75/v2/seccse_muctd4_sampfrac0.75_run12.rds')
-
-final_models_0.75 <- c('data/sequencing_rpoB/processed/secsse/results/samp_frac_0.75/v2/seccse_musse_sampfrac0.75_run10v2.rds',
-                  'data/sequencing_rpoB/processed/secsse/results/samp_frac_0.75/v2/seccse_muhisseSSonly_sampfrac0.75_run10_v2.rds', 
-                  'data/sequencing_rpoB/processed/secsse/results/samp_frac_0.75/v2/seccse_muctd2_sampfrac0.75_run7_v2.rds',
-                  'data/sequencing_rpoB/processed/secsse/results/samp_frac_0.75/v2/seccse_muctd3_sampfrac0.75_run9_v2.rds', 
-                  'data/sequencing_rpoB/processed/secsse/results/samp_frac_0.75/v2/seccse_muctd4_sampfrac0.75_run12_v2.rds')
-
-best_ctd4$mod$MLpars
-
-#------------------------#
-# sample fraction 0.5 ####
-#------------------------#
-
-# list all model files
-files <- list.files('data/sequencing_rpoB/processed/secsse/results/samp_frac_0.5/v2', full.names = TRUE)
-
-# read in musse models
-fits_musse <- str_subset(files, 'musse') %>%
-  map(., get_loglik) %>%
-  list_rbind() %>%
-  mutate(., aic = (2*n_params) - 2*loglik)
-# best models are runs 13, 14, 15, 16, 17, 18 
-# AIC = 3333.751
-
-# read in muhisse full models
-fits_muhisse <- str_subset(files, 'muhisseSS') %>%
-  map(., get_loglik) %>%
-  list_rbind() %>%
-  mutate(., aic = (2*n_params) - 2*loglik)
-# best models are runs 14, 15, 18
-# AIC = 2565.014
-
-# read in ctd2
-fits_ctd2 <- str_subset(files, 'ctd2') %>%
-  map(., get_loglik) %>%
-  list_rbind() %>%
-  mutate(., aic = (2*n_params) - 2*loglik)
-# best models are runs 13, 14, 15, 16, 17, 18  
-# AIC = 2621.852
-
-# read in ctd3 models
-fits_ctd3 <- str_subset(files, 'ctd3') %>%
-  map(., get_loglik) %>%
-  list_rbind() %>%
-  mutate(., aic = (2*n_params) - 2*loglik)
-# best model is run 18
-# AIC = 2517.092
-
-# read in ctd4 models
-fits_ctd4 <- str_subset(files, 'ctd4') %>%
-  map(., get_loglik) %>%
-  list_rbind() %>%
-  mutate(., aic = (2*n_params) - 2*loglik)
-# best model is run 15
-# AIC = 2520.147
-
-# read in those four models and do model comparison using AIC scores
-best_musse <- readRDS('data/sequencing_rpoB/processed/secsse/results/samp_frac_0.5/v2/seccse_musse_sampfrac0.5_run13v2.rds')
-best_muhisse <- readRDS('data/sequencing_rpoB/processed/secsse/results/samp_frac_0.5/v2/seccse_muhisseSSonly_sampfrac0.5_run18_v2.rds')
-best_ctd2 <- readRDS('data/sequencing_rpoB/processed/secsse/results/samp_frac_0.5/v2/seccse_muctd2_sampfrac0.5_run13_v2.rds')
-best_ctd3 <- readRDS('data/sequencing_rpoB/processed/secsse/results/samp_frac_0.5/v2/seccse_muctd3_sampfrac0.5_run18_v2.rds')
-best_ctd4 <- readRDS('data/sequencing_rpoB/processed/secsse/results/samp_frac_0.5/v2/seccse_muctd2_sampfrac0.5_run15_v2.rds')
-
-final_models_0.5 <- c('data/sequencing_rpoB/processed/secsse/results/samp_frac_0.5/v2/seccse_musse_sampfrac0.5_run13v2.rds',
-                  'data/sequencing_rpoB/processed/secsse/results/samp_frac_0.5/v2/seccse_muhisseSSonly_sampfrac0.5_run18_v2.rds', 
-                  'data/sequencing_rpoB/processed/secsse/results/samp_frac_0.5/v2/seccse_muctd2_sampfrac0.5_run13_v2.rds',
-                  'data/sequencing_rpoB/processed/secsse/results/samp_frac_0.5/v2/seccse_muctd3_sampfrac0.5_run18_v2.rds', 
-                  'data/sequencing_rpoB/processed/secsse/results/samp_frac_0.5/v2/seccse_muctd4_sampfrac0.5_run15_v2.rds')
-
-best_ctd2$mod$MLpars
-
-# create summary table of the sampling fractions for 0.75 and 0.5
-model_table_0.75 <- final_models_0.75 %>%
-  map(., get_loglik) %>%
-  list_rbind() %>%
-  mutate(., aic = (2*n_params) - 2*loglik,
-         model = sub("^[^_]*_(.*?)_.*$", "\\1", model_name),
-         weights = MuMIn::Weights(aic) %>% round(2),
-         sample_fraction = 0.75) %>%
-  arrange(aic) %>%
+model_table_all <- fits %>%
+  filter(samp_frac != '0.5') %>%
+  group_by(samp_frac) %>%
+  mutate(., weights = MuMIn::Weights(aic) %>% round(2)) %>%
+  arrange(samp_frac, aic) %>%
+  ungroup() %>%
   mutate(model = case_when(model == 'muctd2' ~ 'CTD2',
                            model == 'musse' ~ 'MuSSE',
                            model == 'muhisseSSonly' ~ 'MuHiSSE',
                            model == 'muctd3' ~ 'CTD3',
                            model == 'muctd4' ~ 'CTD4'))
-model_table_0.5 <- final_models_0.5 %>%
-  map(., get_loglik) %>%
-  list_rbind() %>%
-  mutate(., aic = (2*n_params) - 2*loglik,
-         model = sub("^[^_]*_(.*?)_.*$", "\\1", model_name),
-         weights = MuMIn::Weights(aic) %>% round(2),
-         sample_fraction = 0.5) %>%
-  arrange(aic) %>%
-  mutate(model = case_when(model == 'muctd2' ~ 'CTD2',
-                           model == 'musse' ~ 'MuSSE',
-                           model == 'muhisseSSonly' ~ 'MuHiSSE',
-                           model == 'muctd3' ~ 'CTD3',
-                           model == 'muctd4' ~ 'CTD4'))
-
-model_table_all <- bind_rows(model_table_0.75, model_table_0.5)
-
-model_table_all
 
 # make table
-table <- select(model_table_all, sample_fraction, model, n_params, loglik, aic, weights) %>%
-  mutate(across(where(is.numeric), \(x) round(x,2))) %>%
+table <- select(model_table_all, samp_frac, model, n_params, loglik, aic, weights) %>%
+  mutate(samp_frac = as.character(samp_frac), 
+         across(where(is.numeric), \(x) round(x,2))) %>%
   flextable() %>%
   align(align = 'center', part = 'all') %>%
-  set_header_labels(sample_fraction = 'Sampled fraction',
+  set_header_labels(samp_frac = 'Sampled fraction',
                     model = "Model",
                     n_params = 'Number of estimated parameters',
                     loglik = 'Log Likelihood',
@@ -279,8 +153,8 @@ table <- select(model_table_all, sample_fraction, model, n_params, loglik, aic, 
                     weights = "AIC weight") %>%
   font(fontname = 'Times', part = 'all') %>%
   fontsize(size = 16, part = 'all') %>%
-  merge_v(~sample_fraction) %>%
-  hline(i = c(5), border = fp_border_default()) %>%
+  merge_v(~samp_frac) %>%
+  hline(i = c(5, 10, 15), border = fp_border_default()) %>%
   valign(valign = 'top', j = 1, part = 'body') %>%
   fix_border_issues() %>%
   autofit() 
@@ -288,3 +162,60 @@ table <- select(model_table_all, sample_fraction, model, n_params, loglik, aic, 
 table
 
 save_as_image(table, 'plots/manuscript_plots/secsse_supp_table.png')
+
+# read in parameter values of all the best models
+pars <- files_best %>%
+  map(., get_pars) %>%
+  list_rbind() %>%
+  mutate(., model = sub("^[^_]*_(.*?)_.*$", "\\1", model_name),
+         samp_frac = sub("^[^_]*_[^_]*_(.*?)_.*$", "\\1", model_name),
+         samp_frac = parse_number(samp_frac)) %>%
+  mutate(model = case_when(model == 'muctd2' ~ 'CTD2',
+                           model == 'musse' ~ 'MuSSE',
+                           model == 'muhisseSSonly' ~ 'MuHiSSE',
+                           model == 'muctd3' ~ 'CTD3',
+                           model == 'muctd4' ~ 'CTD4'))
+
+p_extinction <- filter(pars, str_detect(param, 'mu')) %>%
+  mutate(samp_frac = as.character(samp_frac)) %>%
+  ggplot(aes(samp_frac, val)) +
+  stat_summary(fun = "median", geom = "point", col = "black", size = 4) +
+  stat_summary(fun = "median", fun.min = function(x){median(x) - 2*sd(x)/sqrt(length(x))}, fun.max = function(x){median(x) + 2*sd(x)/sqrt(length(x))}) +
+  geom_point(aes(group = model, col = model), shape = 21, fill = 'white', position = position_dodge(width = 0.5)) +
+  theme_bw() +
+  scale_color_brewer(type = 'qual', palette = 'Set1') +
+  labs(x = 'Sampled fraction',
+       y = 'Extinction rate (mu)',
+       title = '(b) Extinction rate')
+
+p_speciation <- filter(pars, str_detect(param, 'lambda')) %>%
+  mutate(samp_frac = as.character(samp_frac)) %>%
+  ggplot(aes(samp_frac, val)) +
+  stat_summary(fun = "median", geom = "point", col = "black", size = 4) +
+  stat_summary(fun = "median", fun.min = function(x){median(x) - 2*sd(x)/sqrt(length(x))}, fun.max = function(x){median(x) + 2*sd(x)/sqrt(length(x))}) +
+  geom_point(aes(group = model, col = model), shape = 21, fill = 'white', position = position_dodge(width = 0.5)) +
+  theme_bw() +
+  scale_color_brewer(type = 'qual', palette = 'Set1') +
+  labs(x = 'Sampled fraction',
+       y = 'Speciation rate (lambda)',
+       title = '(a) Speciation rate') 
+
+p_speciation
+
+p_transition <- filter(pars, str_detect(param, 'q')) %>%
+  mutate(samp_frac = as.character(samp_frac)) %>%
+  filter(is.na(parse_number(param))) %>%
+  ggplot(aes(samp_frac, val)) +
+  stat_summary(fun = "median", geom = "point", col = "black", size = 4) +
+  stat_summary(fun = "median", fun.min = function(x){median(x) - 2*sd(x)/sqrt(length(x))}, fun.max = function(x){median(x) + 2*sd(x)/sqrt(length(x))}) +
+  geom_point(aes(group = model, col = model), shape = 21, fill = 'white', position = position_dodge(width = 0.5), show.legend = FALSE) +
+  theme_bw() +
+  scale_color_brewer(type = 'qual', palette = 'Set1') +
+  labs(x = 'Sampled fraction',
+       y = 'Hidden transition rates',
+       title = '(c) Transition rates')
+
+p_speciation + p_extinction + p_transition + plot_layout(guides = 'collect')
+
+# save as image
+ggsave('plots/manuscript_plots/secsse_params.png', width = 12, height = 3.5)
