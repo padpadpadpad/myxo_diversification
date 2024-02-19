@@ -98,7 +98,7 @@ lik_null_no_ss <- constrain(lik_musse, lambda2 ~ lambda1, lambda3 ~ lambda1, lam
 lik_null_no_se <- constrain(lik_musse, mu2 ~ mu1, mu3 ~ mu1, mu4 ~ mu1, mu5 ~ mu1)
 
 # fit model
-fit_musse_no_sse <- find.mle(lik_null_no_sse, x.init = start_vals[argnames(lik_null_no_sse)], method = 'subplex', control = list(maxit = 100000), samp)
+fit_musse_no_sse <- find.mle(lik_null_no_sse, x.init = start_vals[argnames(lik_null_no_sse)], method = 'subplex', control = list(maxit = 100000))
 fit_musse_no_ss <- find.mle(lik_null_no_ss, x.init = start_vals[argnames(lik_null_no_ss)],method = 'subplex', control = list(maxit = 50000))
 fit_musse_no_se <- find.mle(lik_null_no_se, x.init = start_vals[argnames(lik_null_no_se)], method = 'subplex', control = list(maxit = 100000))
 
@@ -116,7 +116,6 @@ saveRDS(fit_musse, 'data/sequencing_rpoB/processed/transition_rates/asv_musse.rd
 saveRDS(fit_musse_no_se, 'data/sequencing_rpoB/processed/transition_rates/asv_musse_no_se.rds')
 saveRDS(fit_musse_no_sse, 'data/sequencing_rpoB/processed/transition_rates/asv_musse_no_sse.rds')
 saveRDS(fit_musse_no_ss, 'data/sequencing_rpoB/processed/transition_rates/asv_musse_no_ss.rds')
-
 
 # read in MuSSE models
 fit_musse <- readRDS('data/sequencing_rpoB/processed/transition_rates/asv_musse.rds')

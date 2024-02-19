@@ -63,7 +63,7 @@ coding <- tibble(hab_pref = unname(hab_pref), hab_pref_num = unname(hab_pref_num
 coding
 
 # set up sampling fractions, set them all to 1
-sampling_frac <- setNames(rep(1, times = 5), sort(unique(hab_pref_num)))
+sampling_frac <- setNames(rep(0.5, times = 5), sort(unique(hab_pref_num)))
 
 # read in best Mk model
 fit_mk <- readRDS('data/sequencing_rpoB/processed/transition_rates/mod_custom_3.rds')
@@ -148,3 +148,5 @@ cor(d_lambda$original, d_lambda$new)
 d_q <- data.frame(markov = fit_mk$par[str_detect(names(fit_mk$par), 'q')],
                   musse = fit_musse_no_se$par[str_detect(names(fit_musse_no_se$par), 'q')])
 cor(d_q$markov, d_q$musse)
+
+# 
