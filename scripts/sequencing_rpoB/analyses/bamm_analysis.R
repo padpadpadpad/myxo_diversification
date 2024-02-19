@@ -41,11 +41,11 @@ tree2 <- tree
 is.ultrametric(tree)
 
 
-# load in bamm run
+# # load in bamm run
 mcmcout <- read.csv('data/sequencing_rpoB/bamm/revision/asv/bamm_asv_SF0.5_mcmc_out.txt')
 
 # load in bamm event data
-edata <- getEventData(tree, eventdata = 'data/sequencing_rpoB/bamm/revision/asv/bamm_asv_SF0.5_event_data.txt', burnin = 0.3)
+edata <- getEventData(tree, eventdata = 'data/sequencing_rpoB/bamm/revision/asv/bamm_asv_SF0.5_event_data.txt', burnin = 0.25)
 
 # alter tip labels to remove family as they will not link to the distance matrix
 # write function to remove family labels
@@ -61,7 +61,7 @@ tree$tip.label <- purrr::map_chr(tree$tip.label, strsplit_mod)
 max(mcmcout$generation)
 
 # discard some runs as burnin. We will discard the first 30% of samples
-burnstart <- floor(0.3 * nrow(mcmcout))
+burnstart <- floor(0.25 * nrow(mcmcout))
 postburn <- mcmcout[burnstart:nrow(mcmcout), ]
 
 # calculate effective sample size
@@ -70,7 +70,7 @@ effectiveSize(postburn$logLik)
 # in general, we want the effective sample size to be at least 200 for these
 
 # visualise prior and posterior simultaneously to look at convergence
-d_prior <- plotPrior(mcmcout, expectedNumberOfShifts=500, burnin = 0.3) %>%
+d_prior <- plotPrior(mcmcout, expectedNumberOfShifts=500, burnin = 0.25) %>%
   data.frame() %>%
   janitor::clean_names() %>%
   pivot_longer(cols = contains('probs'), names_to = 'type', values_to = 'prob', names_pattern = "(.*)_probs")
@@ -82,7 +82,8 @@ d_prior <- plotPrior(mcmcout, expectedNumberOfShifts=500, burnin = 0.3) %>%
 # look at probability of different numbers of rate shifts
 post_probs <- table(postburn$N_shifts) / nrow(postburn)
 names(post_probs)
-post_probs
+post_probs %>%
+  sort()
 
 # get the same thing from the event data
 shift_probs <- summary(edata)
