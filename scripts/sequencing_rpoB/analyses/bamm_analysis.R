@@ -36,7 +36,6 @@ d_meta <- left_join(dplyr::select(d_habpref, otu, habitat_preference = habitat_p
 cols_hab <- readRDS('data/sequencing_rpoB/phyloseq/myxococcus/habitat_preference/summary/habitat_colours.rds')
 
 # load in tree
-#tree <- ape::read.tree('data/sequencing_rpoB/raxml/trees/myxo_asv/myxo_asv_chronopl10.tre')
 tree <- ape::read.tree('data/sequencing_rpoB/raxml/trees/myxo_asv/myxo_asv_treepl_cv_node_labels.tre')
 tree2 <- tree
 is.ultrametric(tree)
@@ -338,15 +337,6 @@ tip_rates <- data.frame(tip_label2 = edata$tip.label,
          hab_pref_axis = gsub('_', ' ', hab_pref_axis),
          net_diversification = speciation - extinction)
 
-# set up correlation matrix for the tree
-cor_lambda <- corPagel(value = 1, phy = tree2, form = ~tip_label2)
-
-# fit phylogenetic generalised linear model
-mod <- gls(net_diversification ~ habitat_preference, data = tip_rates, correlation = cor_lambda)
-
-# do contrasts between habitat preferences
-contrasts <- emmeans(mod, pairwise ~ habitat_preference)
-
 p1 <- ggplot(tip_rates, aes(forcats::fct_reorder(hab_pref_axis, n), speciation)) +
   MicrobioUoE::geom_pretty_boxplot(col='black', fill = 'black') +
   geom_point(shape = 21, fill = 'white', position = position_jitter(width = 0.2)) +
@@ -369,7 +359,7 @@ p3 <- ggplot(tip_rates, aes(forcats::fct_reorder(hab_pref_axis, n), net_diversif
   theme_bw(base_size = 12) +
   scale_x_discrete(labels = scales::label_wrap(13)) +
   labs(x = 'Habitat preference',
-       y = 'Net diversification rate')
+       y = 'Tip specific\nnet diversification rate')
 
 p1 + p2 + p3
 
