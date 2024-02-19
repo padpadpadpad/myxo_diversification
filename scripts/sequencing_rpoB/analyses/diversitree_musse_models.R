@@ -62,7 +62,7 @@ coding
 best_model <- readRDS('data/sequencing_rpoB/processed/transition_rates/mod_custom_3.rds')
 
 # set up sampling fractions, set them all to 1
-sampling_frac <- setNames(rep(1, times = 5), sort(unique(hab_pref_num)))
+sampling_frac <- setNames(rep(0.5, times = 5), sort(unique(hab_pref_num)))
 
 # set up likelihood model for diversitree
 lik_musse <- make.musse(tree, hab_pref_num, k = max(hab_pref_num), sampling.f = sampling_frac)
@@ -98,7 +98,7 @@ lik_null_no_ss <- constrain(lik_musse, lambda2 ~ lambda1, lambda3 ~ lambda1, lam
 lik_null_no_se <- constrain(lik_musse, mu2 ~ mu1, mu3 ~ mu1, mu4 ~ mu1, mu5 ~ mu1)
 
 # fit model
-fit_musse_no_sse <- find.mle(lik_null_no_sse, x.init = start_vals[argnames(lik_null_no_sse)], method = 'subplex', control = list(maxit = 100000))
+fit_musse_no_sse <- find.mle(lik_null_no_sse, x.init = start_vals[argnames(lik_null_no_sse)], method = 'subplex', control = list(maxit = 100000), samp)
 fit_musse_no_ss <- find.mle(lik_null_no_ss, x.init = start_vals[argnames(lik_null_no_ss)],method = 'subplex', control = list(maxit = 50000))
 fit_musse_no_se <- find.mle(lik_null_no_se, x.init = start_vals[argnames(lik_null_no_se)], method = 'subplex', control = list(maxit = 100000))
 
@@ -116,3 +116,18 @@ saveRDS(fit_musse, 'data/sequencing_rpoB/processed/transition_rates/asv_musse.rd
 saveRDS(fit_musse_no_se, 'data/sequencing_rpoB/processed/transition_rates/asv_musse_no_se.rds')
 saveRDS(fit_musse_no_sse, 'data/sequencing_rpoB/processed/transition_rates/asv_musse_no_sse.rds')
 saveRDS(fit_musse_no_ss, 'data/sequencing_rpoB/processed/transition_rates/asv_musse_no_ss.rds')
+
+
+# read in MuSSE models
+fit_musse <- readRDS('data/sequencing_rpoB/processed/transition_rates/asv_musse.rds')
+fit_musse_no_se <- readRDS('data/sequencing_rpoB/processed/transition_rates/asv_musse_no_se.rds')
+fit_musse_no_sse <- readRDS('data/sequencing_rpoB/processed/transition_rates/asv_musse_no_sse.rds')
+fit_musse_no_ss <- readRDS('data/sequencing_rpoB/processed/transition_rates/asv_musse_no_ss.rds')
+
+# make AIC table
+d_musse_aic <- data.frame(model = c('full_sse', 'no_se', 'no_ss', 'no_sse'), aic = c(AIC(fit_musse), AIC(fit_musse_no_se), AIC(fit_musse_no_ss), AIC(fit_musse_no_sse))) %>%
+  dplyr::arrange(., aic) %>%
+  mutate(weights = round(MuMIn::Weights(aic), 3))
+
+d_musse_aic
+fit_musse_no_se$par
