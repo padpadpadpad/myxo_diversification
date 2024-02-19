@@ -4,7 +4,7 @@
 
 # make sure curl is installed
 library(curl)
-librarian::shelf(diversitree, secsse, DDD, apTreeshape, doParallel, foreach, doMC, tidyverse, here, furrr)
+librarian::shelf(diversitree, secsse, DDD, apTreeshape, doParallel, foreach, doMC, tidyverse, here, furrr, flextable, patchwork)
 
 # identify conflicts in the tidyverse packages and other packages
 tidyverse_conflicts()
@@ -105,6 +105,7 @@ idparslist$lambdas[] <- rep(1:2, each = 5)
 # firstly make all extinction rates the same
 idparslist$mus[] <- 3
 
+
 # setup transition rates ####
 
 # make transition matrix a dataframe so I can set rules more easily
@@ -179,6 +180,93 @@ for(i in min(q,na.rm = TRUE):max(q, na.rm = TRUE)){
 q
 
 idparslist$Q <- q
+
+# make table for SI
+
+table_lambda <- idparslist$lambdas %>%
+  t() %>%
+  as_tibble() %>%
+  flextable() %>%
+  # add column name above
+  add_header_row(values = c('Speciation rate:'), colwidths = 10) %>%
+  align(align = 'left', part = 'header', i=1) %>%
+  font(fontname = 'Times', part = 'all') %>%
+  fontsize(size = 16, part = 'all') %>%
+  fix_border_issues() %>%
+  autofit() %>%
+  hline_top(border = fp_border_default(width = 0), 
+            part = "header")
+
+table_mu <- idparslist$mus %>%
+  t() %>%
+  as_tibble() %>%
+  flextable() %>%
+  # add column name above
+  add_header_row(values = c('Extinction rate:'), colwidths = 10) %>%
+  align(align = 'left', part = 'header', i=1) %>%
+  font(fontname = 'Times', part = 'all') %>%
+  fontsize(size = 16, part = 'all') %>%
+  fix_border_issues() %>%
+  autofit() %>%
+  hline_top(border = fp_border_default(width = 0), 
+            part = "header")
+
+# numbers to make bold
+to_bold <- c(4,5,6,8,9,10,11,12,13,14,15)
+length(to_bold)
+
+table_transition <- idparslist$Q %>%
+  as_tibble() %>%
+  mutate(from = colnames(.)) %>%
+  select(from, everything()) %>%
+  # replace 0s with - across all columns
+  mutate(across(everything(), ~ ifelse(. == 0, '-', .)),
+         across(everything(), ~ ifelse(is.na(.), '-', .))) %>%
+  flextable() %>%
+  # add column name above
+  add_header_row(values = c('Transition rates:'), colwidths = 11) %>%
+  align(align = 'left', part = 'header', i=1) %>%
+  font(fontname = 'Times', part = 'all') %>%
+  fontsize(size = 16, part = 'all') %>%
+  bold(~ c(`1A`) %in% to_bold, ~ `1A`) %>%
+  bold(~ c(`2A`) %in% to_bold, ~ `2A`) %>%
+  bold(~ c(`3A`) %in% to_bold, ~ `3A`) %>%
+  bold(~ c(`4A`) %in% to_bold, ~ `4A`) %>%
+  bold(~ c(`5A`) %in% to_bold, ~ `5A`) %>%
+  bold(~ c(`1B`) %in% to_bold, ~ `1B`) %>%
+  bold(~ c(`2B`) %in% to_bold, ~ `2B`) %>%
+  bold(~ c(`3B`) %in% to_bold, ~ `3B`) %>%
+  bold(~ c(`4B`) %in% to_bold, ~ `4B`) %>%
+  bold(~ c(`5B`) %in% to_bold, ~ `5B`) %>%
+  # make column name from blank
+  set_header_labels(from = '') %>%
+  hline(i = c(5), border = fp_border_default()) %>%
+  vline(j = c(1, 6), border = fp_border_default()) %>%
+  fix_border_issues() %>%
+  autofit() %>%
+  hline_top(border = fp_border_default(width = 0), 
+            part = "header")
+
+table_transition
+
+# combine tables
+design <- "
+  111
+  222
+  333
+  444
+"
+
+plot_spacer() +
+  gen_grob(table_lambda, fit = "fixed", just = c('left', 'top')) +
+  gen_grob(table_mu, fit = "fixed", just = c('left', 'top')) +
+  gen_grob(table_transition, fit = "fixed", just = c('left', 'top')) +
+  plot_layout(design = design, 
+              heights = c(0, 0.15, 0.15, 0.7))
+
+# save this out
+ggsave('plots/manuscript_plots/ctd2_model_params.png', height = 8, width = 6)
+
 
 # replace all values in q matrix that are not 0 or NA by next logical value
 

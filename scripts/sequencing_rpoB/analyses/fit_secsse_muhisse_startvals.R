@@ -203,6 +203,93 @@ for(i in 1:nrow(to_change)){
 
 idparslist$Q
 
+# make table for SI
+
+table_lambda <- idparslist$lambdas %>%
+  t() %>%
+  as_tibble() %>%
+  flextable() %>%
+  # add column name above
+  add_header_row(values = c('Speciation rate:'), colwidths = 10) %>%
+  align(align = 'left', part = 'header', i=1) %>%
+  font(fontname = 'Times', part = 'all') %>%
+  fontsize(size = 16, part = 'all') %>%
+  fix_border_issues() %>%
+  autofit() %>%
+  hline_top(border = fp_border_default(width = 0), 
+            part = "header")
+
+table_mu <- idparslist$mus %>%
+  t() %>%
+  as_tibble() %>%
+  flextable() %>%
+  # add column name above
+  add_header_row(values = c('Extinction rate:'), colwidths = 10) %>%
+  align(align = 'left', part = 'header', i=1) %>%
+  font(fontname = 'Times', part = 'all') %>%
+  fontsize(size = 16, part = 'all') %>%
+  fix_border_issues() %>%
+  autofit() %>%
+  hline_top(border = fp_border_default(width = 0), 
+            part = "header")
+
+# numbers to make bold
+to_bold <- c(12,13,14,16,17,18,19,20,21,22,23)
+length(to_bold)
+
+table_transition <- idparslist$Q %>%
+  as_tibble() %>%
+  mutate(from = colnames(.)) %>%
+  select(from, everything()) %>%
+  # replace 0s with - across all columns
+  mutate(across(everything(), ~ ifelse(. == 0, '-', .)),
+         across(everything(), ~ ifelse(is.na(.), '-', .))) %>%
+  flextable() %>%
+  # add column name above
+  add_header_row(values = c('Transition rates:'), colwidths = 11) %>%
+  align(align = 'left', part = 'header', i=1) %>%
+  font(fontname = 'Times', part = 'all') %>%
+  fontsize(size = 16, part = 'all') %>%
+  bold(~ c(`1A`) %in% to_bold, ~ `1A`) %>%
+  bold(~ c(`2A`) %in% to_bold, ~ `2A`) %>%
+  bold(~ c(`3A`) %in% to_bold, ~ `3A`) %>%
+  bold(~ c(`4A`) %in% to_bold, ~ `4A`) %>%
+  bold(~ c(`5A`) %in% to_bold, ~ `5A`) %>%
+  bold(~ c(`1B`) %in% to_bold, ~ `1B`) %>%
+  bold(~ c(`2B`) %in% to_bold, ~ `2B`) %>%
+  bold(~ c(`3B`) %in% to_bold, ~ `3B`) %>%
+  bold(~ c(`4B`) %in% to_bold, ~ `4B`) %>%
+  bold(~ c(`5B`) %in% to_bold, ~ `5B`) %>%
+  # make column name from blank
+  set_header_labels(from = '') %>%
+  hline(i = c(5), border = fp_border_default()) %>%
+  vline(j = c(1, 6), border = fp_border_default()) %>%
+  fix_border_issues() %>%
+  autofit() %>%
+  hline_top(border = fp_border_default(width = 0), 
+            part = "header")
+
+table_transition
+
+# combine tables
+design <- "
+  111
+  222
+  333
+  444
+"
+
+plot_spacer() +
+  gen_grob(table_lambda, fit = "fixed", just = c('left', 'top')) +
+  gen_grob(table_mu, fit = "fixed", just = c('left', 'top')) +
+  gen_grob(table_transition, fit = "fixed", just = c('left', 'top')) +
+  plot_layout(design = design, 
+              heights = c(0, 0.15, 0.15, 0.7))
+
+# save this out
+ggsave('plots/manuscript_plots/muhisse_model_params.png', height = 8, width = 6)
+
+
 # set initial values ####
 
 # mk transition rates

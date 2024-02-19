@@ -153,15 +153,15 @@ table <- select(model_table_all, samp_frac, model, n_params, loglik, aic, weight
                     weights = "AIC weight") %>%
   font(fontname = 'Times', part = 'all') %>%
   fontsize(size = 16, part = 'all') %>%
+  hline(i = c(5, 10, 15), border = fp_border(color = "grey"), part = 'body') %>%
   merge_v(~samp_frac) %>%
-  hline(i = c(5, 10, 15), border = fp_border_default()) %>%
   valign(valign = 'top', j = 1, part = 'body') %>%
-  fix_border_issues() %>%
-  autofit() 
+  fix_border_issues(part = 'all')
 
-table
+print(table)
+plot(table)
 
-save_as_image(table, 'plots/manuscript_plots/secsse_supp_table.png')
+save_as_image(table, 'plots/manuscript_plots/secsse_supp_table.png', webshot = 'webshot')
 
 # read in parameter values of all the best models
 pars <- files_best %>%

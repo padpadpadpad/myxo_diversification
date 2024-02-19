@@ -4,7 +4,7 @@
 
 # make sure curl is installed
 library(curl)
-librarian::shelf(diversitree, secsse, DDD, apTreeshape, doParallel, foreach, doMC, tidyverse, here, furrr)
+librarian::shelf(diversitree, secsse, DDD, doParallel, foreach, doMC, tidyverse, here, furrr)
 
 # identify conflicts in the tidyverse packages and other packages
 tidyverse_conflicts()
@@ -276,7 +276,7 @@ sampled_fraction_0.25 <- rep(0.25, times = length(unique(traits)))
 sampled_fraction_0.125 <- rep(0.125, times = length(unique(traits)))
 sampled_fraction_0.0625 <- rep(0.0625, times = length(unique(traits)))
 
-sampled_fractions <- list(sampled_fraction_1, sampled_fraction_0.5, sampled_fraction_0.25, sampled_fraction_0.125, sampled_fraction_0.0625)
+sampled_fractions <- list(sampled_fraction_0.0625, sampled_fraction_0.125, sampled_fraction_0.25, sampled_fraction_0.5, sampled_fraction_1)
 
 num_samp_frac <- length(sampled_fractions)
 
@@ -287,6 +287,9 @@ all_combs <- expand_grid(sampled_fractions, inits) %>%
          mu = rep(start_vals$mu, times = num_samp_frac),
          q = rep(start_vals$q, times = num_samp_frac)) %>%
   purrr::transpose()
+
+# list files that already exist
+
 
 # write a custom function to do everything we want in terms of fitting the model and saving it out
 fit_secsse <- function(list_inits_sampfrac){
@@ -314,9 +317,9 @@ fit_secsse <- function(list_inits_sampfrac){
     sampling_fraction = temp_samp_frac,
     maxiter = max_iter,
     optimmethod = "simplex",
-    num_cycles = 20,
+    num_cycles = 75,
     num_threads = 2,
-    method = 'odeint::runge_kutta_cash_karp54',
+    method = 'odeint::bulirsch_stoer',
     loglik_penalty = 0.1
   )
   
@@ -354,14 +357,14 @@ secsse_ml(
   sampling_fraction = all_combs[[1]]$sampled_fractions,
   maxiter = max_iter,
   optimmethod = "simplex",
-  num_cycles = 20,
+  num_cycles = 2,
   num_threads = 2,
-  method = 'odeint::runge_kutta_cash_karp54',
+  method = 'odeint::bulirsch_stoer',
   loglik_penalty = 0.1
 )
 
 # Set a "plan" for how the code should run.
-plan(multisession, workers = 2)
+plan(multisession, workers = 10)
 
 # run future_walk
 furrr::future_walk(all_combs, fit_secsse)
