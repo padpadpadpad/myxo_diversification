@@ -27,13 +27,13 @@ if(server == TRUE){
 
 if(server == FALSE){
   # read in habitat preference
-  d_habpref <- read.csv(here('data/sequencing_rpoB/phyloseq/myxococcus/habitat_preference/summary/habitat_preference_asv_new.csv'))
+  d_habpref <- read.csv(here('data/sequencing_rpoB/phyloseq/myxococcus/habitat_preference/summary/habitat_preference_95percent.csv'))
   # read in phyloseq object and grab tax table
-  d_taxa <- readRDS(here('data/sequencing_rpoB/phyloseq/myxococcus/prevalence_filtered/ps_otu_asv_filt.rds'))
+  d_taxa <- readRDS(here('data/sequencing_rpoB/phyloseq/myxococcus/prevalence_filtered/ps_otu_95percent_filt.rds'))
   # read in tree
-  tree <- read.tree(here('data/sequencing_rpoB/raxml/trees/myxo_asv/myxo_asv_treepl_cv_node_labels.tre'))
+  tree <-  read.tree('data/sequencing_rpoB/raxml/trees/myxo_95/myxo_95_treepl_cv_node_labels.tre')
   # read in Mk model
-  fit_mk <- readRDS('data/sequencing_rpoB/processed/transition_rates/mod_custom_3.rds')
+  fit_mk <- readRDS('data/sequencing_rpoB/processed/transition_rates/mod_custom_6_otu95.rds')
   # read in start value dataframe
   start_vals <- readRDS(paste('data/sequencing_rpoB/processed/secsse/init_vals_ml/otu_cutoffs/', name, '.rds', sep = ''))
 }
