@@ -220,12 +220,17 @@ p_speciation + p_extinction + p_transition + plot_layout(guides = 'collect')
 # save as image
 ggsave('plots/manuscript_plots/secsse_params.png', width = 12, height = 3.5)
 
+
 #------------------------------------------------#
 # read in models for the bootstrap replicates ####
 #------------------------------------------------#
 
 # read in all the files
 files <- list.files('data/sequencing_rpoB/processed/secsse/results/bootstraps', full.names = TRUE)
+
+test1 <- readRDS(files[100])
+test1$mod$MLpars
+
 
 # read in all files
 fits <- files %>%
@@ -376,3 +381,11 @@ p_speciation + p_extinction + p_transition + plot_layout(guides = 'collect')
 
 # save as image
 ggsave('plots/manuscript_plots/secsse_params_boots.png', width = 12, height = 3.5)
+
+# check pars
+pars %>% filter(str_detect(param, 'q')) %>%
+  mutate(samp_frac = as.character(samp_frac)) %>%
+  filter(!is.na(parse_number(param))) %>%
+  select(param, val, boot) %>%
+  distinct() %>%
+  View()

@@ -18,9 +18,12 @@ get_transition_rate_df <- function(mod){
   return(temp)
   }
 
+# grab the fourth to last character of each element of best_bootstraps
+str_sub(best_bootstraps, -5, -5)
+
 # combine all the files together and run the function
 d_rates <- tibble(file = c(best_asv, best_95, best_97.7, best_bootstraps),
-                model = c('best_asv', 'best_95', 'best_97.7', paste('asv_bootstrap', 1:9, sep ='_'))) %>%
+                model = c('best_asv', 'best_95', 'best_97.7', paste('asv_bootstrap',str_sub(best_bootstraps, -5, -5), sep ='_'))) %>%
   mutate(data = map(file, get_transition_rate_df)) %>%
   unnest(data) %>%
   mutate(from = as.numeric(str_sub(transition, 2,2)),
@@ -70,7 +73,7 @@ ggsave('plots/manuscript_plots/transition_rates_compare_plot.png', width = 8, he
 d_table <- select(d_rates, model, rate2, transition2, from_name, to_name) %>%
   mutate(rate2 = ifelse(is.na(rate2), '-', round(rate2, 2))) %>%
   pivot_wider(names_from = model, values_from = rate2) %>%
-  select(from_name, to_name, best_asv, contains('asv'), everything(), -transition2)
+  select(from_name, to_name, best_asv, asv_bootstrap_1, asv_bootstrap_2, asv_bootstrap_3, asv_bootstrap_4, asv_bootstrap_5, asv_bootstrap_6, asv_bootstrap_7, asv_bootstrap_8, asv_bootstrap_9, everything(), -transition2)
 
 table <- flextable(d_table) %>%
   set_header_labels(from_name = 'from',
