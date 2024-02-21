@@ -68,11 +68,11 @@ convergence_asv <- purrr::map_dfr(mcmc_files, check_convergence, burnin = 0.25, 
          samp_frac = parse_number(file))
 # pretty good, use a burn in of 0.25 throughout
 
-convergence_asv_97.7 <- purrr::map_dfr(mcmc_files_97.7, check_convergence, burnin = 0.6, .id = 'run') %>%
+convergence_asv_97.7 <- purrr::map_dfr(mcmc_files_97.7, check_convergence, burnin = 0.25, .id = 'run') %>%
   mutate(file = basename(mcmc_files_97.7),
          samp_frac = parse_number(file))
 
-convergence_asv_95 <- purrr::map_dfr(mcmc_files_95, check_convergence, burnin = 0.15, .id = 'run') %>%
+convergence_asv_95 <- purrr::map_dfr(mcmc_files_95, check_convergence, burnin = 0.25, .id = 'run') %>%
   mutate(file = basename(mcmc_files_95),
          samp_frac = parse_number(file))
 

@@ -1,7 +1,7 @@
 Command line: bamm -c bamm_control_sf1.txt
 Git commit id: ab1b69be13e9841d9e103170d0f61e4324f78676
-Random seed: 1707236597
-Start time: Tue Feb  6 16:23:17 2024
+Random seed: 1708348292
+Start time: Mon Feb 19 13:11:32 2024
 
 Current parameter settings:
        acceptanceInfoFileName    bamm_97.7_SF1_acceptance_info.txt
@@ -14,7 +14,7 @@ Current parameter settings:
      combineExtinctionAtNodes    if_different
           conditionOnSurvival    -1
                        deltaT    0.01
-              eventDataInfile    event_data_in.txt
+              eventDataInfile    bamm_97.7_SF1_event_data.txt
              eventDataOutfile    bamm_97.7_SF1_event_data.txt
            eventDataWriteFreq    20000
        expectedNumberOfShifts    500
@@ -34,7 +34,7 @@ fastSimulatePrior_Generations    5000000
                  lambdaShift0    0
              lambdaShiftPrior    1.15129378346422
          lambdaShiftRootPrior    -1.0
-                loadEventData    0
+                loadEventData    1
          localGlobalMoveRatio    10.0
               maxNumberEvents    5000
                   mcmcOutfile    bamm_97.7_SF1_mcmc_out.txt
@@ -50,7 +50,7 @@ fastSimulatePrior_Generations    5000000
              muShiftRootPrior    -1.0
             numberOccurrences    0
                numberOfChains    4
-          numberOfGenerations    30000000
+          numberOfGenerations    60000000
               observationTime    -1
                       outName    bamm_97.7_SF1
          outputAcceptanceInfo    0
@@ -90,5 +90,5 @@ updateRateEventNumberForBranch    0.0
  useGlobalSamplingProbability    1
    validateEventConfiguration    0
    writeMeanBranchLengthTrees    0
-End time: Wed Feb  7 12:27:10 2024
+End time: Tue Feb 20 19:24:38 2024
 
