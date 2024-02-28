@@ -149,4 +149,12 @@ d_q <- data.frame(markov = fit_mk$par[str_detect(names(fit_mk$par), 'q')],
                   musse = fit_musse_no_se$par[str_detect(names(fit_musse_no_se$par), 'q')])
 cor(d_q$markov, d_q$musse)
 
-# 
+# load in the best model of the secsse analysis to have a look at those lambda values
+mod_secsse <- readRDS('data/sequencing_rpoB/processed/secsse/results/asv/seccse_musse_sampfrac0.5_run24.rds')
+mod_secsse_2 <- readRDS('data/sequencing_rpoB/processed/secsse/results/asv/seccse_muctd4_sampfrac0.5_run19.rds')
+mod_secsse$mod$MLpars[[1]]
+mod_secsse_2$mod$MLpars[[1]]
+d_lambda$new
+
+cor(mod_secsse$mod$MLpars[[1]],
+    d_lambda$new)
