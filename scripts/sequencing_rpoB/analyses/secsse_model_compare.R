@@ -181,9 +181,9 @@ names(cols) <- sort(unique(pars$model))
 p_extinction_asv <- filter(pars, str_detect(param, 'mu')) %>%
   mutate(samp_frac = as.character(samp_frac)) %>%
   ggplot(aes(samp_frac, val)) +
+  geom_point(aes(group = model, col = model), shape = 21, fill = 'white', position = position_dodge(width = 0.5)) +
   stat_summary(fun = "mean", geom = "point", col = "black", size = 4) +
   stat_summary(fun = "mean", fun.min = function(x){mean(x) - 2*sd(x)/sqrt(length(x))}, fun.max = function(x){mean(x) + 2*sd(x)/sqrt(length(x))}) +
-  geom_point(aes(group = model, col = model), shape = 21, fill = 'white', position = position_dodge(width = 0.5)) +
   theme_bw() +
   scale_color_manual(values = cols) +
   labs(x = 'Sampled fraction',
@@ -194,9 +194,9 @@ p_extinction_asv <- filter(pars, str_detect(param, 'mu')) %>%
 p_speciation_asv <- filter(pars, str_detect(param, 'lambda')) %>%
   mutate(samp_frac = as.character(samp_frac)) %>%
   ggplot(aes(samp_frac, val)) +
+  geom_point(aes(group = model, col = model), shape = 21, fill = 'white', position = position_dodge(width = 0.5)) +
   stat_summary(fun = "mean", geom = "point", col = "black", size = 4) +
   stat_summary(fun = "mean", fun.min = function(x){mean(x) - 2*sd(x)/sqrt(length(x))}, fun.max = function(x){mean(x) + 2*sd(x)/sqrt(length(x))}) +
-  geom_point(aes(group = model, col = model), shape = 21, fill = 'white', position = position_dodge(width = 0.5)) +
   theme_bw() +
   scale_color_manual(values = cols) +
   labs(x = 'Sampled fraction',
@@ -210,9 +210,9 @@ p_transition_asv <- filter(pars, str_detect(param, 'q')) %>%
   mutate(samp_frac = as.character(samp_frac)) %>%
   filter(is.na(parse_number(param))) %>%
   ggplot(aes(samp_frac, val)) +
+  geom_point(aes(group = model, col = model), shape = 21, fill = 'white', position = position_dodge(width = 0.5), show.legend = FALSE) +
   stat_summary(fun = "mean", geom = "point", col = "black", size = 4) +
   stat_summary(fun = "mean", fun.min = function(x){mean(x) - 2*sd(x)/sqrt(length(x))}, fun.max = function(x){mean(x) + 2*sd(x)/sqrt(length(x))}) +
-  geom_point(aes(group = model, col = model), shape = 21, fill = 'white', position = position_dodge(width = 0.5), show.legend = FALSE) +
   theme_bw() +
   scale_color_manual(values = cols) +
   labs(x = 'Sampled fraction',
