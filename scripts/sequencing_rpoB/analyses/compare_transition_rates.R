@@ -34,7 +34,9 @@ coding <- read.csv('data/sequencing_rpoB/processed/transition_rates/coding.csv')
 
 d_rates <- left_join(d_rates, select(coding, to_name = hab_pref, to = hab_pref_num)) %>%
   left_join(., select(coding, from_name = hab_pref, from = hab_pref_num)) %>%
-  mutate(transition2 = paste(from_name, to_name, sep = ' -> ')) %>%
+  mutate(from_name = gsub('terrestrial', 'land', from_name),
+         to_name = gsub('terrestrial', 'land', to_name),
+         transition2 = paste(from_name, to_name, sep = ' -> ')) %>%
   mutate(rate2 = ifelse(rate == 0, NA, rate))
 
 # make prevalence plot for transitions

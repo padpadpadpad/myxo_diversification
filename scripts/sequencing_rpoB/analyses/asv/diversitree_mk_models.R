@@ -37,6 +37,8 @@ strsplit_mod <- function(x)(strsplit(x, split = '_') %>% unlist() %>% .[1:2] %>%
 
 tree$tip.label <- purrr::map_chr(tree$tip.label, strsplit_mod)
 
+source('scripts/sequencing_rpoB/analyses/diversitree_helper_functions.R')
+
 # setup for analyses ####
 
 # reorder metadata to match tip labels of tree
@@ -506,7 +508,8 @@ d_source_sink_rate <- select(diversitree_df, away = state_1, into = state_2, tra
   summarise(total_rate = sum(transition_rate), .groups = 'drop') %>%
   pivot_wider(names_from = direction, values_from = total_rate) %>%
   mutate(source_sink1 = away / into,
-         source_sink2 = into - away)
+         source_sink2 = into - away,
+         habitat_preference = gsub('terrestrial', 'land', habitat_preference))
 
 table_rate <- select(d_source_sink_rate, habitat_preference, away, into, source_sink1) %>%
   mutate(across(away:source_sink1, ~round(.x, 2)),
@@ -524,9 +527,8 @@ table_rate <- select(d_source_sink_rate, habitat_preference, away, into, source_
   autofit()
 
 # save out
-save_as_image(table_rate, here('plots/sequencing_rpoB/source_sink_rate.png'), zoom = 3, webshot = 'webshot2')
-save_as_docx(table_rate, path = here('plots/sequencing_rpoB/source_sink_rate.docx'))
-
+save_as_image(table_rate, here('plots/manuscript_plots/source_sink_rate.png'), zoom = 3, webshot = 'webshot2')
+save_as_docx(table_rate, path = here('plots/manuscript_plots/source_sink_rate.docx'))
 
 # bootstrap ####
 

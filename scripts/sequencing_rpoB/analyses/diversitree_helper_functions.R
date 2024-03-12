@@ -117,10 +117,10 @@ plot_ltt <- function(tree, log = 'N'){
   # create lineage through time plot
   # plot N or log(N) based on the argument log = Y or N
   if(log == 'Y'){
-    p2 <- ggplot(d_ltt, aes(time2, log(N))) +
+    p2 <- ggplot(d_ltt, aes(time, log(N))) +
       geom_line() +
       theme_bw(base_size = 12) +
-      labs(x = 'Relative time',
+      labs(x = 'Relative time from present',
            y = 'Log number of lineages')
   } else {
     p2 <- ggplot(d_ltt, aes(time2, N)) +

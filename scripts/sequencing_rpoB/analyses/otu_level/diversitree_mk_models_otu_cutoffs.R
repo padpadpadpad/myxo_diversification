@@ -328,7 +328,8 @@ p <- make_network_diversitree(d_diversitree, d_habpref_summary, cols_hab) +
        subtitle = 'Tree contained 1023 tips')
 
 # make source sink table - see diversitree_helper_functions.R
-table_rate <- make_source_sink_table(d_diversitree)
+table_rate <- make_source_sink_table(d_diversitree %>%
+                                                              mutate(across(where(is.character), function(x) gsub('terrestrial', 'land', x))))
 
 # make ltt plot
 p_ltt <- plot_ltt(tree, log = 'Y')
@@ -625,7 +626,8 @@ p <- make_network_diversitree(d_diversitree, d_habpref_summary, cols_hab) +
        subtitle = 'Tree contained 1682 tips')
 
 # make source sink table - see diversitree_helper_functions.R
-table_rate <- make_source_sink_table(d_diversitree)
+table_rate <- make_source_sink_table(d_diversitree %>%
+                                       mutate(across(where(is.character), function(x) gsub('terrestrial', 'land', x))))
 
 # make ltt plot
 p_ltt <- plot_ltt(tree, log = 'Y')

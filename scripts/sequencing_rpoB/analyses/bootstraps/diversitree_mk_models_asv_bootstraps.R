@@ -26,7 +26,7 @@ d_taxa <- readRDS(here('data/sequencing_rpoB/phyloseq/myxococcus/prevalence_filt
 
 # create d_meta
 # use habitat_preference3 which collapses into marine mud generalists
-d_meta <- left_join(select(d_habpref, otu, habitat_preference = habitat_preference3, num_present), select(d_taxa, otu:family))
+d_meta2 <- left_join(select(d_habpref, otu, habitat_preference = habitat_preference3, num_present), select(d_taxa, otu:family))
 
 # set colours
 cols_hab <- readRDS(here('data/sequencing_rpoB/phyloseq/myxococcus/habitat_preference/summary/habitat_colours.rds'))
@@ -49,7 +49,7 @@ tree$tip.label <- purrr::map_chr(tree$tip.label, strsplit_mod)
 
 # reorder metadata to match tip labels of tree
 d_meta <- tibble(tip_label = tree$tip.label) %>%
-  left_join(., rename(d_meta, tip_label = otu))
+  left_join(., rename(d_meta2, tip_label = otu))
 
 # make sure order of habitat preference is the same in the trait vector as the tip labels
 sum(d_meta$tip_label == tree$tip.label) == length(tree$tip.label)
@@ -229,7 +229,7 @@ p <- make_network_diversitree(d_diversitree, d_habpref_summary, cols_hab) +
   labs(title = 'Best model from ASV data: random bootstrap 1')
 
 # make source sink table - see diversitree_helper_functions.R
-table_rate <- make_source_sink_table(d_diversitree)
+table_rate <- make_source_sink_table(d_diversitree %>%                                                               mutate(across(where(is.character), function(x) gsub('terrestrial', 'land', x))))
 
 # make ltt plot
 p_ltt <- plot_ltt(tree, log = 'Y')
@@ -274,7 +274,7 @@ tree$tip.label <- purrr::map_chr(tree$tip.label, strsplit_mod)
 
 # reorder metadata to match tip labels of tree
 d_meta <- tibble(tip_label = tree$tip.label) %>%
-  left_join(., rename(d_meta, tip_label = otu))
+  left_join(., dplyr::rename(d_meta2, tip_label = otu))
 
 # make sure order of habitat preference is the same in the trait vector as the tip labels
 sum(d_meta$tip_label == tree$tip.label) == length(tree$tip.label)
@@ -454,7 +454,7 @@ p <- make_network_diversitree(d_diversitree, d_habpref_summary, cols_hab) +
   labs(title = 'Best model from ASV data: random bootstrap 2')
 
 # make source sink table - see diversitree_helper_functions.R
-table_rate <- make_source_sink_table(d_diversitree)
+table_rate <- make_source_sink_table(d_diversitree %>%                                                               mutate(across(where(is.character), function(x) gsub('terrestrial', 'land', x))))
 
 # make ltt plot
 p_ltt <- plot_ltt(tree, log = 'Y')
@@ -501,7 +501,7 @@ d_meta <- left_join(select(d_habpref, otu, habitat_preference = habitat_preferen
 
 # reorder metadata to match tip labels of tree
 d_meta <- tibble(tip_label = tree$tip.label) %>%
-  left_join(., rename(d_meta, tip_label = otu))
+  left_join(., rename(d_meta2, tip_label = otu))
 
 # make sure order of habitat preference is the same in the trait vector as the tip labels
 sum(d_meta$tip_label == tree$tip.label) == length(tree$tip.label)
@@ -681,7 +681,7 @@ p <- make_network_diversitree(d_diversitree, d_habpref_summary, cols_hab) +
   labs(title = 'Best model from ASV data: random bootstrap 3')
 
 # make source sink table - see diversitree_helper_functions.R
-table_rate <- make_source_sink_table(d_diversitree)
+table_rate <- make_source_sink_table(d_diversitree %>%                                                               mutate(across(where(is.character), function(x) gsub('terrestrial', 'land', x))))
 
 # make ltt plot
 p_ltt <- plot_ltt(tree, log = 'Y')
@@ -727,7 +727,7 @@ d_meta <- left_join(select(d_habpref, otu, habitat_preference = habitat_preferen
 
 # reorder metadata to match tip labels of tree
 d_meta <- tibble(tip_label = tree$tip.label) %>%
-  left_join(., rename(d_meta, tip_label = otu))
+  left_join(., rename(d_meta2, tip_label = otu))
 
 # make sure order of habitat preference is the same in the trait vector as the tip labels
 sum(d_meta$tip_label == tree$tip.label) == length(tree$tip.label)
@@ -927,7 +927,7 @@ p <- make_network_diversitree(d_diversitree, d_habpref_summary, cols_hab) +
   labs(title = 'Best model from ASV data: random bootstrap 4')
 
 # make source sink table - see diversitree_helper_functions.R
-table_rate <- make_source_sink_table(d_diversitree)
+table_rate <- make_source_sink_table(d_diversitree %>%                                                               mutate(across(where(is.character), function(x) gsub('terrestrial', 'land', x))))
 
 # make ltt plot
 p_ltt <- plot_ltt(tree, log = 'Y')
@@ -973,7 +973,7 @@ d_meta <- left_join(select(d_habpref, otu, habitat_preference = habitat_preferen
 
 # reorder metadata to match tip labels of tree
 d_meta <- tibble(tip_label = tree$tip.label) %>%
-  left_join(., rename(d_meta, tip_label = otu))
+  left_join(., rename(d_meta2, tip_label = otu))
 
 # make sure order of habitat preference is the same in the trait vector as the tip labels
 sum(d_meta$tip_label == tree$tip.label) == length(tree$tip.label)
@@ -1134,7 +1134,7 @@ p <- make_network_diversitree(d_diversitree, d_habpref_summary, cols_hab) +
   labs(title = 'Best model from ASV data: random bootstrap 5')
 
 # make source sink table - see diversitree_helper_functions.R
-table_rate <- make_source_sink_table(d_diversitree)
+table_rate <- make_source_sink_table(d_diversitree %>%                                                               mutate(across(where(is.character), function(x) gsub('terrestrial', 'land', x))))
 
 # make ltt plot
 p_ltt <- plot_ltt(tree, log = 'Y')
@@ -1180,7 +1180,7 @@ d_meta <- left_join(select(d_habpref, otu, habitat_preference = habitat_preferen
 
 # reorder metadata to match tip labels of tree
 d_meta <- tibble(tip_label = tree$tip.label) %>%
-  left_join(., rename(d_meta, tip_label = otu))
+  left_join(., rename(d_meta2, tip_label = otu))
 
 # make sure order of habitat preference is the same in the trait vector as the tip labels
 sum(d_meta$tip_label == tree$tip.label) == length(tree$tip.label)
@@ -1360,7 +1360,7 @@ p <- make_network_diversitree(d_diversitree, d_habpref_summary, cols_hab) +
   labs(title = 'Best model from ASV data: random bootstrap 6')
 
 # make source sink table - see diversitree_helper_functions.R
-table_rate <- make_source_sink_table(d_diversitree)
+table_rate <- make_source_sink_table(d_diversitree %>%                                                               mutate(across(where(is.character), function(x) gsub('terrestrial', 'land', x))))
 
 # make ltt plot
 p_ltt <- plot_ltt(tree, log = 'Y')
@@ -1406,7 +1406,7 @@ d_meta <- left_join(select(d_habpref, otu, habitat_preference = habitat_preferen
 
 # reorder metadata to match tip labels of tree
 d_meta <- tibble(tip_label = tree$tip.label) %>%
-  left_join(., rename(d_meta, tip_label = otu))
+  left_join(., rename(d_meta2, tip_label = otu))
 
 # make sure order of habitat preference is the same in the trait vector as the tip labels
 sum(d_meta$tip_label == tree$tip.label) == length(tree$tip.label)
@@ -1586,7 +1586,7 @@ p <- make_network_diversitree(d_diversitree, d_habpref_summary, cols_hab) +
   labs(title = 'Best model from ASV data: random bootstrap 7')
 
 # make source sink table - see diversitree_helper_functions.R
-table_rate <- make_source_sink_table(d_diversitree)
+table_rate <- make_source_sink_table(d_diversitree %>%                                                               mutate(across(where(is.character), function(x) gsub('terrestrial', 'land', x))))
 
 # make ltt plot
 p_ltt <- plot_ltt(tree, log = 'Y')
@@ -1632,7 +1632,7 @@ d_meta <- left_join(select(d_habpref, otu, habitat_preference = habitat_preferen
 
 # reorder metadata to match tip labels of tree
 d_meta <- tibble(tip_label = tree$tip.label) %>%
-  left_join(., rename(d_meta, tip_label = otu))
+  left_join(., rename(d_meta2, tip_label = otu))
 
 # make sure order of habitat preference is the same in the trait vector as the tip labels
 sum(d_meta$tip_label == tree$tip.label) == length(tree$tip.label)
@@ -1812,7 +1812,7 @@ p <- make_network_diversitree(d_diversitree, d_habpref_summary, cols_hab) +
   labs(title = 'Best model from ASV data: random bootstrap 8')
 
 # make source sink table - see diversitree_helper_functions.R
-table_rate <- make_source_sink_table(d_diversitree)
+table_rate <- make_source_sink_table(d_diversitree %>%                                                               mutate(across(where(is.character), function(x) gsub('terrestrial', 'land', x))))
 
 # make ltt plot
 p_ltt <- plot_ltt(tree, log = 'Y')
@@ -1858,7 +1858,7 @@ d_meta <- left_join(select(d_habpref, otu, habitat_preference = habitat_preferen
 
 # reorder metadata to match tip labels of tree
 d_meta <- tibble(tip_label = tree$tip.label) %>%
-  left_join(., rename(d_meta, tip_label = otu))
+  left_join(., rename(d_meta2, tip_label = otu))
 
 # make sure order of habitat preference is the same in the trait vector as the tip labels
 sum(d_meta$tip_label == tree$tip.label) == length(tree$tip.label)
@@ -2038,7 +2038,7 @@ p <- make_network_diversitree(d_diversitree, d_habpref_summary, cols_hab) +
   labs(title = 'Best model from ASV data: random bootstrap 9')
 
 # make source sink table - see diversitree_helper_functions.R
-table_rate <- make_source_sink_table(d_diversitree)
+table_rate <- make_source_sink_table(d_diversitree %>%                                                               mutate(across(where(is.character), function(x) gsub('terrestrial', 'land', x))))
 
 # make ltt plot
 p_ltt <- plot_ltt(tree, log = 'Y')

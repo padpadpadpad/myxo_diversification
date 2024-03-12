@@ -19,11 +19,10 @@
 librarian::shelf(here, tidyverse, ggtree, ggnewscale, RColorBrewer, patchwork, ape, phytools, MetBrewer, flextable, officer, magick)
 
 # load in the tree
-#tree <- ape::read.tree('data/sequencing_rpoB/raxml/trees/myxo_asv/myxo_asv_chronopl10.tre')
 tree <- ape::read.tree('data/sequencing_rpoB/raxml/trees/myxo_asv/myxo_asv_treepl_cv_node_labels.tre')
-tree <- phytools::force.ultrametric(tree)
+#tree <- phytools::force.ultrametric(tree)
 
-tree <- ape::write.tree(tree, 'data/sequencing_rpoB/raxml/trees/myxo_asv/myxo_asv_treepl_cv_node_labels.tre')
+#tree <- ape::write.tree(tree, 'data/sequencing_rpoB/raxml/trees/myxo_asv/myxo_asv_treepl_cv_node_labels.tre')
 
 # replace NA in node label with ""
 tree$node.label[is.na(tree$node.label)] <- ''
@@ -313,11 +312,11 @@ d_ltt <-  ape::ltt.plot.coords(tree) %>%
   mutate(time2 = time + 1)
 
 # create lineage through time plot
-p2 <- ggplot(d_ltt, aes(time2, N)) +
+p2 <- ggplot(d_ltt, aes(time, log(N))) +
   geom_line() +
   theme_bw(base_size = 12) +
-  labs(x = 'Relative time',
-       y = 'Number of lineages')
+  labs(x = 'Relative time from present',
+       y = 'Log number of lineages')
 
 # make constraint tree
 backbone <- read.tree(here('data/sequencing_rpoB/raxml/backbone.tre'))

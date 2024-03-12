@@ -47,6 +47,29 @@ d_table <- separate(d, coordinates, c('lat', 'lon'), sep = ',') %>%
          sequenced_16s = 'yes',
          sequenced_rpob = ifelse(habitat_group_16s %in% c('beach_supratidal', 'thrift_rhizosphere', 'estuarine mud_low polyhaline'), 'no', 'yes'))
 
+# read in cluster assignments
+clusters <- read.csv('data/sequencing_16S/sample_cluster_assignments.csv') %>%
+  select(X = sample, biome = medoid_nbclust) %>%
+  mutate(biome = case_when(biome == '1' ~ 'land',
+                           biome == '2' ~ 'freshwater',
+                           biome == '3' ~ 'marine'),
+         biome = ifelse(X == 's46', 'marine', biome))
+
+d_table <- left_join(d_table, clusters)
+
+# grab info to paste into ena
+d_table %>%
+  dplyr::arrange(id) %>%
+  select(location, site, lat, lon, predefined_habitat, biome) %>%
+  clipr::write_clip()
+
+d_table %>%
+  dplyr::arrange(id) %>%
+  filter(!is.na(biome)) %>%
+  mutate(id = paste('myxo_rpoB_', id, sep = '')) %>%
+  select(location, site, lat, lon, predefined_habitat, biome, id) %>%
+  clipr::write_clip()
+
 table_1 <- select(d_table, id, site, location, lat, lon, predefined_habitat, sequenced_16s, sequenced_rpob) %>%
   arrange(predefined_habitat, site) %>%
   flextable() %>%
