@@ -382,7 +382,7 @@ p_tiprates <- mutate(tip_rates, hab_pref_axis = case_when(hab_pref_axis == 'mari
        y = 'Net diversification rate') +
   scale_color_manual('Biome preference', values = cols_hab, labels = c('freshwater + land generalist', 'freshwater specialist', 'marine generalist', 'marine specialist', 'land specialist')) +
   scale_fill_manual('Biome preference', values = cols_hab, labels = c('freshwater + land generalist', 'freshwater specialist', 'marine generalist', 'marine specialist', 'land specialist')) +
-  ylim(c(0, 10))
+  ylim(c(-2, 30))
 
 #----------------------#
 # Assemble Figure 4 ####
