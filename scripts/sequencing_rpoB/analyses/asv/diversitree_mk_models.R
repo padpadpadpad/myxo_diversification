@@ -509,7 +509,8 @@ d_source_sink_rate <- select(diversitree_df, away = state_1, into = state_2, tra
   pivot_wider(names_from = direction, values_from = total_rate) %>%
   mutate(source_sink1 = away / into,
          source_sink2 = into - away,
-         habitat_preference = gsub('terrestrial', 'land', habitat_preference))
+         habitat_preference = gsub('terrestrial', 'land', habitat_preference),
+         habitat_preference = gsub('mud', '', habitat_preference))
 
 table_rate <- select(d_source_sink_rate, habitat_preference, away, into, source_sink1) %>%
   mutate(across(away:source_sink1, ~round(.x, 2)),
