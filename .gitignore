@@ -21,5 +21,6 @@ scripts/to_ignore/*
 data/sriswasdi_data/*
 scripts/sriswasdi_data/*
 scripts/sequencing_rpoB/tree_building/previous/*
+scripts/sequencing_rpoB/processing/previous/*
 scripts/sequencing_rpoB/analyses/previous/*
 data/sequencing_rpoB/bamm/previous*

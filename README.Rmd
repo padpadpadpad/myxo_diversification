@@ -15,15 +15,21 @@ knitr::opts_chunk$set(
 
 ## Summary
 
-This repository contains the processed data and scripts used to investigate the macroevolution of Myxobacteria in natural environments. The repository has evolved through the project and now contains the processed data and scripts used to recreate the analyses and figures in the manuscript (as it is now, for the revised manuscript). We have tried our best to highlight the instances where the code to run an analysis (e.g. for running BAMM) is not available in this repository.
+This repository contains the processed data and scripts used to investigate the macroevolution of Myxobacteria in natural environments, work that is publised in Molecular Biology & Evoution. The repository has evolved through the project and now contains the processed data and scripts used to recreate the analyses and figures in the manuscript (as it is now, for the published manuscript). We have tried our best to highlight the instances where the code to run an analysis (e.g. for running BAMM) is not available in this repository.
 
-It will be cleaned up of intermediate and surplus files upon acceptance of the manuscript.
+Any questions about the data or scripts can be directed to me on the [Issues tab](https://github.com/padpadpadpad/myxo_diversification/issues) or you can email me: d.padfield@exeter.ac.uk.
 
-## To use
+## Outputs and references
+
+- Padfield, D., Kay, S., Vos, R., Quince, C., & Vos, M. (2024) Macroevolutionary dynamics in micro-organisms: generalists give rise to specialists across biomes in the ubiquitous bacterial phylum Myxococcota. __Molecular Biology & Evolution__. DOI: https://doi.org/10.1093/molbev/msae088.
+- Raw sequencing data submitted to European Nucleotide Archive: https://www.ebi.ac.uk/ena/browser/view/PRJEB73761.
+- Archived version of this repository after acceptance: https://zenodo.org/doi/10.5281/zenodo.11210843
+
+## How to use this repository
 
 The GitHub repo should be easy to use on everyone's machine using RStudio projects. RStudio projects automatically assigns the root directory to the directory in which the project resides. Consequently all of the analyses should be runnable without altering paths. Simply double-click on the `.Rproj` folder that is in the base folder of this repository and it should open the project in RStudio. All the packages used in the script should be at the top of each script, and RStudio usually requests you install them if they are not installed already.
 
-I have avoided uploading overly large files to GitHub as there is a file size limit of 50MB. The processed sequencing data is stored as [phyloseq](https://joey711.github.io/phyloseq/) objects and should be easy to read in. Raw sequencing files will be uploaded upon publishing of the manuscript to the European Nucleotide Archive.
+I have avoided uploading overly large files to GitHub as there is a file size limit of 50MB. The processed sequencing data is stored as [phyloseq](https://joey711.github.io/phyloseq/) objects and should be easy to read in. Raw sequencing can be found on the European Nucleotide Archive.
 
 ## Folder structure
 
